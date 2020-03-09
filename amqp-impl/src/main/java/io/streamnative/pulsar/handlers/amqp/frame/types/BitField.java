@@ -13,7 +13,6 @@
  */
 package io.streamnative.pulsar.handlers.amqp.frame.types;
 
-import io.netty.buffer.ByteBuf;
 import java.util.Arrays;
 import java.util.List;
 
@@ -42,18 +41,6 @@ public class BitField implements Type {
 
     public int getSize() {
         return SIZE;
-    }
-
-    public void writeTo(ByteBuf channelBuffer) {
-
-        byte b = 0;
-
-        for (short i = 0; i < bits.size(); i++) {
-            b = set(b, bits.get(i).isTrue(), i);
-        }
-
-        channelBuffer.writeByte(b);
-
     }
 
     @Override

@@ -26,10 +26,6 @@ public class Timestamp implements FieldTableValueType {
 
     private final Date date;
 
-    public Timestamp(Date date) {
-        this.date = date;
-    }
-
     public Timestamp(ByteBuf channelBuffer) {
         this.date = new Date(new UnsignedLong(channelBuffer).getUnsignedLong().longValue());
     }

@@ -40,14 +40,6 @@ public class UnsignedInt implements Type {
         return SIZE;
     }
 
-    public void writeTo(ByteBuf channelBuffer) {
-        channelBuffer.writeBytes(new byte[] {
-                (byte) (unsignedInt >>> 24),
-                (byte) (unsignedInt >>> 16),
-                (byte) (unsignedInt >>> 8),
-                (byte) (unsignedInt) });
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -68,7 +60,7 @@ public class UnsignedInt implements Type {
 
     @Override
     public int hashCode() {
-        return (unsignedInt ^ (unsignedInt >>> 32));
+        return (unsignedInt ^ (unsignedInt >>> 16));
     }
 
     @Override

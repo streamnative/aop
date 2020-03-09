@@ -51,15 +51,6 @@ public class UnsignedLongLong implements Type {
         return SIZE;
     }
 
-    public void writeTo(ByteBuf channelBuffer) {
-
-        byte[] buffer = unsignedLongLong.toByteArray();
-
-        channelBuffer.writeZero(SIZE - buffer.length);
-        channelBuffer.writeBytes(buffer);
-
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {

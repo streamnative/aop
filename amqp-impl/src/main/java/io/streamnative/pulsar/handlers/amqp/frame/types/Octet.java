@@ -60,10 +60,6 @@ public class Octet implements Type {
         return SIZE;
     }
 
-    public void writeTo(ByteBuf channelBuffer) {
-        channelBuffer.writeByte(octet);
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {

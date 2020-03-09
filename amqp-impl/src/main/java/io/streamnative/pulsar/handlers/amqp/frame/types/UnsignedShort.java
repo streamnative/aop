@@ -52,11 +52,6 @@ public class UnsignedShort implements Type {
         return SIZE;
     }
 
-    public void writeTo(ByteBuf channelBuffer) {
-        channelBuffer.writeBytes(new byte[]
-                { (byte) (unsignedShort >>> 8), (byte) (unsignedShort) });
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {

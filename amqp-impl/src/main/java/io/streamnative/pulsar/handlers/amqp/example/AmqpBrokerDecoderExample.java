@@ -21,8 +21,9 @@ import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
 import org.apache.qpid.server.transport.ByteBufferSender;
 
-import java.util.Arrays;
-
+/**
+ * Example for AMQP protocol decoder.
+ */
 public class AmqpBrokerDecoderExample {
 
     public static void main(String[] args) throws Exception {

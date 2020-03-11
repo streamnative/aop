@@ -22,7 +22,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 
 /**
- * Amqp server level method processor
+ * Amqp server level method processor.
  */
 public class AmqpServerMethodProcessor implements ServerMethodProcessor<ServerChannelMethodProcessor> {
 
@@ -36,7 +36,8 @@ public class AmqpServerMethodProcessor implements ServerMethodProcessor<ServerCh
     }
 
     @Override
-    public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response, AMQShortString locale) {
+    public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response,
+             AMQShortString locale) {
 
     }
 

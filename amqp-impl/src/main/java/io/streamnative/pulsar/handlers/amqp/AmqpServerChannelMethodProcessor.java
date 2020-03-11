@@ -31,12 +31,14 @@ public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProc
     }
 
     @Override
-    public void receiveAccessRequest(AMQShortString realm, boolean exclusive, boolean passive, boolean active, boolean write, boolean read) {
+    public void receiveAccessRequest(AMQShortString realm, boolean exclusive, boolean passive, boolean active,
+            boolean write, boolean read) {
 
     }
 
     @Override
-    public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable, boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
+    public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
+            boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
 
     }
 
@@ -51,12 +53,14 @@ public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProc
     }
 
     @Override
-    public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive, boolean autoDelete, boolean nowait, FieldTable arguments) {
+    public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
+            boolean autoDelete, boolean nowait, FieldTable arguments) {
 
     }
 
     @Override
-    public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey, boolean nowait, FieldTable arguments) {
+    public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+             boolean nowait, FieldTable arguments) {
 
     }
 
@@ -71,7 +75,8 @@ public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProc
     }
 
     @Override
-    public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey, FieldTable arguments) {
+    public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+            FieldTable arguments) {
 
     }
 
@@ -86,7 +91,8 @@ public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProc
     }
 
     @Override
-    public void receiveBasicConsume(AMQShortString queue, AMQShortString consumerTag, boolean noLocal, boolean noAck, boolean exclusive, boolean nowait, FieldTable arguments) {
+    public void receiveBasicConsume(AMQShortString queue, AMQShortString consumerTag, boolean noLocal, boolean noAck,
+            boolean exclusive, boolean nowait, FieldTable arguments) {
 
     }
 
@@ -96,7 +102,8 @@ public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProc
     }
 
     @Override
-    public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory, boolean immediate) {
+    public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory,
+            boolean immediate) {
 
     }
 

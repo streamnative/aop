@@ -13,20 +13,18 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static com.google.common.base.Preconditions.checkState;
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import java.net.SocketAddress;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
-
-import java.net.SocketAddress;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Netty channel inbound handler adapter for Amqp protocol.

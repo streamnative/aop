@@ -33,7 +33,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 /**
- * Unit test for AmqpChannelInboundHandlerAdapter
+ * Unit test for AmqpChannelInboundHandlerAdapter.
  */
 public class AmqpChannelInboundHandlerAdapterTest {
 

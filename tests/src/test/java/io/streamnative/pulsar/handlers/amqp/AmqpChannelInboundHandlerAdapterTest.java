@@ -16,18 +16,21 @@ package io.streamnative.pulsar.handlers.amqp;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
-import org.apache.qpid.server.protocol.v0_8.transport.*;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.EncodableAMQDataBlock;
+import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 
 /**
  * Unit test for AmqpChannelInboundHandlerAdapter
@@ -41,12 +44,14 @@ public class AmqpChannelInboundHandlerAdapterTest {
 
     @BeforeClass
     public void setup() {
-        amqpChannelInboundHandlerAdapter = new AmqpChannelInboundHandlerAdapter(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class));
+        amqpChannelInboundHandlerAdapter = new AmqpChannelInboundHandlerAdapter(Mockito.mock(PulsarService.class),
+                Mockito.mock(AmqpServiceConfiguration.class));
         this.responseProcessor = new ResponseProcessor();
         ctx = Mockito.mock(ChannelHandlerContext.class);
         Mockito.when(ctx.channel()).thenReturn(Mockito.mock(Channel.class));
         amqpChannelInboundHandlerAdapter.setCtx(ctx);
-        AmqpBrokerDecoder decoder = new AmqpBrokerDecoder(new MockServerMethodProcessor(amqpChannelInboundHandlerAdapter, responseProcessor));
+        AmqpBrokerDecoder decoder = new AmqpBrokerDecoder(new MockServerMethodProcessor(
+                amqpChannelInboundHandlerAdapter, responseProcessor));
         decoder.setExpectProtocolInitiation(false);
         amqpChannelInboundHandlerAdapter.setDecoder(decoder);
     }
@@ -58,7 +63,8 @@ public class AmqpChannelInboundHandlerAdapterTest {
         AMQFrame frame = new AMQFrame(1, basicGetBody);
         frame.writePayload(new TestByteBufferSender(buffer));
 
-        //todo QpidByteBuffer does not expose ability to get nio buffer, so it's better to implement a ByteBuf based QpidByteBuffer
+        //todo QpidByteBuffer does not expose ability to get nio buffer, so it's better to implement
+        // a ByteBuf based QpidByteBuffer
         buffer.flip();
         amqpChannelInboundHandlerAdapter.channelRead(ctx, Unpooled.wrappedBuffer(buffer.array(), 0, buffer.limit()));
         EncodableAMQDataBlock response = responseProcessor.getResponse();
@@ -70,7 +76,8 @@ public class AmqpChannelInboundHandlerAdapterTest {
 
         private MockServerChannelMethodProcessor channelMethodProcessor;
 
-        public MockServerMethodProcessor(AmqpChannelInboundHandlerAdapter inboundHandlerAdapter, ResponseProcessor responseProcessor) {
+        public MockServerMethodProcessor(AmqpChannelInboundHandlerAdapter inboundHandlerAdapter,
+                                         ResponseProcessor responseProcessor) {
             super(inboundHandlerAdapter);
             this.channelMethodProcessor = new MockServerChannelMethodProcessor(this, responseProcessor);
         }
@@ -108,7 +115,8 @@ public class AmqpChannelInboundHandlerAdapterTest {
 
         private final ResponseProcessor responseProcessor;
 
-        public MockServerChannelMethodProcessor(AmqpServerMethodProcessor serverMethodProcessor, ResponseProcessor responseProcessor) {
+        public MockServerChannelMethodProcessor(AmqpServerMethodProcessor serverMethodProcessor,
+                                                ResponseProcessor responseProcessor) {
             super(serverMethodProcessor);
             this.responseProcessor = responseProcessor;
         }

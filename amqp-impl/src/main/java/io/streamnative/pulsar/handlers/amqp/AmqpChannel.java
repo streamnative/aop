@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -22,12 +23,13 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 /**
  * Amqp Channel level method processor.
  */
-public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProcessor {
+@Log4j2
+public class AmqpChannel implements ServerChannelMethodProcessor {
 
-    private final AmqpServerMethodProcessor serverMethodProcessor;
+    protected final AmqpConnection connection;
 
-    public AmqpServerChannelMethodProcessor(AmqpServerMethodProcessor serverMethodProcessor) {
-        this.serverMethodProcessor = serverMethodProcessor;
+    public AmqpChannel(AmqpConnection connection) {
+        this.connection = connection;
     }
 
     @Override
@@ -109,6 +111,7 @@ public class AmqpServerChannelMethodProcessor implements ServerChannelMethodProc
 
     @Override
     public void receiveBasicGet(AMQShortString queue, boolean noAck) {
+
     }
 
     @Override

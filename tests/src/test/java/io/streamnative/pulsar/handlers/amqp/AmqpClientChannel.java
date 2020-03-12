@@ -13,18 +13,27 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import java.io.Closeable;
-import lombok.extern.slf4j.Slf4j;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Amqp response that will encoded into ByteBuf and send to client.
+ * Amqp client channel for receive responses from server.
  */
-@Slf4j
-public class AmqpResponse implements Closeable {
+public class AmqpClientChannel {
 
-    @Override
-    public void close() {
-        // todo
+    private final BlockingQueue<AMQMethodBody> responses;
+
+    public AmqpClientChannel() {
+        this.responses = new LinkedBlockingQueue<>();
+    }
+
+    public void add(AMQMethodBody response) {
+        responses.add(response);
+    }
+
+    public AMQMethodBody poll() {
+        return responses.poll();
     }
 }

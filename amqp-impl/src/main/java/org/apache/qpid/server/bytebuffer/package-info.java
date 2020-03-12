@@ -11,9 +11,4 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * Timer related classes.
- *
- * <p>The classes under this package are ported from Amqp.
- */
-package io.streamnative.pulsar.handlers.amqp.example;
+package org.apache.qpid.server.bytebuffer;

@@ -228,14 +228,6 @@
       <scope>test</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.apache.qpid</groupId>
-      <artifactId>protocol-tests-amqp-0-8</artifactId>
-      <version>${qpid-protocol-plugin.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-
   </dependencies>
 
   <build>
@@ -402,11 +394,6 @@
       <id>bintray-streamnative-maven</id>
       <name>bintray</name>
       <url>https://dl.bintray.com/streamnative/maven</url>
-    </repository>
-
-    <repository>
-      <id>apache</id>
-      <url>https://repository.apache.org/maven</url>
     </repository>
 
     <repository>

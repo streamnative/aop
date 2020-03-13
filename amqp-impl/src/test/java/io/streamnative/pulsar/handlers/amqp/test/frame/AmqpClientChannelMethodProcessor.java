@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test.frame;
 
 import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -108,23 +108,27 @@ public class AmqpClientChannelMethodProcessor implements ClientChannelMethodProc
     }
 
     @Override
-    public void receiveBasicReturn(int replyCode, AMQShortString replyText, AMQShortString exchange, AMQShortString routingKey) {
+    public void receiveBasicReturn(int replyCode, AMQShortString replyText, AMQShortString exchange,
+                                   AMQShortString routingKey) {
 
     }
 
     @Override
-    public void receiveBasicDeliver(AMQShortString consumerTag, long deliveryTag, boolean redelivered, AMQShortString exchange, AMQShortString routingKey) {
+    public void receiveBasicDeliver(AMQShortString consumerTag, long deliveryTag, boolean redelivered,
+                                    AMQShortString exchange, AMQShortString routingKey) {
 
     }
 
     @Override
-    public void receiveBasicGetOk(long deliveryTag, boolean redelivered, AMQShortString exchange, AMQShortString routingKey, long messageCount) {
+    public void receiveBasicGetOk(long deliveryTag, boolean redelivered, AMQShortString exchange,
+                                  AMQShortString routingKey, long messageCount) {
         if (log.isDebugEnabled()) {
-            log.debug("[RECEIVE BASIC GET OK] - deliveryTag: {} - redelivered: {} - exchange: {} - " +
-                    "routingKey: {} - messageCount{}", deliveryTag, redelivered, exchange, routingKey, messageCount);
+            log.debug("[RECEIVE BASIC GET OK] - deliveryTag: {} - redelivered: {} - exchange: {} - "
+                    + "routingKey: {} - messageCount{}", deliveryTag, redelivered, exchange, routingKey, messageCount);
         }
 
-        clientMethodProcessor.clientChannel.add(clientMethodProcessor.methodRegistry.createBasicGetOkBody(deliveryTag, redelivered, exchange, routingKey, messageCount));
+        clientMethodProcessor.clientChannel.add(clientMethodProcessor.methodRegistry.createBasicGetOkBody(deliveryTag,
+                redelivered, exchange, routingKey, messageCount));
     }
 
     @Override

@@ -11,11 +11,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 
+import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
+import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
+import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
+import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
+import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
+import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
+import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.test.frame.ToServerByteBufferSender;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -32,7 +40,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 /**
@@ -45,7 +53,7 @@ public class AmqpConnectionTest {
     private MethodRegistry methodRegistry;
     private AmqpClientChannel clientChannel;
 
-    @BeforeClass
+    @BeforeMethod
     public void setup() throws Exception {
         AmqpConnection connection = new MockConnection();
         ChannelHandlerContext ctx = Mockito.mock(ChannelHandlerContext.class);
@@ -124,7 +132,8 @@ public class AmqpConnectionTest {
                 log.debug("RECV BasicGet[queue={}, noAck={}]", queue, noAck);
             }
             try {
-                AMQMethodBody res = connection.getMethodRegistry().createBasicGetOkBody(1, true, AMQShortString.createAMQShortString("default"), AMQShortString.createAMQShortString(""), 100);
+                AMQMethodBody res = connection.getMethodRegistry().createBasicGetOkBody(1, true,
+                        AMQShortString.createAMQShortString("default"), AMQShortString.createAMQShortString(""), 100);
                 connection.writeFrame(res.generateFrame(1));
             } catch (Exception e) {
                 log.error("FAILED BasicGet", e);

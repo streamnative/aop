@@ -11,23 +11,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test.frame;
 
-import io.netty.buffer.Unpooled;
-import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
-import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
-import org.apache.qpid.server.transport.ByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 
 /**
  * Sender for the client send byte buffer to the server.
  */
-public class ToServerByteBufferSender implements ByteBufferSender {
-
-    private final AmqpConnection connection;
-    private final QpidByteBuffer buffer = QpidByteBuffer.allocate(10 * 1024 * 1024);
+public class ToServerByteBufferSender extends AmqpByteBufferSender {
 
     public ToServerByteBufferSender(AmqpConnection connection) {
-        this.connection = connection;
+        super(connection);
     }
 
     @Override
@@ -36,19 +31,13 @@ public class ToServerByteBufferSender implements ByteBufferSender {
     }
 
     @Override
-    public void send(QpidByteBuffer buffer) {
-        this.buffer.put(buffer.duplicate());
-    }
-
-    @Override
     public void flush() {
-        buffer.flip();
         try {
-            connection.channelRead(connection.ctx, Unpooled.wrappedBuffer(((SingleQpidByteBuffer)buffer).getUnderlyingBuffer()));
+            connection.channelRead(connection.getCtx(), buf);
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
-            buffer.clear();
+            buf.clear();
         }
     }
 

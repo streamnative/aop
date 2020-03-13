@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -143,40 +144,40 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
                             .collect(Collectors.toList());
 
                     FutureUtil.waitForAll(list)
-                            .whenComplete((ignore, th) -> {
-                                        if (th != null) {
-                                            log.error("Error in getDataAsync() for {}", pulsarAddress, th);
-                                            returnFuture.complete(Optional.empty());
-                                            return;
-                                        }
+                        .whenComplete((ignore, th) -> {
+                            if (th != null) {
+                                log.error("Error in getDataAsync() for {}", pulsarAddress, th);
+                                returnFuture.complete(Optional.empty());
+                                return;
+                            }
 
-                                        try {
-                                            for (CompletableFuture<Optional<ServiceLookupData>> lookupData : list) {
-                                                ServiceLookupData data = lookupData.get().get();
-                                                if (log.isDebugEnabled()) {
-                                                    log.debug("Handle getProtocolDataToAdvertise for {}, pulsarUrl: {}, "
-                                                                    + "pulsarUrlTls: {}, webUrl: {}, webUrlTls: {} amqp: {}",
-                                                            topic, data.getPulsarServiceUrl(), data.getPulsarServiceUrlTls(),
-                                                            data.getWebServiceUrl(), data.getWebServiceUrlTls(),
-                                                            data.getProtocol(AmqpProtocolHandler.PROTOCOL_NAME));
-                                                }
-
-                                                if (lookupDataContainsAddress(data, hostAndPort)) {
-                                                    returnFuture.complete(data.getProtocol(AmqpProtocolHandler.PROTOCOL_NAME));
-                                                    return;
-                                                }
-                                            }
-                                        } catch (Exception e) {
-                                            log.error("Error in {} lookupFuture get: ", pulsarAddress, e);
-                                            returnFuture.complete(Optional.empty());
-                                            return;
-                                        }
-
-                                        // no matching lookup data in all matchBrokers.
-                                        log.error("Not able to search {} in all child of zk://loadbalance", pulsarAddress);
-                                        returnFuture.complete(Optional.empty());
+                            try {
+                                for (CompletableFuture<Optional<ServiceLookupData>> lookupData : list) {
+                                    ServiceLookupData data = lookupData.get().get();
+                                    if (log.isDebugEnabled()) {
+                                        log.debug("Handle getProtocolDataToAdvertise for {}, pulsarUrl: {}, "
+                                                        + "pulsarUrlTls: {}, webUrl: {}, webUrlTls: {} amqp: {}",
+                                                topic, data.getPulsarServiceUrl(), data.getPulsarServiceUrlTls(),
+                                                data.getWebServiceUrl(), data.getWebServiceUrlTls(),
+                                                data.getProtocol(AmqpProtocolHandler.PROTOCOL_NAME));
                                     }
-                            );
+
+                                    if (lookupDataContainsAddress(data, hostAndPort)) {
+                                        returnFuture.complete(data.getProtocol(AmqpProtocolHandler.PROTOCOL_NAME));
+                                        return;
+                                    }
+                                }
+                            } catch (Exception e) {
+                                log.error("Error in {} lookupFuture get: ", pulsarAddress, e);
+                                returnFuture.complete(Optional.empty());
+                                return;
+                            }
+
+                            // no matching lookup data in all matchBrokers.
+                            log.error("Not able to search {} in all child of zk://loadbalance", pulsarAddress);
+                            returnFuture.complete(Optional.empty());
+                        }
+                        );
                 });
         return returnFuture;
     }
@@ -187,5 +188,10 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
                 || (data.getPulsarServiceUrlTls() != null && data.getPulsarServiceUrlTls().contains(hostAndPort))
                 || (data.getWebServiceUrl() != null && data.getWebServiceUrl().contains(hostAndPort))
                 || (data.getWebServiceUrlTls() != null && data.getWebServiceUrlTls().contains(hostAndPort));
+    }
+
+    @VisibleForTesting
+    public ChannelHandlerContext getCtx() {
+        return ctx;
     }
 }

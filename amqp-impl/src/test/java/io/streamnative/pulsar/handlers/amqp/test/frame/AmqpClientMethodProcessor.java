@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test.frame;
 
 import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -37,11 +37,14 @@ public class AmqpClientMethodProcessor implements ClientMethodProcessor<AmqpClie
 
 
     @Override
-    public void receiveConnectionStart(short versionMajor, short versionMinor, FieldTable serverProperties, byte[] mechanisms, byte[] locales) {
+    public void receiveConnectionStart(short versionMajor, short versionMinor, FieldTable serverProperties,
+                                       byte[] mechanisms, byte[] locales) {
         if (log.isDebugEnabled()) {
-            log.debug("[RECEIVE CONNECTION OPEN OK] - version major {} - version minor {}", versionMajor, versionMinor);
+            log.debug("[RECEIVE CONNECTION OPEN OK] - version major {} - version minor {}", versionMajor,
+                    versionMinor);
         }
-        clientChannel.add(methodRegistry.createConnectionStartBody(versionMajor, versionMinor, serverProperties, mechanisms, locales));
+        clientChannel.add(methodRegistry.createConnectionStartBody(versionMajor, versionMinor, serverProperties,
+                mechanisms, locales));
     }
 
     @Override

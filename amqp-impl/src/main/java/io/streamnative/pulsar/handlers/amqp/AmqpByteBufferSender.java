@@ -13,9 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import io.netty.channel.ChannelHandlerContext;
-import lombok.SneakyThrows;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
+import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
 import org.apache.qpid.server.transport.ByteBufferSender;
 
 /**
@@ -23,26 +24,33 @@ import org.apache.qpid.server.transport.ByteBufferSender;
  */
 public class AmqpByteBufferSender implements ByteBufferSender {
 
-    private final ChannelHandlerContext ctx;
+    protected final AmqpConnection connection;
+    protected ByteBuf buf = ByteBufAllocator.DEFAULT.buffer();
 
-    public AmqpByteBufferSender(ChannelHandlerContext ctx) {
-        this.ctx = ctx;
+    public AmqpByteBufferSender(AmqpConnection connection) {
+        this.connection = connection;
     }
 
     @Override
     public boolean isDirectBufferPreferred() {
-        return true;
+        return false;
     }
 
-    @SneakyThrows
     @Override
-    public void send(QpidByteBuffer qpidByteBuffer) {
-        QpidByteBuffer.write(ctx, qpidByteBuffer);
+    public void send(QpidByteBuffer buffer) {
+        buf.retain();
+        buf.writeBytes(((SingleQpidByteBuffer) buffer.duplicate()).getUnderlyingBuffer());
     }
 
     @Override
     public void flush() {
-        ctx.flush();
+        try {
+            connection.getCtx().writeAndFlush(buf);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            buf.clear();
+        }
     }
 
     @Override

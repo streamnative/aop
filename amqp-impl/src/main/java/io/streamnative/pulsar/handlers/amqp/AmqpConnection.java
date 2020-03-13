@@ -13,8 +13,11 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static java.nio.charset.StandardCharsets.US_ASCII;
+
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.channel.ChannelHandlerContext;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
@@ -33,18 +36,13 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static java.nio.charset.StandardCharsets.US_ASCII;
-
 /**
  * Amqp server level method processor.
  */
 @Log4j2
 public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodProcessor<ServerChannelMethodProcessor> {
 
-    enum ConnectionState
-    {
+    enum ConnectionState {
         INIT,
         AWAIT_START_OK,
         AWAIT_SECURE_OK,
@@ -67,6 +65,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
+        this.bufferSender = new AmqpByteBufferSender(this);
     }
 
     @Override
@@ -75,7 +74,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.remoteAddress = ctx.channel().remoteAddress();
         this.ctx = ctx;
         isActive.set(true);
-        this.bufferSender = new AmqpByteBufferSender(this.ctx);
         this.brokerDecoder = new AmqpBrokerDecoder(this);
     }
 
@@ -146,8 +144,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public void receiveHeartbeat() {
-        if(log.isDebugEnabled())
-        {
+        if (log.isDebugEnabled()) {
             log.debug("RECV Heartbeat");
         }
     }
@@ -186,7 +183,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     void assertState(final ConnectionState requiredState) {
-        if(state != requiredState) {
+        if (state != requiredState) {
             String replyText = "Command Invalid, expected " + requiredState + " but was " + state;
             sendConnectionClose(ErrorCodes.COMMAND_INVALID, replyText, 0);
             throw new RuntimeException(replyText);
@@ -206,7 +203,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     public synchronized void writeFrame(AMQDataBlock frame) {
-        if(log.isDebugEnabled()) {
+        if (log.isDebugEnabled()) {
             log.debug("SEND: " + frame);
         }
 
@@ -219,7 +216,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     @VisibleForTesting
-    void setBufferSender(ByteBufferSender sender) {
+    public void setBufferSender(ByteBufferSender sender) {
         this.bufferSender = sender;
     }
 }

@@ -11,44 +11,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test.frame;
 
-import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
-import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
+import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import org.apache.qpid.server.protocol.v0_8.AMQFrameDecodingException;
-import org.apache.qpid.server.transport.ByteBufferSender;
+import org.mockito.Mockito;
 
 /**
  * Sender for the server send byte buffer to the client.
  */
-public class ToClientByteBufferSender implements ByteBufferSender {
+public class ToClientByteBufferSender extends AmqpByteBufferSender {
 
-    private final QpidByteBuffer buffer = QpidByteBuffer.allocate(10 * 1024 * 1024);
     private final ClientDecoder clientDecoder;
 
     public ToClientByteBufferSender(ClientDecoder clientDecoder) {
+        super(Mockito.mock(AmqpConnection.class));
         this.clientDecoder = clientDecoder;
     }
 
     @Override
-    public boolean isDirectBufferPreferred() {
-        return false;
-    }
-
-    @Override
-    public void send(QpidByteBuffer qpidByteBuffer) {
-        buffer.put(qpidByteBuffer.duplicate());
-    }
-
-    @Override
     public void flush() {
-        buffer.flip();
         try {
-            clientDecoder.decodeBuffer(((SingleQpidByteBuffer)buffer).getUnderlyingBuffer());
+            clientDecoder.decodeBuffer(buf.nioBuffer());
         } catch (AMQFrameDecodingException e) {
             throw new RuntimeException(e);
         } finally {
-            buffer.clear();
+            buf.clear();
         }
     }
 

@@ -44,4 +44,6 @@
 
     <!-- suppress all checks in the copied code -->
     <suppress checks=".*" files=".+[\\/]com[\\/]scurrilous[\\/]circe[\\/].+\.java" />
+    <suppress checks=".*" files=".+[\\/]org[\\/]apache[\\/]qpid[\\/].+\.java" />
+    <suppress checks=".*" files="ClientDecoder.java" />
 </suppressions>

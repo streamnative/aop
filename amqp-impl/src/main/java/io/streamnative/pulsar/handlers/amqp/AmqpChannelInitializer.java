@@ -50,9 +50,9 @@ public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
         //+------+---------+---------+ +-------------+ +-----------+
         // octet   short      long       'size' octets   octet
         ch.pipeline().addLast("frameDecoder",
-            new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 4, 8, 0));
+            new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 4, 1, 0));
         ch.pipeline().addLast("handler",
-            new AmqpRequestHandler(pulsarService, amqpConfig));
+            new AmqpConnection(pulsarService, amqpConfig));
     }
 
 }

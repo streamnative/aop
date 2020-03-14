@@ -11,20 +11,4 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
-
-import java.io.Closeable;
-import lombok.extern.slf4j.Slf4j;
-
-
-/**
- * Amqp response that will encoded into ByteBuf and send to client.
- */
-@Slf4j
-public class AmqpResponse implements Closeable {
-
-    @Override
-    public void close() {
-        // todo
-    }
-}
+package org.apache.qpid.server.bytebuffer;

@@ -15,24 +15,23 @@ package io.streamnative.pulsar.handlers.amqp.test.frame;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 
 /**
  * Amqp client channel for receive responses from server.
  */
 public class AmqpClientChannel {
 
-    private final BlockingQueue<AMQMethodBody> responses;
+    private final BlockingQueue<Object> responses;
 
     public AmqpClientChannel() {
         this.responses = new LinkedBlockingQueue<>();
     }
 
-    public void add(AMQMethodBody response) {
+    public void add(Object response) {
         responses.add(response);
     }
 
-    public AMQMethodBody poll() {
+    public Object poll() {
         return responses.poll();
     }
 }

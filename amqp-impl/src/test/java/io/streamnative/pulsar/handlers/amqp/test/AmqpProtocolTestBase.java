@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
@@ -28,12 +27,9 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
-import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
-import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
-import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionStartBody;
-import org.apache.qpid.server.protocol.v0_8.transport.ConnectionStartOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
@@ -41,70 +37,47 @@ import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
 /**
- * Unit test for AmqpConnection.
+ * Base test for AMQP protocol tests.
  */
 @Log4j2
-public class AmqpConnectionTest {
+public abstract class AmqpProtocolTestBase {
 
-    private ByteBufferSender toServerSender;
-    private MethodRegistry methodRegistry;
-    private AmqpClientChannel clientChannel;
+    protected AmqpConnection connection;
+    protected ByteBufferSender toServerSender;
+    protected MethodRegistry methodRegistry;
+    protected AmqpClientChannel clientChannel;
 
     @BeforeMethod
     public void setup() throws Exception {
-        AmqpConnection connection = new MockConnection();
+        // 1.Init AMQP connection for connection methods and channel methods tests.
+        connection = new MockConnection();
         ChannelHandlerContext ctx = Mockito.mock(ChannelHandlerContext.class);
         Mockito.when(ctx.channel()).thenReturn(Mockito.mock(Channel.class));
         connection.channelActive(ctx);
-        connection.getBrokerDecoder().setExpectProtocolInitiation(false);
+
+        // 2.Init ByteBuffer sender for the test to send requests to AMQP server.
         toServerSender = new ToServerByteBufferSender(connection);
+
+        // 3.Init method registry for convenient request creation
         methodRegistry = new MethodRegistry(ProtocolVersion.v0_91);
+
+        // 4.Init client channel to get response from AMQP server.
         clientChannel = new AmqpClientChannel();
+
+        // 5.Buffer sender in connection sends response to the client. So set a new ToClientByteBufferSender for
+        //   the connection. So that the response ByteBuffer from the AMQP server sends to the client by
+        //   ToClientByteBufferSender and decodes by ClientDecoder, then the decoder add decoded protocol body to the
+        //   client channel. So, we can get a response from the client channel straightforward.
         connection.setBufferSender(new ToClientByteBufferSender(new ClientDecoder
                 (new AmqpClientMethodProcessor(clientChannel))));
-    }
-
-    @Test
-    public void testConnectionStart() throws Exception {
         initProtocol();
-        AMQMethodBody response = clientChannel.poll();
-        Assert.assertTrue(response instanceof ConnectionStartBody);
-        ConnectionStartBody connectionStartBody = (ConnectionStartBody) response;
-        Assert.assertEquals(connectionStartBody.getVersionMajor(), 0);
-        Assert.assertEquals(connectionStartBody.getVersionMinor(), 9);
     }
 
-    @Test
-    public void testConnectionStartOk() throws Exception {
-        initProtocol();
-        ConnectionStartOkBody cmd = methodRegistry.createConnectionStartOkBody(Mockito.mock(FieldTable.class),
-                AMQShortString.createAMQShortString(""), new byte[0], AMQShortString.createAMQShortString("en_US"));
-        cmd.generateFrame(0).writePayload(toServerSender);
-        toServerSender.flush();
-    }
-
-    @Test
-    public void testBasicGet() throws Exception {
-        initProtocol();
-        clientChannel.poll();
-        BasicGetBody cmd = methodRegistry.createBasicGetBody(1, AMQShortString.createAMQShortString("test"), false);
-        cmd.generateFrame(1).writePayload(toServerSender);
-        toServerSender.flush();
-        AMQMethodBody response = clientChannel.poll();
-        Assert.assertTrue(response instanceof BasicGetOkBody);
-        BasicGetOkBody basicGetOkBody = (BasicGetOkBody) response;
-        Assert.assertEquals(basicGetOkBody.getMessageCount(), 100);
-    }
-
-    private void initProtocol() {
-        ProtocolInitiation initiation = new ProtocolInitiation(ProtocolVersion.v0_91);
-        initiation.writePayload(toServerSender);
-        toServerSender.flush();
-    }
-
+    /**
+     * Mock AMQP connection for tests.
+     */
     private static class MockConnection extends AmqpConnection {
 
         private MockChannel channelMethodProcessor;
@@ -120,6 +93,9 @@ public class AmqpConnectionTest {
         }
     }
 
+    /**
+     * Mock AMQP channel for tests.
+     */
     private static class MockChannel extends AmqpChannel {
 
         public MockChannel(AmqpConnection serverMethodProcessor) {
@@ -139,5 +115,21 @@ public class AmqpConnectionTest {
                 log.error("FAILED BasicGet", e);
             }
         }
+    }
+
+    /**
+     * Before test connection methods and channel methods, client should send protocol header to AMQP server.
+     * Otherwise, the server decoder will skip all other methods. Also can get around by
+     * {@code connection.getBrokerDecoder().setExpectProtocolInitiation(false)}.
+     */
+    protected void initProtocol() {
+        ProtocolInitiation initiation = new ProtocolInitiation(ProtocolVersion.v0_91);
+        initiation.writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ConnectionStartBody);
+        ConnectionStartBody connectionStartBody = (ConnectionStartBody) response;
+        Assert.assertEquals(connectionStartBody.getVersionMajor(), 0);
+        Assert.assertEquals(connectionStartBody.getVersionMinor(), 9);
     }
 }

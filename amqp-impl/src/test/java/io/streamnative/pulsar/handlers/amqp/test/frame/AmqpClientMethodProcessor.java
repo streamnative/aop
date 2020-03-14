@@ -18,6 +18,7 @@ import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientMethodProcessor;
+import org.apache.qpid.server.protocol.v0_8.transport.HeartbeatBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 
@@ -40,7 +41,7 @@ public class AmqpClientMethodProcessor implements ClientMethodProcessor<AmqpClie
     public void receiveConnectionStart(short versionMajor, short versionMinor, FieldTable serverProperties,
                                        byte[] mechanisms, byte[] locales) {
         if (log.isDebugEnabled()) {
-            log.debug("[RECEIVE CONNECTION OPEN OK] - version major {} - version minor {}", versionMajor,
+            log.debug("[RECEIVE CONNECTION START] - version major {} - version minor {}", versionMajor,
                     versionMinor);
         }
         clientChannel.add(methodRegistry.createConnectionStartBody(versionMajor, versionMinor, serverProperties,
@@ -49,27 +50,40 @@ public class AmqpClientMethodProcessor implements ClientMethodProcessor<AmqpClie
 
     @Override
     public void receiveConnectionSecure(byte[] challenge) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE CONNECTION SECURE] - challenge {}", challenge);
+        }
+        clientChannel.add(methodRegistry.createConnectionSecureBody(challenge));
     }
 
     @Override
     public void receiveConnectionRedirect(AMQShortString host, AMQShortString knownHosts) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE CONNECTION REDIRECT] - host {} - knownHosts {}", host, knownHosts);
+        }
+        clientChannel.add(methodRegistry.createConnectionRedirectBody(host, knownHosts));
     }
 
     @Override
     public void receiveConnectionTune(int channelMax, long frameMax, int heartbeat) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE CONNECTION TUNE] - channelMax {} - frameMax {} - heartbeat {}", channelMax,
+                    frameMax, heartbeat);
+        }
+        clientChannel.add(methodRegistry.createConnectionTuneBody(channelMax, frameMax, heartbeat));
     }
 
     @Override
     public void receiveConnectionOpenOk(AMQShortString knownHosts) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE CONNECTION OPEN OK] - knownHosts {}", knownHosts);
+        }
+        clientChannel.add(methodRegistry.createConnectionOpenOkBody(knownHosts));
     }
 
     @Override
     public ProtocolVersion getProtocolVersion() {
-        return null;
+        return ProtocolVersion.v0_91;
     }
 
     @Override
@@ -79,22 +93,35 @@ public class AmqpClientMethodProcessor implements ClientMethodProcessor<AmqpClie
 
     @Override
     public void receiveConnectionClose(int replyCode, AMQShortString replyText, int classId, int methodId) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE CONNECTION CLOSE] - replyCode {} - replyText {} - classId {} - methodId {}",
+                    replyCode, replyText, classId, methodId);
+        }
+        clientChannel.add(methodRegistry.createConnectionCloseBody(replyCode, replyText, classId, methodId));
     }
 
     @Override
     public void receiveConnectionCloseOk() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE CONNECTION CLOSE OK]");
+        }
+        clientChannel.add(methodRegistry.createConnectionCloseOkBody());
     }
 
     @Override
     public void receiveHeartbeat() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE HEARTBEAT]");
+        }
+        clientChannel.add(new HeartbeatBody());
     }
 
     @Override
     public void receiveProtocolHeader(ProtocolInitiation protocolInitiation) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE PROTOCOL HEADER] - {}", protocolInitiation);
+        }
+        clientChannel.add(protocolInitiation);
     }
 
     @Override

@@ -99,7 +99,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                     clientProperties, mechanism, locale);
         }
         assertState(ConnectionState.AWAIT_START_OK);
-
+        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
+        writeFrame(responseBody.generateFrame(0));
+        state = ConnectionState.AWAIT_SECURE_OK;
+        bufferSender.flush();
     }
 
     @Override

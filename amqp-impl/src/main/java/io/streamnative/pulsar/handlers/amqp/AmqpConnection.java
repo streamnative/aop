@@ -122,7 +122,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public void receiveChannelOpen(int channelId) {
-        this.channels.put(channelId, new AmqpChannel(this));
+        this.channels.put(channelId, new AmqpChannel(this, channelId));
     }
 
     @Override

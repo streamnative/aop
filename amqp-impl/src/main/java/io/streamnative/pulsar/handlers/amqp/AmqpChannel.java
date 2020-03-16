@@ -17,7 +17,9 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
+import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 
 /**
@@ -28,13 +30,27 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     protected final AmqpConnection connection;
 
-    public AmqpChannel(AmqpConnection connection) {
+    private final int channelId;
+
+    public AmqpChannel(AmqpConnection connection, int channelId) {
         this.connection = connection;
+        this.channelId = channelId;
     }
 
     @Override
     public void receiveAccessRequest(AMQShortString realm, boolean exclusive, boolean passive, boolean active,
             boolean write, boolean read) {
+        if (log.isDebugEnabled()) {
+            log.debug(
+                    "RECV[{}] AccessRequest[ realm: {}, exclusive: {}, passive: {}, active: {}, write: {}, read: {} ]",
+                    channelId, realm, exclusive, passive, active, write, read);
+        }
+
+        MethodRegistry methodRegistry = connection.getMethodRegistry();
+
+        // We don't implement access control class, but to keep clients happy that expect it always use the "0" ticket.
+        AccessRequestOkBody response = methodRegistry.createAccessRequestOkBody(0);
+        connection.writeFrame(response.generateFrame(channelId));
 
     }
 
@@ -62,7 +78,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-             boolean nowait, FieldTable arguments) {
+            boolean nowait, FieldTable arguments) {
 
     }
 

@@ -14,9 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
-import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
-import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
-import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.*;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -34,5 +32,18 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(response instanceof BasicGetOkBody);
         BasicGetOkBody basicGetOkBody = (BasicGetOkBody) response;
         Assert.assertEquals(basicGetOkBody.getMessageCount(), 100);
+    }
+
+    @Test
+    public void testAccessRequest() {
+        AccessRequestBody cmd = methodRegistry
+                .createAccessRequestBody(AMQShortString.createAMQShortString("test"), true, false, true, true, true);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof AccessRequestOkBody);
+        AccessRequestOkBody accessRequestOkBody = (AccessRequestOkBody) response;
+        Assert.assertEquals(accessRequestOkBody.getTicket(), 0);
+
     }
 }

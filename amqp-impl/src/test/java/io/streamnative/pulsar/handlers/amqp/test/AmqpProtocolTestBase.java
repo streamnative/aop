@@ -99,7 +99,7 @@ public abstract class AmqpProtocolTestBase {
     private static class MockChannel extends AmqpChannel {
 
         public MockChannel(AmqpConnection serverMethodProcessor) {
-            super(serverMethodProcessor);
+            super(serverMethodProcessor, 1);
         }
 
         @Override

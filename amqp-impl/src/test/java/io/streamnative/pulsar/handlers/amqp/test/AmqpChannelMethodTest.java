@@ -16,9 +16,9 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestBody;
+import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
-import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

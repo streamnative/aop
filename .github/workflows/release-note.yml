@@ -1,4 +1,4 @@
-name: amqpop Release Notes
+name: aop Release Notes
 
 on:
   push:
@@ -15,6 +15,6 @@ jobs:
 
     steps:
       - name: release note
-        uses: toolmantim/release-drafter@master
+        uses: toolmantim/release-drafter@@v5.2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

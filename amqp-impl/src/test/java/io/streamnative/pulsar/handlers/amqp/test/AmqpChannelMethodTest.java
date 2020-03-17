@@ -13,12 +13,18 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeclareBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeclareOkBody;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -48,6 +54,30 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(response instanceof AccessRequestOkBody);
         AccessRequestOkBody accessRequestOkBody = (AccessRequestOkBody) response;
         Assert.assertEquals(accessRequestOkBody.getTicket(), 0);
+    }
 
+    @Test
+    public void testExchangeDeclareFail() {
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
+        ExchangeDeclareBody cmd = methodRegistry
+                .createExchangeDeclareBody(0, "test", "fanout", true, true, false, false, false, null);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ConnectionCloseBody);
+    }
+
+    @Test
+    public void testExchangeDeclareSuccess() {
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
+        Mockito.when(connection.getPulsarService().getBrokerService().getOrCreateTopic("test")).thenReturn(null);
+        ExchangeDeclareBody cmd = methodRegistry
+                .createExchangeDeclareBody(0, "test", "fanout", true, true, false, false, false, null);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
     }
 }

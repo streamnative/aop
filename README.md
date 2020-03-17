@@ -122,3 +122,84 @@ e.g.
 
 There is also other configs that can be changed and placed into Pulsar broker config file.
 
+
+
+## Contribute
+If you want to make contributions to AMQP on Pulsar, follow the steps below.
+
+### Prerequisite
+
+1. Install system dependency.
+
+Dependency | Installation guide 
+|---|---
+Java 8 | https://openjdk.java.net/install/
+Maven | https://maven.apache.org/
+
+2. Clone code to your machine. 
+    
+    ```bash
+    git@github.com:streamnative/aop.git
+    ```
+
+3. Build the project.
+    ```bash
+    mvn install -DskipTests
+    ```
+
+### Contribution workflow
+
+currently this repo disabled fork, developer all work on this repo.
+
+1. Sync you code remote repository.
+
+    ```bash
+    git checkout master
+    git pull origin master
+    ```
+
+2. Checkout new branch for each PR, Do your change, Commit code changes.
+
+   Because this repo disabled fork, It is recommend that you use a prefix of {your_id} before your_branch.
+
+    ```bash
+    git checkout -b ${your_id}/your_branch
+    ## ... do the changes ...
+    git add [your change files]
+    git commit -m "what is done for this change"
+    git push origin ${your_id}/your_branch
+    ```
+
+3. do the local tests and checks before create an PR in github.
+
+    ```bash
+    ## build
+    mvn install -DskipTests 
+    ## run local check
+    mvn checkstyle:check && mvn license:check && mvn spotbugs:check
+    ## run tests locally
+    mvn test
+    ```
+    
+    If you want to run only part of your tests, try command like this.
+    
+    ```bash
+    ## run all tests of a module: ampq-impl/tests
+    mvn test -pl amqp-impl
+    ## run all tests in test class
+    mvn test -pl amqp-impl -Dtest=WantedTestClass
+    ## run a specific test method
+    mvn test -pl amqp-impl -Dtest=WantedTestClass#wantedTestMethod 
+    ```
+
+4. make sure, pushed your latest change, and then create a PR.
+  
+    ```bash
+    git push origin ${your_id}/your_branch 
+    ```
+  
+  Go back to the main page: https://github.com/streamnative/aop, you should find a reminder in yellow, click it to create a PR.
+  
+  Or you could go to the link directly like: 
+  https://github.com/streamnative/aop/pull/new/${your_id}/your_branch
+

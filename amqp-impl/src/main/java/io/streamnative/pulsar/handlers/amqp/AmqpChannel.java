@@ -14,7 +14,9 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import lombok.extern.log4j.Log4j2;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
@@ -87,7 +89,20 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             // create new exchange, on first step, we just create a Pulsar Topic.
             // TODO need to associate with VHost/namespace.
             if (PulsarService.State.Started == connection.getPulsarService().getState()) {
-                connection.getPulsarService().getBrokerService().getOrCreateTopic(name);
+                try {
+                    if (durable) {
+                        // use sync create.
+                        connection.getPulsarService().getAdminClient().topics().createNonPartitionedTopic(name);
+                    } else {
+                        // TODO create nonPersistent Topic for nonDurable Exchange.
+                    }
+                } catch (PulsarAdminException e) {
+                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                            "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
+                } catch (PulsarServerException e) {
+                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                            "Catch a PulsarServerException: " + e.getMessage() + ". ", channelId);
+                }
                 connection.writeFrame(declareOkBody.generateFrame(channelId));
             } else {
                 connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "PulsarService not start.", channelId);

@@ -13,8 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import lombok.SneakyThrows;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.service.BrokerService;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.Topics;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestBody;
@@ -56,9 +58,10 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertEquals(accessRequestOkBody.getTicket(), 0);
     }
 
+    @SneakyThrows
     @Test
     public void testExchangeDeclareFail() {
-        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+        Mockito.when(connection.getPulsarService().getAdminClient()).thenReturn(Mockito.mock(PulsarAdmin.class));
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
                 .createExchangeDeclareBody(0, "test", "fanout", true, true, false, false, false, null);
@@ -68,11 +71,12 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(response instanceof ConnectionCloseBody);
     }
 
+    @SneakyThrows
     @Test
     public void testExchangeDeclareSuccess() {
-        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+        Mockito.when(connection.getPulsarService().getAdminClient()).thenReturn(Mockito.mock(PulsarAdmin.class));
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
-        Mockito.when(connection.getPulsarService().getBrokerService().getOrCreateTopic("test")).thenReturn(null);
+        Mockito.when(connection.getPulsarService().getAdminClient().topics()).thenReturn(Mockito.mock(Topics.class));
         ExchangeDeclareBody cmd = methodRegistry
                 .createExchangeDeclareBody(0, "test", "fanout", true, true, false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);

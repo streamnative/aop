@@ -14,9 +14,15 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import lombok.extern.log4j.Log4j2;
+import org.apache.pulsar.broker.PulsarServerException;
+import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
+import org.apache.qpid.server.exchange.ExchangeDefaults;
+import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
@@ -57,7 +63,51 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
             boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
+                            + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
+                            + "nowait: {}, arguments: {} ]", channelId, exchange,
+                    type, passive, durable, autoDelete, internal, nowait, arguments);
+        }
 
+        final MethodRegistry methodRegistry = connection.getMethodRegistry();
+        final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
+
+        if (isDefaultExchange(exchange)) {
+            if (!AMQShortString.createAMQShortString(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).equals(type)) {
+                StringBuffer sb = new StringBuffer();
+                sb.append("Attempt to redeclare default exchange: of type")
+                        .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).append("to").append(type).append(".");
+                connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, sb.toString(), channelId);
+            } else {
+                // if declare a default exchange, return success.
+                connection.writeFrame(declareOkBody.generateFrame(channelId));
+            }
+        } else {
+            String name = exchange.toString();
+
+            // create new exchange, on first step, we just create a Pulsar Topic.
+            // TODO need to associate with VHost/namespace.
+            if (PulsarService.State.Started == connection.getPulsarService().getState()) {
+                try {
+                    if (durable) {
+                        // use sync create.
+                        connection.getPulsarService().getAdminClient().topics().createNonPartitionedTopic(name);
+                    } else {
+                        // TODO create nonPersistent Topic for nonDurable Exchange.
+                    }
+                } catch (PulsarAdminException e) {
+                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                            "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
+                } catch (PulsarServerException e) {
+                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                            "Catch a PulsarServerException: " + e.getMessage() + ". ", channelId);
+                }
+                connection.writeFrame(declareOkBody.generateFrame(channelId));
+            } else {
+                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "PulsarService not start.", channelId);
+            }
+        }
     }
 
     @Override
@@ -198,5 +248,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveConfirmSelect(boolean nowait) {
 
+    }
+
+    private boolean isDefaultExchange(final AMQShortString exchangeName) {
+        return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
     }
 }

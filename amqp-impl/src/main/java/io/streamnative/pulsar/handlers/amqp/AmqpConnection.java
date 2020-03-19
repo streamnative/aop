@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -26,7 +27,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.policies.data.Policies;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.protocol.ErrorCodes;
@@ -72,7 +72,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private volatile int currentClassId;
     private volatile int currentMethodId;
     private final AtomicBoolean orderlyClose = new AtomicBoolean(false);
-    private volatile int maxNoOfChannels;
+    private volatile int maxChannels;
     private volatile int maxFrameSize;
     private volatile int heartBeat;
     private NamespaceName namespaceName;
@@ -86,7 +86,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
         this.bufferSender = new AmqpByteBufferSender(this);
         this.amqpConfig = amqpConfig;
-        this.maxNoOfChannels = amqpConfig.getMaxNoOfChannels();
+        this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
     }
@@ -137,7 +137,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         assertState(ConnectionState.AWAIT_SECURE_OK);
         // TODO AUTH
         ConnectionTuneBody tuneBody =
-            methodRegistry.createConnectionTuneBody(maxNoOfChannels,
+            methodRegistry.createConnectionTuneBody(maxChannels,
                 maxFrameSize,
                 heartBeat);
         writeFrame(tuneBody.generateFrame(0));
@@ -181,7 +181,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             int value = ((channelMax == 0) || (channelMax > 0xFFFF))
                 ? 0xFFFF
                 : channelMax;
-            maxNoOfChannels = value;
+            maxChannels = value;
         }
         state = ConnectionState.AWAIT_OPEN;
 
@@ -202,18 +202,18 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
 
         NamespaceName namespaceName = NamespaceName.get(amqpConfig.getAmqpTenant(), virtualHostStr);
-        Policies policies = getPolicies(namespaceName);
-        if (policies != null) {
-            this.namespaceName = namespaceName;
+        // Policies policies = getPolicies(namespaceName);
+//        if (policies != null) {
+        this.namespaceName = namespaceName;
 
-            MethodRegistry methodRegistry = getMethodRegistry();
-            AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
-            writeFrame(responseBody.generateFrame(0));
-            state = ConnectionState.OPEN;
-        } else {
-            sendConnectionClose(ErrorCodes.NOT_FOUND,
-                "Unknown virtual host: '" + virtualHostStr + "'", 0);
-        }
+        MethodRegistry methodRegistry = getMethodRegistry();
+        AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
+        writeFrame(responseBody.generateFrame(0));
+        state = ConnectionState.OPEN;
+//        } else {
+//            sendConnectionClose(ErrorCodes.NOT_FOUND,
+//                "Unknown virtual host: '" + virtualHostStr + "'", 0);
+//        }
     }
 
     @Override
@@ -276,10 +276,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 "Virtualhost has not yet been set. ConnectionOpen has not been called.", channelId);
         } else if (channels.get(channelId) != null || channelAwaitingClosure(channelId)) {
             sendConnectionClose(ErrorCodes.CHANNEL_ERROR, "Channel " + channelId + " already exists", channelId);
-        } else if (channelId > maxNoOfChannels) {
+        } else if (channelId > maxChannels) {
             sendConnectionClose(ErrorCodes.CHANNEL_ERROR,
                 "Channel " + channelId + " cannot be created as the max allowed channel id is "
-                    + maxNoOfChannels,
+                    + maxChannels,
                 channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
@@ -322,7 +322,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 (short) protocolVersion.getMajorVersion(),
                 (short) pv.getActualMinorVersion(),
                 null,
-                "".getBytes(US_ASCII),
+                // TODO temporary modification
+                "PLAIN".getBytes(US_ASCII),
                 "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
             state = ConnectionState.AWAIT_START_OK;
@@ -413,8 +414,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     @VisibleForTesting
-    public void setMaxNoOfChannels(int maxNoOfChannels) {
-        this.maxNoOfChannels = maxNoOfChannels;
+    public void setMaxChannels(int maxChannels) {
+        this.maxChannels = maxChannels;
     }
 
     @VisibleForTesting
@@ -424,24 +425,30 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public void initHeartBeatHandler(long writerIdle, long readerIdle) {
 
-        this.ctx.pipeline().addLast("idleStateHandler", new IdleStateHandler(writerIdle, readerIdle, 0,
+        this.ctx.pipeline().addFirst("idleStateHandler", new IdleStateHandler(readerIdle, writerIdle, 0,
             TimeUnit.MILLISECONDS));
+        this.ctx.pipeline().addLast("connectionIdleHandler", new ConnectionIdleHandler());
 
     }
 
-    @Override public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent) {
-            IdleStateEvent event = (IdleStateEvent) evt;
-            if (event.state().equals(IdleState.READER_IDLE)) {
-                log.error("heartbeat timeout close remoteSocketAddress [{}]", this.remoteAddress.toString());
-                close();
-            } else if (event.state().equals(IdleState.WRITER_IDLE)) {
-                log.warn("heartbeat write  idle [{}]", this.remoteAddress.toString());
-                writeFrame(HeartbeatBody.FRAME);
+    class ConnectionIdleHandler extends ChannelDuplexHandler {
+
+        @Override public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+            if (evt instanceof IdleStateEvent) {
+                IdleStateEvent event = (IdleStateEvent) evt;
+                if (event.state().equals(IdleState.READER_IDLE)) {
+                    log.error("heartbeat timeout close remoteSocketAddress [{}]",
+                        AmqpConnection.this.remoteAddress.toString());
+                    AmqpConnection.this.close();
+                } else if (event.state().equals(IdleState.WRITER_IDLE)) {
+                    log.warn("heartbeat write  idle [{}]", AmqpConnection.this.remoteAddress.toString());
+                    writeFrame(HeartbeatBody.FRAME);
+                }
             }
+
+            super.userEventTriggered(ctx, evt);
         }
 
-        super.userEventTriggered(ctx, evt);
     }
 
     public void setMaxFrameSize(int frameMax) {
@@ -540,24 +547,19 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
     }
 
-    public Policies getPolicies(NamespaceName namespaceName) {
-        try {
-            return getPulsarService().getAdminClient().namespaces().getPolicies(namespaceName.toString());
-        } catch (Exception e) {
-            log.error("pulsar server get namespace policies exception :{}", e.getMessage());
-            return null;
-        }
+//    public Policies getPolicies(NamespaceName namespaceName) {
+//        return getPulsarService().getConfigurationCache().policiesCache()
+//            .get(AdminResource.path(POLICIES, namespaceName.toString())).orElse(null);
+
+    public int getMaxChannels () {
+        return maxChannels;
     }
 
-    public int getMaxNoOfChannels() {
-        return maxNoOfChannels;
-    }
-
-    public int getMaxFrameSize() {
+    public int getMaxFrameSize () {
         return maxFrameSize;
     }
 
-    public int getHeartBeat() {
+    public int getHeartBeat () {
         return heartBeat;
     }
 

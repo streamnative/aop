@@ -59,7 +59,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
         final int maxNoOfChannels = 256;
         connection.setHeartBeat(heartBeat);
         connection.setMaxFrameSize(maxFrameSize);
-        connection.setMaxNoOfChannels(maxNoOfChannels);
+        connection.setMaxChannels(maxNoOfChannels);
         ConnectionSecureOkBody cmd = methodRegistry.createConnectionSecureOkBody("".getBytes());
         cmd.generateFrame(0).writePayload(toServerSender);
         toServerSender.flush();
@@ -83,7 +83,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
         toServerSender.flush();
         Assert.assertTrue(connection.getMaxFrameSize() == maxFrameSize);
         Assert.assertTrue(connection.getHeartBeat() == heartBeat);
-        Assert.assertTrue(connection.getMaxNoOfChannels() == maxNoOfChannels);
+        Assert.assertTrue(connection.getMaxChannels() == maxNoOfChannels);
     }
 
     @Test

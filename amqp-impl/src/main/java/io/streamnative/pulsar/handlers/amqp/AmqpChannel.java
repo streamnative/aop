@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
+import static org.apache.qpid.server.transport.util.Functions.hex;
+
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.security.AccessControlException;
 import lombok.Getter;
@@ -36,10 +39,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 
 
-import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
-import static org.apache.qpid.server.transport.util.Functions.hex;
-
-
 /**
  * Amqp Channel level method processor.
  */
@@ -56,18 +55,18 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      * been received by this channel. As the frames are received the message gets updated and once all frames have been
      * received the message can then be routed. -- copied qpid
      */
-    private IncomingMessage _currentMessage;
+    private IncomingMessage currentMessage;
 
-    private long _blockTime;
-    private long _blockingTimeout;
-    private boolean _wireBlockingState;
-    private boolean _forceMessageValidation = false;
-    private boolean _confirmOnPublish;
-    private long _confirmedMessageCounter;
+    private long blockTime;
+    private long blockingTimeout;
+    private boolean wireBlockingState;
+    private boolean forceMessageValidation = false;
+    private boolean confirmOnPublish;
+    private long confirmedMessageCounter;
 
     private ExchangeTopicManager exchangeTopicManager;
 
-    public static final AMQShortString EMPTY_STRING = createAMQShortString((String)null);
+    public static final AMQShortString EMPTY_STRING = createAMQShortString((String) null);
 
     public AmqpChannel(AmqpConnection connection, int channelId) {
         this.connection = connection;
@@ -162,22 +161,20 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     /**
-     * receive BasicPublish command, setPublishFrame
+     * receive BasicPublish command, setPublishFrame.
      */
     @Override
     public void receiveBasicPublish(AMQShortString exchangeName, AMQShortString routingKey, boolean mandatory,
             boolean immediate) {
-        if(log.isDebugEnabled()) {
-            log.debug("RECV[" + channelId + "] BasicPublish[" +" exchange: " + exchangeName +
-                    " routingKey: " + routingKey +
-                    " mandatory: " + mandatory +
-                    " immediate: " + immediate + " ]");
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] BasicPublish[exchange: {} routingKey: {} mandatory: {} immediate: {}",
+                    channelId, exchangeName, routingKey, mandatory, immediate);
         }
 
         // TODO - get NamedAddressSpace
         NamedAddressSpace vHost = null;
 
-        if(blockingTimeoutExceeded()) {
+        if (blockingTimeoutExceeded()) {
             message(ChannelMessages.FLOW_CONTROL_IGNORED());
             closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
                     "Channel flow control was requested, but not enforced by sender");
@@ -205,12 +202,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private boolean blockingTimeoutExceeded() {
-        return _wireBlockingState && (System.currentTimeMillis() - _blockTime) > _blockingTimeout;
+        return wireBlockingState && (System.currentTimeMillis() - blockTime) > blockingTimeout;
     }
 
     private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {
-        _currentMessage = new IncomingMessage(info);
-        _currentMessage.setMessageDestination(e);
+        currentMessage = new IncomingMessage(info);
+        currentMessage.setMessageDestination(e);
     }
 
     private boolean isDefaultExchange(final AMQShortString exchangeName) {
@@ -243,17 +240,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private boolean hasCurrentMessage() {
-        return _currentMessage != null;
+        return currentMessage != null;
     }
 
     @Override
     public void receiveMessageContent(QpidByteBuffer data) {
-        if(log.isDebugEnabled()) {
+        if (log.isDebugEnabled()) {
             int binaryDataLimit = 2000;
-            log.debug("RECV[" + channelId + "] MessageContent[" +" data: " + hex(data, binaryDataLimit) + " ] ");
+            log.debug("RECV[{}] MessageContennt[data: {}]", channelId, hex(data, binaryDataLimit));
         }
 
-        if(hasCurrentMessage()) {
+        if (hasCurrentMessage()) {
             publishContentBody(new ContentBody(data));
         } else {
             connection.sendConnectionClose(ErrorCodes.COMMAND_INVALID,
@@ -263,12 +260,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     private void publishContentBody(ContentBody contentBody) {
         if (log.isDebugEnabled()) {
-            log.debug(debugIdentity() + " content body received on channel " + channelId);
+            log.debug("{} content body received on channel {}", debugIdentity(), channelId);
         }
 
         try {
-            long currentSize = _currentMessage.addContentBodyFrame(contentBody);
-            if(currentSize > _currentMessage.getSize()) {
+            long currentSize = currentMessage.addContentBodyFrame(contentBody);
+            if (currentSize > currentMessage.getSize()) {
                 connection.sendConnectionClose(ErrorCodes.FRAME_ERROR,
                         "More message data received than content header defined", channelId);
             } else {
@@ -277,7 +274,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         } catch (RuntimeException e) {
             // we want to make sure we don't keep a reference to the message in the
             // event of an error
-            _currentMessage = null;
+            currentMessage = null;
             throw e;
         }
     }
@@ -290,19 +287,20 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveMessageHeader(BasicContentHeaderProperties properties, long bodySize) {
-        if(log.isDebugEnabled()) {
-            log.debug("RECV[" + channelId + "] MessageHeader[ properties: {" + properties + "} bodySize: " + bodySize + " ]");
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] MessageHeader[ properties: {{}} bodySize: {}",
+                    channelId, properties, bodySize);
         }
 
         // TODO - maxMessageSize ?
         long maxMessageSize = 1024 * 1024 * 10;
-        if(hasCurrentMessage()) {
-            if(bodySize > maxMessageSize) {
+        if (hasCurrentMessage()) {
+            if (bodySize > maxMessageSize) {
                 properties.dispose();
                 closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
                         "Message size of " + bodySize + " greater than allowed maximum of " + maxMessageSize);
             } else {
-                if (!_forceMessageValidation || properties.checkValid()) {
+                if (!forceMessageValidation || properties.checkValid()) {
                     publishContentHeader(new ContentHeaderBody(properties, bodySize));
                 } else {
                     properties.dispose();
@@ -322,22 +320,22 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("Content header received on channel " + channelId);
         }
 
-        _currentMessage.setContentHeaderBody(contentHeaderBody);
+        currentMessage.setContentHeaderBody(contentHeaderBody);
 
         deliverCurrentMessageIfComplete();
     }
 
     private void deliverCurrentMessageIfComplete() {
-        if (_currentMessage.allContentReceived()) {
-            MessagePublishInfo info = _currentMessage.getMessagePublishInfo();
+        if (currentMessage.allContentReceived()) {
+            MessagePublishInfo info = currentMessage.getMessagePublishInfo();
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
 
             try {
-                MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(_currentMessage);
+                MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(currentMessage);
                 // TODO send message to pulsar topic
             } finally {
-                _currentMessage = null;
+                currentMessage = null;
             }
         }
     }

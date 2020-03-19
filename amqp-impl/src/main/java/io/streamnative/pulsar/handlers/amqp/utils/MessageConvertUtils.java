@@ -1,8 +1,26 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.streamnative.pulsar.handlers.amqp.utils;
 
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import java.time.Clock;
+import java.util.List;
+import java.util.Map;
 import javafx.util.Pair;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -19,15 +37,9 @@ import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperti
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 
-import java.time.Clock;
-import java.util.List;
-import java.util.Map;
-
-import static com.google.common.base.Preconditions.checkArgument;
-
 
 /**
- * Util for convert message between Pulsar and AMQP
+ * Util for convert message between Pulsar and AMQP.
  */
 @UtilityClass
 @Slf4j
@@ -66,7 +78,7 @@ public final class MessageConvertUtils {
         // value
         if (incomingMessage.getBodyCount() > 0) {
             ByteBuf byteBuf = Unpooled.buffer(incomingMessage.getBodyCount());
-            for (int i = 0 ; i < incomingMessage.getBodyCount() ; i++) {
+            for (int i = 0; i < incomingMessage.getBodyCount(); i++) {
                 byteBuf.writeBytes(incomingMessage.getContentChunk(i).getPayload().array());
             }
             builder.value(byteBuf.array());
@@ -143,7 +155,8 @@ public final class MessageConvertUtils {
         return null;
     }
 
-    public static List<Pair<ContentHeaderBody, ContentBody>> entriesToAmqpBodyList(List<org.apache.bookkeeper.mledger.Entry> entries) {
+    public static List<Pair<ContentHeaderBody, ContentBody>> entriesToAmqpBodyList(
+            List<org.apache.bookkeeper.mledger.Entry> entries) {
         // TODO convert bk entries to amqpbody,
         //  then assemble deliver body with ContentHeaderBody and ContentBody
         return null;

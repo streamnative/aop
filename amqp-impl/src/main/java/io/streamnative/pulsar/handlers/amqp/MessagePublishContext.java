@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.messageToByteBuf;
+import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.toPulsarMessage;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
@@ -24,9 +27,6 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.Topic.PublishContext;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.store.StorableMessageMetaData;
-
-import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.messageToByteBuf;
-import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.toPulsarMessage;
 
 
 /**
@@ -97,7 +97,7 @@ public final class MessagePublishContext implements PublishContext {
     }
 
     /**
-     * publish amqp message to pulsar topic
+     * Publish amqp message to pulsar topic.
      */
     public static <T extends StorableMessageMetaData> void publishMessages(IncomingMessage incomingMessage,
                                                                            Topic topic) {

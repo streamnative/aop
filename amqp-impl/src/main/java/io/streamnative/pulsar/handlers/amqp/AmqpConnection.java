@@ -59,6 +59,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private volatile int currentClassId;
     private volatile int currentMethodId;
     private final AtomicBoolean orderlyClose = new AtomicBoolean(false);
+    private ExchangeTopicManager exchangeTopicManager;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
@@ -66,6 +67,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
         this.bufferSender = new AmqpByteBufferSender(this);
+        this.exchangeTopicManager = new ExchangeTopicManager(this);
     }
 
     @Override
@@ -221,5 +223,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     @VisibleForTesting
     public void setBufferSender(ByteBufferSender sender) {
         this.bufferSender = sender;
+    }
+
+    public ExchangeTopicManager getExchangeTopicManager() {
+        return exchangeTopicManager;
     }
 }

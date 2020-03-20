@@ -13,22 +13,34 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import java.util.List;
+import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
+import static org.apache.qpid.server.transport.util.Functions.hex;
 
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.util.List;
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
+import org.apache.qpid.server.logging.LogMessage;
+import org.apache.qpid.server.message.MessageDestination;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
+import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
@@ -43,11 +55,35 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     protected final AmqpConnection connection;
 
+    @Getter
     private final int channelId;
+
+    /**
+     * The current message - which may be partial in the sense that not all frames have been received yet - which has
+     * been received by this channel. As the frames are received the message gets updated and once all frames have been
+     * received the message can then be routed.
+     */
+    private IncomingMessage currentMessage;
+
+    private long blockTime;
+    private long blockingTimeout;
+    private boolean wireBlockingState;
+    private boolean forceMessageValidation = false;
+    private long confirmedMessageCounter;
+    private boolean confirmOnPublish;
+
+    private ExchangeTopicManager exchangeTopicManager;
+
+    public static final AMQShortString EMPTY_STRING = createAMQShortString((String) null);
 
     public AmqpChannel(AmqpConnection connection, int channelId) {
         this.connection = connection;
         this.channelId = channelId;
+    }
+
+    private void message(final LogMessage message) {
+        // TODO - log
+        log.error("FLOW_CONTROL_IGNORED");
     }
 
     @Override
@@ -265,9 +301,57 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory,
+    public void receiveBasicPublish(AMQShortString exchangeName, AMQShortString routingKey, boolean mandatory,
             boolean immediate) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] BasicPublish[exchange: {} routingKey: {} mandatory: {} immediate: {}]",
+                    channelId, exchangeName, routingKey, mandatory, immediate);
+        }
 
+        MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);
+        setPublishFrame(info, null);
+
+        // TODO - get NamedAddressSpace
+//        NamedAddressSpace vHost = null;
+//
+//        if (blockingTimeoutExceeded()) {
+//            message(ChannelMessages.FLOW_CONTROL_IGNORED());
+//            closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
+//                    "Channel flow control was requested, but not enforced by sender");
+//        } else {
+//            MessageDestination destination;
+//
+//            if (isDefaultExchange(exchangeName)) {
+//                destination = vHost.getDefaultDestination();
+//            } else {
+//                destination = vHost.getAttainedMessageDestination(exchangeName.toString(), true);
+//            }
+//
+//            // if the exchange does not exist we raise a channel exception
+//            if (destination == null) {
+//                closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange name: '" + exchangeName + "'");
+//            } else {
+//                MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);
+//                try {
+//                    setPublishFrame(info, destination);
+//                } catch (AccessControlException e) {
+//                    connection.sendConnectionClose(ErrorCodes.ACCESS_REFUSED, e.getMessage(), getChannelId());
+//                }
+//            }
+//        }
+    }
+
+    private boolean blockingTimeoutExceeded() {
+        return wireBlockingState && (System.currentTimeMillis() - blockTime) > blockingTimeout;
+    }
+
+    private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {
+        currentMessage = new IncomingMessage(info);
+        currentMessage.setMessageDestination(e);
+    }
+
+    private boolean isDefaultExchange(final AMQShortString exchangeName) {
+        return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
     }
 
     @Override
@@ -295,14 +379,118 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     }
 
+    private boolean hasCurrentMessage() {
+        return currentMessage != null;
+    }
+
     @Override
     public void receiveMessageContent(QpidByteBuffer data) {
+        if (log.isDebugEnabled()) {
+            int binaryDataLimit = 2000;
+            log.debug("RECV[{}] MessageContent[data:{}]", channelId, hex(data, binaryDataLimit));
+        }
 
+        if (hasCurrentMessage()) {
+            publishContentBody(new ContentBody(data));
+        } else {
+            connection.sendConnectionClose(ErrorCodes.COMMAND_INVALID,
+                    "Attempt to send a content header without first sending a publish frame", channelId);
+        }
+    }
+
+    private void publishContentBody(ContentBody contentBody) {
+        if (log.isDebugEnabled()) {
+            log.debug("{} content body received on channel {}", debugIdentity(), channelId);
+        }
+
+        try {
+            long currentSize = currentMessage.addContentBodyFrame(contentBody);
+            if (currentSize > currentMessage.getSize()) {
+                connection.sendConnectionClose(ErrorCodes.FRAME_ERROR,
+                        "More message data received than content header defined", channelId);
+            } else {
+                deliverCurrentMessageIfComplete();
+            }
+        } catch (RuntimeException e) {
+            // we want to make sure we don't keep a reference to the message in the
+            // event of an error
+            currentMessage = null;
+            throw e;
+        }
+    }
+
+    private final String id = "(" + System.identityHashCode(this) + ")";
+
+    private String debugIdentity() {
+        return channelId + id;
     }
 
     @Override
     public void receiveMessageHeader(BasicContentHeaderProperties properties, long bodySize) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] MessageHeader[ properties: {{}} bodySize: {}]", channelId, properties, bodySize);
+        }
 
+        // TODO - maxMessageSize ?
+        long maxMessageSize = 1024 * 1024 * 10;
+        if (hasCurrentMessage()) {
+            if (bodySize > maxMessageSize) {
+                properties.dispose();
+                closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
+                        "Message size of " + bodySize + " greater than allowed maximum of " + maxMessageSize);
+            } else {
+                if (!forceMessageValidation || properties.checkValid()) {
+                    publishContentHeader(new ContentHeaderBody(properties, bodySize));
+                } else {
+                    properties.dispose();
+                    connection.sendConnectionClose(ErrorCodes.FRAME_ERROR,
+                            "Attempt to send a malformed content header", channelId);
+                }
+            }
+        } else {
+            properties.dispose();
+            connection.sendConnectionClose(ErrorCodes.COMMAND_INVALID,
+                    "Attempt to send a content header without first sending a publish frame", channelId);
+        }
+    }
+
+    private void publishContentHeader(ContentHeaderBody contentHeaderBody) {
+        if (log.isDebugEnabled()) {
+            log.debug("Content header received on channel " + channelId);
+        }
+
+        currentMessage.setContentHeaderBody(contentHeaderBody);
+
+        deliverCurrentMessageIfComplete();
+    }
+
+    private void deliverCurrentMessageIfComplete() {
+        if (currentMessage.allContentReceived()) {
+            MessagePublishInfo info = currentMessage.getMessagePublishInfo();
+            String routingKey = AMQShortString.toString(info.getRoutingKey());
+            String exchangeName = AMQShortString.toString(info.getExchange());
+
+            try {
+                MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(currentMessage);
+                // TODO send message to pulsar topic
+                connection.getExchangeTopicManager()
+                        .getTopic(exchangeName)
+                        .whenComplete((mockTopic, throwable) -> {
+                            if (throwable != null) {
+
+                            } else {
+                                mockTopic.publishMessage(MessageConvertUtils.messageToByteBuf(message), null);
+                                long deliveryTag = 1;
+                                BasicAckBody body = connection.getMethodRegistry()
+                                        .createBasicAckBody(
+                                                deliveryTag, false);
+                                connection.writeFrame(body.generateFrame(channelId));
+                            }
+                });
+            } finally {
+                currentMessage = null;
+            }
+        }
     }
 
     @Override
@@ -345,11 +533,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     }
 
-    private boolean isDefaultExchange(final AMQShortString exchangeName) {
-        return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
-    }
 
     private void closeChannel(int cause, final String message) {
+        // TODO - close channel write frame
     }
 
 }

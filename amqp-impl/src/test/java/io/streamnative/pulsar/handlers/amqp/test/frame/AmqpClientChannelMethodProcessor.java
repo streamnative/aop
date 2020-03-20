@@ -17,6 +17,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
@@ -315,5 +316,6 @@ public class AmqpClientChannelMethodProcessor implements ClientChannelMethodProc
         if (log.isDebugEnabled()) {
             log.debug("[RECEIVE BASIC ACK] - deliveryTag {} - multiple {}", deliveryTag, multiple);
         }
+        clientMethodProcessor.clientChannel.add(new BasicAckBody(deliveryTag, multiple));
     }
 }

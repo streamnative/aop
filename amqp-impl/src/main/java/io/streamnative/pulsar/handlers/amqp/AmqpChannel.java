@@ -23,8 +23,8 @@ import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
-import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
@@ -199,7 +199,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] ChannelClose[replyCode: {} replyText: {} classId: {} methodId: {}",
                 channelId, replyCode, replyText, classId, methodId);
         }
-        // TODO 处理未完成的客户端请求
+        // TODO Process outstanding client requests
         processAsync();
         connection.closeChannel(this);
         connection.writeFrame(new AMQFrame(getChannelId(), connection.getMethodRegistry().createChannelCloseOkBody()));
@@ -294,7 +294,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     public boolean isClosing() {
         return closing.get() || connection.isClosing();
-      
+    }
+
     private boolean isDefaultExchange(final AMQShortString exchangeName) {
         return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
     }

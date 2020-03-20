@@ -198,8 +198,4 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
     public ChannelHandlerContext getCtx() {
         return ctx;
     }
-
-    public PulsarService getPulsarService() {
-        return pulsarService;
-    }
 }

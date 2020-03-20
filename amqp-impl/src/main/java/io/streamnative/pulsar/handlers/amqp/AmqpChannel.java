@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.List;
+
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -25,8 +27,13 @@ import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+
 
 /**
  * Amqp Channel level method processor.
@@ -112,40 +119,128 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveExchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeDelete[ exchange: {}, ifUnused: {}, nowait:{} ]", channelId, exchange, ifUnused,
+                    nowait);
+        }
+        if (isDefaultExchange(exchange)) {
+            connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Default Exchange cannot be deleted", channelId);
+        } else {
+            final String exchangeName = exchange.toString();
+            // TODO get namespace.
+            String namespace = "";
+            try {
+                List<String> topics = connection.getPulsarService().getAdminClient().topics().
+                        getList(namespace);
+                List<String> queues = connection.getPulsarService().getAdminClient().topics().
+                        getSubscriptions(exchangeName);
+                if (!topics.contains(exchangeName)) {
+                    closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
+                } else {
+                    if (ifUnused && null != queues && !queues.isEmpty()) {
+                        closeChannel(ErrorCodes.IN_USE, "Exchange has bindings");
+                    } else {
+                        connection.getPulsarService().getAdminClient().topics().delete(exchangeName);
+                        ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
+                        connection.writeFrame(responseBody.generateFrame(channelId));
+                    }
+                }
+            } catch (PulsarAdminException e) {
+                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                        "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
+            } catch (PulsarServerException e) {
+                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                        "Catch a PulsarServerException: " + e.getMessage() + ". ", channelId);
+            }
+        }
     }
 
     @Override
     public void receiveExchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queue) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeBound[ exchange: {}, routingKey: {}, queue:{} ]", channelId, exchange,
+                    routingKey, queue);
+        }
+        // TODO need to add logic.
+        // return success.
+        int replyCode = ExchangeBoundOkBody.OK;
+        MethodRegistry methodRegistry = connection.getMethodRegistry();
+        ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
+                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(null));
+        connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
             boolean autoDelete, boolean nowait, FieldTable arguments) {
+        if (log.isDebugEnabled()) {
+            log.debug(
+                    "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
+                            + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
+                    channelId, passive, durable, exclusive, autoDelete, nowait, arguments);
+        }
+        // TODO
+        // return success.
+        // when call QueueBind, then create Pulsar sub.
+        MethodRegistry methodRegistry = connection.getMethodRegistry();
+        QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
+        connection.writeFrame(responseBody.generateFrame(channelId));
 
     }
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
             boolean nowait, FieldTable arguments) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
+                    channelId, exchange, bindingKey, nowait, arguments);
+        }
+        // create a new sub to Pulsar Topic(exchange in AMQP)
+        // TODO
+        MethodRegistry methodRegistry = connection.getMethodRegistry();
+        AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+        connection.writeFrame(responseBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveQueuePurge(AMQShortString queue, boolean nowait) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueuePurge[ queue: {}, nowait:{} ]", channelId, queue, nowait);
+        }
+        // not support in first stage.
+        connection.sendConnectionClose(ErrorCodes.UNSUPPORTED_CLIENT_PROTOCOL_ERROR, "Not support yet.", channelId);
+        //        MethodRegistry methodRegistry = connection.getMethodRegistry();
+        //        AMQMethodBody responseBody = methodRegistry.createQueuePurgeOkBody(0);
+        //        connection.writeFrame(responseBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveQueueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
+                    ifUnused, ifEmpty, nowait);
+        }
+        // TODO
+        // return success.
+        MethodRegistry methodRegistry = connection.getMethodRegistry();
+        QueueDeleteOkBody responseBody = methodRegistry.createQueueDeleteOkBody(1);
+        connection.writeFrame(responseBody.generateFrame(channelId));
 
     }
 
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
             FieldTable arguments) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
+                    exchange, bindingKey, arguments);
+        }
+        // TODO
+        // 1. check queue and exchange is existed?
+        // 2. delete the sub mapped to this queue.
 
+        final AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
+        connection.writeFrame(responseBody.generateFrame(channelId));
     }
 
     @Override
@@ -253,4 +348,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private boolean isDefaultExchange(final AMQShortString exchangeName) {
         return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
     }
+
+    private void closeChannel(int cause, final String message) {
+    }
+
 }

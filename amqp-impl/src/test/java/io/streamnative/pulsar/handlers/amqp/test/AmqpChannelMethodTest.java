@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import lombok.SneakyThrows;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.admin.PulsarAdmin;
@@ -24,11 +27,25 @@ import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeclareBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeclareOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueBindBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueBindOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueuePurgeBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindOkBody;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
 
 /**
  * Unit tests for AMQP channel level methods.
@@ -84,4 +101,85 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         AMQBody response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
     }
+
+    @SneakyThrows
+    @Test
+    public void testExchangeDelete() {
+        List<String> topics = new ArrayList<>();
+        topics.add("test1");
+        topics.add("test2");
+        List<String> queues = new ArrayList<>();
+        queues.add("queue1");
+        queues.add("queue2");
+        Mockito.when(connection.getPulsarService().getAdminClient()).thenReturn(Mockito.mock(PulsarAdmin.class));
+        Mockito.when(connection.getPulsarService().getAdminClient().topics()).thenReturn(Mockito.mock(Topics.class));
+        Mockito.when(connection.getPulsarService().getAdminClient().topics().getList("")).thenReturn(topics);
+        Mockito.when(connection.getPulsarService().getAdminClient().topics().getSubscriptions("test1"))
+                .thenReturn(queues);
+        ExchangeDeleteBody cmd = methodRegistry.createExchangeDeleteBody(0, "test1", false, true);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeleteOkBody);
+    }
+
+    @Test
+    public void testExchangeBound() {
+        ExchangeBoundBody cmd = methodRegistry.createExchangeBoundBody("test", "key", "queue");
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeBoundOkBody);
+    }
+
+    @Test
+    public void testQueueDeclare() {
+        QueueDeclareBody cmd = methodRegistry.createQueueDeclareBody(0, "queue", false, true,
+                false, false, false, null);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
+    }
+
+    @Test
+    public void testQueueBind() {
+        QueueBindBody cmd = methodRegistry.createQueueBindBody(0, "queue", "test", "key",
+                false, null);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueBindOkBody);
+    }
+
+    @Test
+    public void testQueuePurge() {
+        QueuePurgeBody cmd = methodRegistry
+                .createQueuePurgeBody(0, AMQShortString.createAMQShortString("queue"), false);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ConnectionCloseBody);
+    }
+
+    @Test
+    public void testQueueDelete() {
+        QueueDeleteBody cmd = methodRegistry.createQueueDeleteBody(0, "queue", false, false,
+                false);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeleteOkBody);
+    }
+
+    @Test
+    public void testQueueUnbind() {
+        QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString("queue"),
+                AMQShortString.createAMQShortString("test"), AMQShortString.createAMQShortString("key"), null);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueUnbindOkBody);
+    }
+
 }

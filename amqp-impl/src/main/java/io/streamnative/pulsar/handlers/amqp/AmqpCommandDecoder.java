@@ -190,6 +190,10 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
                 || (data.getWebServiceUrlTls() != null && data.getWebServiceUrlTls().contains(hostAndPort));
     }
 
+    public PulsarService getPulsarService() {
+        return pulsarService;
+    }
+
     @VisibleForTesting
     public ChannelHandlerContext getCtx() {
         return ctx;

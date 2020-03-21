@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
@@ -24,7 +25,10 @@ import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToServerByteBufferSender;
 import lombok.extern.log4j.Log4j2;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.client.admin.Namespaces;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
@@ -55,6 +59,7 @@ public abstract class AmqpProtocolTestBase {
         connection = new MockConnection();
         ChannelHandlerContext ctx = Mockito.mock(ChannelHandlerContext.class);
         Mockito.when(ctx.channel()).thenReturn(Mockito.mock(Channel.class));
+        Mockito.when(ctx.pipeline()).thenReturn(Mockito.mock(ChannelPipeline.class));
         connection.channelActive(ctx);
 
         // 2.Init ByteBuffer sender for the test to send requests to AMQP server.
@@ -78,13 +83,17 @@ public abstract class AmqpProtocolTestBase {
     /**
      * Mock AMQP connection for tests.
      */
-    private static class MockConnection extends AmqpConnection {
+    private class MockConnection extends AmqpConnection {
 
         private MockChannel channelMethodProcessor;
 
-        public MockConnection() {
+        public MockConnection() throws PulsarServerException {
             super(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class));
-            this.channelMethodProcessor = new MockChannel(this);
+            PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
+            Namespaces namespaces = Mockito.mock(Namespaces.class);
+            Mockito.when(getPulsarService().getAdminClient()).thenReturn(adminClient);
+            Mockito.when(getPulsarService().getAdminClient().namespaces()).thenReturn(namespaces);
+            this.channelMethodProcessor = new MockChannel(0, this);
         }
 
         @Override
@@ -96,10 +105,10 @@ public abstract class AmqpProtocolTestBase {
     /**
      * Mock AMQP channel for tests.
      */
-    private static class MockChannel extends AmqpChannel {
+    private class MockChannel extends AmqpChannel {
 
-        public MockChannel(AmqpConnection serverMethodProcessor) {
-            super(serverMethodProcessor, 1);
+        public MockChannel(int channelId, AmqpConnection serverMethodProcessor) {
+            super(channelId, serverMethodProcessor);
         }
 
         @Override

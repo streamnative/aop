@@ -13,8 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
-
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -24,6 +24,7 @@ import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
@@ -41,22 +42,23 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 @Log4j2
 public class AmqpChannel implements ServerChannelMethodProcessor {
 
-    protected final AmqpConnection connection;
-
     private final int channelId;
+    private final AmqpConnection connection;
+    private final AtomicBoolean blocking = new AtomicBoolean(false);
+    private final AtomicBoolean closing = new AtomicBoolean(false);
 
-    public AmqpChannel(AmqpConnection connection, int channelId) {
-        this.connection = connection;
+    public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
+        this.connection = connection;
     }
 
     @Override
     public void receiveAccessRequest(AMQShortString realm, boolean exclusive, boolean passive, boolean active,
-            boolean write, boolean read) {
+        boolean write, boolean read) {
         if (log.isDebugEnabled()) {
             log.debug(
-                    "RECV[{}] AccessRequest[ realm: {}, exclusive: {}, passive: {}, active: {}, write: {}, read: {} ]",
-                    channelId, realm, exclusive, passive, active, write, read);
+                "RECV[{}] AccessRequest[ realm: {}, exclusive: {}, passive: {}, active: {}, write: {}, read: {} ]",
+                channelId, realm, exclusive, passive, active, write, read);
         }
 
         MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -172,7 +174,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
-            boolean autoDelete, boolean nowait, FieldTable arguments) {
+        boolean autoDelete, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug(
                     "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
@@ -185,12 +187,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         MethodRegistry methodRegistry = connection.getMethodRegistry();
         QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
         connection.writeFrame(responseBody.generateFrame(channelId));
-
     }
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-            boolean nowait, FieldTable arguments) {
+        boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
                     channelId, exchange, bindingKey, nowait, arguments);
@@ -230,7 +231,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-            FieldTable arguments) {
+        FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
                     exchange, bindingKey, arguments);
@@ -255,7 +256,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveBasicConsume(AMQShortString queue, AMQShortString consumerTag, boolean noLocal, boolean noAck,
-            boolean exclusive, boolean nowait, FieldTable arguments) {
+        boolean exclusive, boolean nowait, FieldTable arguments) {
 
     }
 
@@ -266,7 +267,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory,
-            boolean immediate) {
+        boolean immediate) {
 
     }
 
@@ -287,12 +288,23 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveChannelClose(int replyCode, AMQShortString replyText, int classId, int methodId) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ChannelClose[replyCode: {} replyText: {} classId: {} methodId: {}",
+                channelId, replyCode, replyText, classId, methodId);
+        }
+        // TODO Process outstanding client requests
+        processAsync();
+        connection.closeChannel(this);
+        connection.writeFrame(new AMQFrame(getChannelId(), connection.getMethodRegistry().createChannelCloseOkBody()));
     }
 
     @Override
     public void receiveChannelCloseOk() {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[ {} ] ChannelCloseOk", channelId);
+        }
 
+        connection.closeChannelOk(getChannelId());
     }
 
     @Override
@@ -343,6 +355,38 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveConfirmSelect(boolean nowait) {
 
+    }
+
+    public void receivedComplete() {
+        processAsync();
+    }
+
+    private void sendChannelClose(int cause, final String message) {
+        connection.closeChannelAndWriteFrame(this, cause, message);
+    }
+
+    public void processAsync() {
+
+    }
+
+    public void close() {
+        // TODO
+    }
+
+    public synchronized void block() {
+        // TODO
+    }
+
+    public synchronized void unblock() {
+        // TODO
+    }
+
+    public int getChannelId() {
+        return channelId;
+    }
+
+    public boolean isClosing() {
+        return closing.get() || connection.isClosing();
     }
 
     private boolean isDefaultExchange(final AMQShortString exchangeName) {

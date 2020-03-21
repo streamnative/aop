@@ -85,7 +85,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
-        this.bufferSender = new AmqpByteBufferSender(this);
+        this.bufferSender = new AmqpByteBufferSenderImpl(this);
         this.amqpConfig = amqpConfig;
         this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();

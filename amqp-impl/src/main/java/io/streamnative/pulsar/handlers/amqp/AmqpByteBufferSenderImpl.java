@@ -11,24 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.test.frame;
-
-import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSender;
+package io.streamnative.pulsar.handlers.amqp;
 
 /**
- * Sender for the server send byte buffer to the client.
+ * Use this sender to send byte buffer to client.
  */
-public class ToClientByteBufferSender extends AmqpByteBufferSender {
+public class AmqpByteBufferSenderImpl extends AmqpByteBufferSender {
 
-    private final ClientDecoder clientDecoder;
+    protected final AmqpConnection connection;
 
-    public ToClientByteBufferSender(ClientDecoder clientDecoder) {
-        this.clientDecoder = clientDecoder;
+    public AmqpByteBufferSenderImpl(AmqpConnection connection) {
+        this.connection = connection;
     }
 
     @Override
-    protected void internalFlush() throws Exception {
-        clientDecoder.decodeBuffer(buf.nioBuffer());
+    public void internalFlush() throws Exception {
+        connection.getCtx().writeAndFlush(buf);
     }
 
     @Override

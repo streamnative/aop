@@ -13,32 +13,21 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test.frame;
 
-import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSenderImpl;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 
 /**
  * Sender for the client send byte buffer to the server.
  */
-public class ToServerByteBufferSender extends AmqpByteBufferSender {
+public class ToServerByteBufferSender extends AmqpByteBufferSenderImpl {
 
     public ToServerByteBufferSender(AmqpConnection connection) {
         super(connection);
     }
 
     @Override
-    public boolean isDirectBufferPreferred() {
-        return false;
-    }
-
-    @Override
-    public void flush() {
-        try {
-            connection.channelRead(connection.getCtx(), buf);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        } finally {
-            buf.clear();
-        }
+    public void internalFlush() throws Exception {
+        connection.channelRead(connection.getCtx(), buf);
     }
 
     @Override

@@ -13,45 +13,47 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
+import java.nio.ByteBuffer;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
 import org.apache.qpid.server.transport.ByteBufferSender;
 
 /**
- * Use this sender to send byte buffer to client.
+ * Base class of ByteBufferSender.
  */
-public class AmqpByteBufferSender implements ByteBufferSender {
+public abstract class AmqpByteBufferSender implements ByteBufferSender {
 
-    protected final AmqpConnection connection;
-    protected ByteBuf buf = ByteBufAllocator.DEFAULT.buffer();
-
-    public AmqpByteBufferSender(AmqpConnection connection) {
-        this.connection = connection;
-    }
+    protected CompositeByteBuf buf = ByteBufAllocator.DEFAULT.compositeDirectBuffer(128);
 
     @Override
     public boolean isDirectBufferPreferred() {
-        return false;
+        return true;
     }
 
     @Override
     public void send(QpidByteBuffer buffer) {
         buf.retain();
-        buf.writeBytes(((SingleQpidByteBuffer) buffer.duplicate()).getUnderlyingBuffer());
+        ByteBuffer byteBuffer = ((SingleQpidByteBuffer) buffer.duplicate()).getUnderlyingBuffer();
+        buf.addComponent(true, Unpooled.wrappedBuffer(byteBuffer));
     }
 
     @Override
-    public void flush() {
+    public final void flush() {
         try {
-            connection.getCtx().writeAndFlush(buf);
+            internalFlush();
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
-            buf.clear();
+            buf.removeComponents(0, buf.numComponents());
+            buf.resetWriterIndex();
+            buf.resetReaderIndex();
         }
     }
+
+    protected abstract void internalFlush() throws Exception;
 
     @Override
     public void close() {

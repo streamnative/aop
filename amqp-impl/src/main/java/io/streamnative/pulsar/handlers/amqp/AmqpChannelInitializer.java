@@ -16,8 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
-import io.netty.handler.codec.LengthFieldPrepender;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 
@@ -43,14 +41,14 @@ public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
-        ch.pipeline().addLast(new LengthFieldPrepender(4));
+//        ch.pipeline().addLast(new LengthFieldPrepender(4));
         //0      1         3         7                 size+7 size+8
         //+------+---------+---------+ +-------------+ +-----------+
         //| type | channel |    size | | payload     | | frame-end |
         //+------+---------+---------+ +-------------+ +-----------+
         // octet   short      long       'size' octets   octet
-        ch.pipeline().addLast("frameDecoder",
-            new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 4, 1, 0));
+//        ch.pipeline().addLast("frameDecoder",
+//            new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 4, 1, 0));
         ch.pipeline().addLast("handler",
             new AmqpConnection(pulsarService, amqpConfig));
     }

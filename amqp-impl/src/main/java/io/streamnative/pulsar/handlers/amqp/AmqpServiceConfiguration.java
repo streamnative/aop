@@ -61,4 +61,24 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private String amqpListeners = "amqp://127.0.0.1:5672";
 
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        required = true,
+        doc = "The maximum number of channels which can exist concurrently on a connection."
+    )
+    private int maxNoOfChannels = 64;
+
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        required = true,
+        doc = "The maximum frame size on a connection."
+    )
+    private int maxFrameSize = 4 * 1024 * 1024;
+
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        required = true,
+        doc = "The default heartbeat timeout on broker"
+    )
+    private int heartBeat = 60 * 1000;
 }

@@ -111,8 +111,8 @@ public final class MessageConvertUtils {
             setProp(builder, PROP_PROPERTY_FLAGS, props.getPropertyFlags());
 
             Map<String, Object> headers = props.getHeadersAsMap();
-            for (String key : headers.keySet()) {
-                setProp(builder, BASIC_PROP_HEADER_PRE + key, headers.get(key));
+            for (Map.Entry<String, Object> entry : headers.entrySet()) {
+                setProp(builder, BASIC_PROP_HEADER_PRE + entry.getKey(), entry.getValue());
             }
         }
 

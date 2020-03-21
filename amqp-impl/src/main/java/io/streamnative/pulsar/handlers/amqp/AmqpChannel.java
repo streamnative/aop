@@ -418,7 +418,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private void deliverCurrentMessageIfComplete() {
         if (currentMessage.allContentReceived()) {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
-            String routingKey = AMQShortString.toString(info.getRoutingKey());
+//            String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
 
             try {

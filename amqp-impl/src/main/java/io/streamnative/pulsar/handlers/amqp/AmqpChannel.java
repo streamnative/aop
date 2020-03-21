@@ -13,13 +13,12 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.List;
-import lombok.Getter;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -27,13 +26,12 @@ import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
-import org.apache.qpid.server.logging.LogMessage;
 import org.apache.qpid.server.message.MessageDestination;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
-import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
@@ -424,7 +422,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             String exchangeName = AMQShortString.toString(info.getExchange());
 
             try {
-                MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(currentMessage);
                 // TODO send message to pulsar topic
                 connection.getExchangeTopicManager()
                         .getTopic(exchangeName)

@@ -33,6 +33,7 @@ import org.apache.pulsar.client.impl.TypedMessageBuilderImpl;
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.compression.CompressionCodecProvider;
 import org.apache.pulsar.common.protocol.Commands;
+import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
@@ -80,9 +81,9 @@ public final class MessageConvertUtils {
         if (incomingMessage.getBodyCount() > 0) {
             ByteBuf byteBuf = Unpooled.buffer(incomingMessage.getBodyCount());
             for (int i = 0; i < incomingMessage.getBodyCount(); i++) {
-                byte[] bytes = new byte[incomingMessage.getContentChunk(i).getSize()];
-                incomingMessage.getContentChunk(i).getPayload().copyTo(bytes);
-                byteBuf.writeBytes(bytes);
+                byteBuf.writeBytes(
+                        ((SingleQpidByteBuffer) incomingMessage.getContentChunk(i).getPayload().duplicate())
+                                .getUnderlyingBuffer());
             }
             builder.value(byteBuf.array());
         } else {

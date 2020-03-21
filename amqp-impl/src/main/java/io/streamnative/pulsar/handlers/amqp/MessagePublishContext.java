@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.Topic.PublishContext;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
-import org.apache.qpid.server.store.StorableMessageMetaData;
 
 
 /**
@@ -80,8 +79,7 @@ public final class MessagePublishContext implements PublishContext {
     /**
      * publish amqp message to pulsar topic.
      */
-    public static <T extends StorableMessageMetaData> void publishMessages(IncomingMessage incomingMessage,
-                                                                           Topic topic) {
+    public static void publishMessages(IncomingMessage incomingMessage, Topic topic) {
         CompletableFuture<Long> offsetFuture = new CompletableFuture<>();
         ByteBuf headerAndPayload = messageToByteBuf(toPulsarMessage(incomingMessage));
         topic.publishMessage(headerAndPayload,

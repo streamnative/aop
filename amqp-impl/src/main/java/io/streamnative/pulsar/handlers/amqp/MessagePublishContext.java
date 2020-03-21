@@ -19,9 +19,7 @@ import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.toP
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
-import io.streamnative.pulsar.handlers.amqp.utils.MessageIdUtils;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.Topic.PublishContext;
@@ -46,23 +44,6 @@ public final class MessagePublishContext implements PublishContext {
      */
     @Override
     public void completed(Exception exception, long ledgerId, long entryId) {
-
-        if (exception != null) {
-            log.error("Failed write entry: ledgerId: {}, entryId: {}. triggered send callback.",
-                ledgerId, entryId);
-            offsetFuture.completeExceptionally(exception);
-        } else {
-            if (log.isDebugEnabled()) {
-                log.debug("Success write topic: {}, ledgerId: {}, entryId: {}"
-                        + " And triggered send callback.",
-                    topic.getName(), ledgerId, entryId);
-            }
-
-            topic.recordAddLatency(System.nanoTime() - startTimeNs, TimeUnit.MICROSECONDS);
-
-            offsetFuture.complete(Long.valueOf(MessageIdUtils.getOffset(ledgerId, entryId)));
-        }
-
         recycle();
     }
 

@@ -59,10 +59,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final AmqpConnection connection;
     private final AtomicBoolean blocking = new AtomicBoolean(false);
     private final AtomicBoolean closing = new AtomicBoolean(false);
-    private long blockTime;
-    private long blockingTimeout;
-    private boolean wireBlockingState;
-    private boolean forceMessageValidation = false;
     private long confirmedMessageCounter;
     private boolean confirmOnPublish;
 
@@ -80,11 +76,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
         this.connection = connection;
-    }
-
-    private void message(final LogMessage message) {
-        // TODO - log
-        log.error("FLOW_CONTROL_IGNORED");
     }
 
     @Override
@@ -310,39 +301,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);
         setPublishFrame(info, null);
-
-        // TODO - get NamedAddressSpace
-//        NamedAddressSpace vHost = null;
-//
-//        if (blockingTimeoutExceeded()) {
-//            message(ChannelMessages.FLOW_CONTROL_IGNORED());
-//            closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
-//                    "Channel flow control was requested, but not enforced by sender");
-//        } else {
-//            MessageDestination destination;
-//
-//            if (isDefaultExchange(exchangeName)) {
-//                destination = vHost.getDefaultDestination();
-//            } else {
-//                destination = vHost.getAttainedMessageDestination(exchangeName.toString(), true);
-//            }
-//
-//            // if the exchange does not exist we raise a channel exception
-//            if (destination == null) {
-//                closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange name: '" + exchangeName + "'");
-//            } else {
-//                MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);
-//                try {
-//                    setPublishFrame(info, destination);
-//                } catch (AccessControlException e) {
-//                    connection.sendConnectionClose(ErrorCodes.ACCESS_REFUSED, e.getMessage(), getChannelId());
-//                }
-//            }
-//        }
-    }
-
-    private boolean blockingTimeoutExceeded() {
-        return wireBlockingState && (System.currentTimeMillis() - blockTime) > blockingTimeout;
     }
 
     private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {
@@ -407,7 +365,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     private void publishContentBody(ContentBody contentBody) {
         if (log.isDebugEnabled()) {
-            log.debug("{} content body received on channel {}", debugIdentity(), channelId);
+            log.debug("content body received on channel {}", channelId);
         }
 
         try {
@@ -426,12 +384,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
     }
 
-    private final String id = "(" + System.identityHashCode(this) + ")";
-
-    private String debugIdentity() {
-        return channelId + id;
-    }
-
     @Override
     public void receiveMessageHeader(BasicContentHeaderProperties properties, long bodySize) {
         if (log.isDebugEnabled()) {
@@ -446,13 +398,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
                         "Message size of " + bodySize + " greater than allowed maximum of " + maxMessageSize);
             } else {
-                if (!forceMessageValidation || properties.checkValid()) {
-                    publishContentHeader(new ContentHeaderBody(properties, bodySize));
-                } else {
-                    properties.dispose();
-                    connection.sendConnectionClose(ErrorCodes.FRAME_ERROR,
-                            "Attempt to send a malformed content header", channelId);
-                }
+                publishContentHeader(new ContentHeaderBody(properties, bodySize));
             }
         } else {
             properties.dispose();
@@ -463,7 +409,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     private void publishContentHeader(ContentHeaderBody contentHeaderBody) {
         if (log.isDebugEnabled()) {
-            log.debug("Content header received on channel " + channelId);
+            log.debug("Content header received on channel {}", channelId);
         }
 
         currentMessage.setContentHeaderBody(contentHeaderBody);
@@ -486,7 +432,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             if (throwable != null) {
 
                             } else {
-                                mockTopic.publishMessage(MessageConvertUtils.messageToByteBuf(message), null);
+                                MessagePublishContext.publishMessages(currentMessage, mockTopic);
                                 long deliveryTag = 1;
                                 BasicAckBody body = connection.getMethodRegistry()
                                         .createBasicAckBody(

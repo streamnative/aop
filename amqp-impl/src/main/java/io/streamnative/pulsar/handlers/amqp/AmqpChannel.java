@@ -16,14 +16,12 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
-import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.admin.PulsarAdminException;
-import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;

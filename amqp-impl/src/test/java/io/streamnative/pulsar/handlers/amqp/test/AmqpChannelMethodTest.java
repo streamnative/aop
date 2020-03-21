@@ -14,19 +14,26 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-
 import lombok.SneakyThrows;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.Topics;
+import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
+import org.apache.qpid.server.protocol.v0_8.FieldTableFactory;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicPublishBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeclareBody;
@@ -180,6 +187,29 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueUnbindOkBody);
+    }
+
+    @Test
+    public void testBasicPublish() {
+        BasicPublishBody methodBody = methodRegistry.createBasicPublishBody(0, "test", "", false, false);
+        methodBody.generateFrame(1).writePayload(toServerSender);
+
+        BasicContentHeaderProperties props = new BasicContentHeaderProperties();
+        props.setDeliveryMode(Integer.valueOf(BasicContentHeaderProperties.PERSISTENT).byteValue());
+        props.setContentType("text/html");
+        props.setTimestamp(System.currentTimeMillis());
+        props.setHeaders(FieldTableFactory.createFieldTable(Collections.singletonMap("Test", "MST")));
+
+        ContentHeaderBody headerBody = new ContentHeaderBody(props, contentBytes.length);
+        ContentHeaderBody.createAMQFrame(1, props, contentBytes.length).writePayload(toServerSender);
+
+        QpidByteBuffer qpidByteBuffer = QpidByteBuffer.wrap(contentBytes);
+        ContentBody contentBody = new ContentBody(qpidByteBuffer);
+        ContentBody.createAMQFrame(1, contentBody).writePayload(toServerSender);
+        toServerSender.flush();
+
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof BasicAckBody);
     }
 
 }

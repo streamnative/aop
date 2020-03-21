@@ -53,6 +53,8 @@ public abstract class AmqpProtocolTestBase {
     protected MethodRegistry methodRegistry;
     protected AmqpClientChannel clientChannel;
 
+    public static byte[] contentBytes = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
     @BeforeMethod
     public void setup() throws Exception {
         // 1.Init AMQP connection for connection methods and channel methods tests.

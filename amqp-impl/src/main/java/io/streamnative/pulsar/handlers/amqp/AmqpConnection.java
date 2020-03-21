@@ -78,6 +78,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private NamespaceName namespaceName;
     private final Object channelAddRemoveLock = new Object();
     private AtomicBoolean blocked = new AtomicBoolean();
+    private ExchangeTopicManager exchangeTopicManager;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
@@ -89,6 +90,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
+        this.exchangeTopicManager = new ExchangeTopicManager(this);
     }
 
     @Override
@@ -563,4 +565,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         return heartBeat;
     }
 
+
+    public ExchangeTopicManager getExchangeTopicManager() {
+        return exchangeTopicManager;
+    }
 }

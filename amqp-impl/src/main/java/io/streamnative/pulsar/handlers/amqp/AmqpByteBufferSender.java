@@ -48,8 +48,7 @@ public abstract class AmqpByteBufferSender implements ByteBufferSender {
             throw new RuntimeException(e);
         } finally {
             buf.removeComponents(0, buf.numComponents());
-            buf.resetWriterIndex();
-            buf.resetReaderIndex();
+            buf.clear();
         }
     }
 

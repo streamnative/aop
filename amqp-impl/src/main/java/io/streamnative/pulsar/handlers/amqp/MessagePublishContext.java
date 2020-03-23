@@ -19,11 +19,15 @@ import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.toP
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
+
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.Topic.PublishContext;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
+import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 
 
 /**
@@ -32,10 +36,9 @@ import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 @Slf4j
 public final class MessagePublishContext implements PublishContext {
 
-    private CompletableFuture<Long> offsetFuture;
     private Topic topic;
     private long startTimeNs;
-    public static final boolean MESSAGE_BATCHED = true;
+    public static final boolean MESSAGE_BATCHED = false;
 
 
     /**
@@ -47,11 +50,9 @@ public final class MessagePublishContext implements PublishContext {
     }
 
     // recycler
-    public static MessagePublishContext get(CompletableFuture<Long> offsetFuture,
-                                            Topic topic,
+    public static MessagePublishContext get(Topic topic,
                                             long startTimeNs) {
         MessagePublishContext callback = RECYCLER.get();
-        callback.offsetFuture = offsetFuture;
         callback.topic = topic;
         callback.startTimeNs = startTimeNs;
         return callback;
@@ -70,19 +71,17 @@ public final class MessagePublishContext implements PublishContext {
     };
 
     public void recycle() {
-        offsetFuture = null;
         topic = null;
         startTimeNs = -1;
         recyclerHandle.recycle(this);
     }
 
     /**
-     * publish amqp message to pulsar topic.
+     * publish amqp message to pulsar topic, no batch.
      */
     public static void publishMessages(IncomingMessage incomingMessage, Topic topic) {
-        CompletableFuture<Long> offsetFuture = new CompletableFuture<>();
         ByteBuf headerAndPayload = messageToByteBuf(toPulsarMessage(incomingMessage));
         topic.publishMessage(headerAndPayload,
-                MessagePublishContext.get(offsetFuture, topic, System.nanoTime()));
+                MessagePublishContext.get(topic, System.nanoTime()));
     }
 }

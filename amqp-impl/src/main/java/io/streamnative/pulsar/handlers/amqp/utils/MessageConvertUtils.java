@@ -46,7 +46,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 
 
 /**
- * Util for convert message between Pulsar entry and AMQP body.
+ * Util for convert message between Pulsar and AMQP.
  */
 @UtilityClass
 @Slf4j

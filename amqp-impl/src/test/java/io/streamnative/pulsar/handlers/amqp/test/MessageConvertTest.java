@@ -24,7 +24,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * test message convert between pulsar entry and amqp body.
+ * test message convert between Pulsar and Amqp.
  */
 public class MessageConvertTest {
 

@@ -585,6 +585,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         return exchangeTopicManager;
     }
 
+    @VisibleForTesting
+    public void setExchangeTopicManager(ExchangeTopicManager exchangeTopicManager) {
+        this.exchangeTopicManager = exchangeTopicManager;
+    }
+
     public NamespaceName getNamespaceName() {
         return namespaceName;
     }

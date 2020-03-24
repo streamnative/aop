@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import io.streamnative.pulsar.handlers.amqp.ExchangeTopicManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -264,6 +265,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testBasicPublish() {
+        connection.setExchangeTopicManager(new ExchangeTopicManager(connection));
         BasicPublishBody methodBody = methodRegistry.createBasicPublishBody(0, "test", "", false, false);
         methodBody.generateFrame(1).writePayload(toServerSender);
 

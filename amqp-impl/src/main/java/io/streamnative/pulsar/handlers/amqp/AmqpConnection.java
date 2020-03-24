@@ -93,6 +93,21 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.exchangeTopicManager = new ExchangeTopicManager(this);
     }
 
+    @VisibleForTesting
+    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
+                          ExchangeTopicManager exchangeTopicManager) {
+        super(pulsarService, amqpConfig);
+        this.channels = new ConcurrentLongHashMap<>();
+        this.protocolVersion = ProtocolVersion.v0_91;
+        this.methodRegistry = new MethodRegistry(this.protocolVersion);
+        this.bufferSender = new AmqpByteBufferSenderImpl(this);
+        this.amqpConfig = amqpConfig;
+        this.maxChannels = amqpConfig.getMaxNoOfChannels();
+        this.maxFrameSize = amqpConfig.getMaxFrameSize();
+        this.heartBeat = amqpConfig.getHeartBeat();
+        this.exchangeTopicManager = exchangeTopicManager;
+    }
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         super.channelActive(ctx);
@@ -568,5 +583,15 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public ExchangeTopicManager getExchangeTopicManager() {
         return exchangeTopicManager;
+    }
+
+    public NamespaceName getNamespaceName() {
+        return namespaceName;
+    }
+
+
+    @VisibleForTesting
+    public void setNamespaceName(NamespaceName namespaceName){
+        this.namespaceName = namespaceName;
     }
 }

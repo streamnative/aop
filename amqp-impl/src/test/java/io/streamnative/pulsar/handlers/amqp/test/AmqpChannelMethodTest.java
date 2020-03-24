@@ -16,10 +16,15 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import lombok.SneakyThrows;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.client.admin.PulsarAdmin;
-import org.apache.pulsar.client.admin.Topics;
+import org.apache.pulsar.broker.service.BrokerService;
+import org.apache.pulsar.broker.service.Subscription;
+import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTableFactory;
@@ -82,10 +87,8 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertEquals(accessRequestOkBody.getTicket(), 0);
     }
 
-    @SneakyThrows
     @Test
     public void testExchangeDeclareFail() {
-        Mockito.when(connection.getPulsarService().getAdminClient()).thenReturn(Mockito.mock(PulsarAdmin.class));
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
                 .createExchangeDeclareBody(0, "test", "fanout", true, true, false, false, false, null);
@@ -95,14 +98,21 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(response instanceof ConnectionCloseBody);
     }
 
-    @SneakyThrows
     @Test
     public void testExchangeDeclareSuccess() {
-        Mockito.when(connection.getPulsarService().getAdminClient()).thenReturn(Mockito.mock(PulsarAdmin.class));
+        String tenant = "public";
+        String namespace = "ns";
+        String exchange = "test";
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
-        Mockito.when(connection.getPulsarService().getAdminClient().topics()).thenReturn(Mockito.mock(Topics.class));
+        Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+        Mockito.when(connection.getExchangeTopicManager().
+                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), true)).
+                thenReturn(Mockito.mock(Topic.class));
         ExchangeDeclareBody cmd = methodRegistry
-                .createExchangeDeclareBody(0, "test", "fanout", true, true, false, false, false, null);
+                .createExchangeDeclareBody(0, exchange, "fanout", true, true, false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -112,18 +122,23 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     @SneakyThrows
     @Test
     public void testExchangeDelete() {
-        List<String> topics = new ArrayList<>();
-        topics.add("test1");
-        topics.add("test2");
-        List<String> queues = new ArrayList<>();
-        queues.add("queue1");
-        queues.add("queue2");
-        Mockito.when(connection.getPulsarService().getAdminClient()).thenReturn(Mockito.mock(PulsarAdmin.class));
-        Mockito.when(connection.getPulsarService().getAdminClient().topics()).thenReturn(Mockito.mock(Topics.class));
-        Mockito.when(connection.getPulsarService().getAdminClient().topics().getList("")).thenReturn(topics);
-        Mockito.when(connection.getPulsarService().getAdminClient().topics().getSubscriptions("test1"))
-                .thenReturn(queues);
-        ExchangeDeleteBody cmd = methodRegistry.createExchangeDeleteBody(0, "test1", false, true);
+        String tenant = "public";
+        String namespace = "ns";
+        String exchange = "test";
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+
+        Topic topic = Mockito.mock(Topic.class);
+        Mockito.when(connection.getExchangeTopicManager().
+                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                thenReturn(topic);
+
+        Mockito.when(topic.delete()).thenReturn(Mockito.mock(CompletableFuture.class));
+        Mockito.when(topic.delete().get()).thenReturn(null);
+
+        ExchangeDeleteBody cmd = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -132,7 +147,24 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testExchangeBound() {
-        ExchangeBoundBody cmd = methodRegistry.createExchangeBoundBody("test", "key", "queue");
+        String tenant = "public";
+        String namespace = "ns";
+        String exchange = "test";
+        List<String> subs = new ArrayList<>();
+        subs.add(exchange);
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+
+        Topic topic = Mockito.mock(Topic.class);
+        Mockito.when(connection.getExchangeTopicManager().
+                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                thenReturn(topic);
+        Mockito.when(topic.getSubscriptions()).thenReturn(Mockito.mock(ConcurrentOpenHashMap.class));
+        Mockito.when(topic.getSubscriptions().keys()).thenReturn(subs);
+
+        ExchangeBoundBody cmd = methodRegistry.createExchangeBoundBody(exchange, "key", "queue");
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -149,9 +181,30 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(response instanceof QueueDeclareOkBody);
     }
 
+    @SneakyThrows
     @Test
     public void testQueueBind() {
-        QueueBindBody cmd = methodRegistry.createQueueBindBody(0, "queue", "test", "key",
+        String tenant = "public";
+        String namespace = "ns";
+        String exchange = "test";
+        String queue = "queue";
+        List<String> subs = new ArrayList<>();
+        subs.add(exchange);
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+
+        Topic topic = Mockito.mock(Topic.class);
+        Mockito.when(connection.getExchangeTopicManager().
+                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                thenReturn(topic);
+        Mockito.when(topic.createSubscription(queue, PulsarApi.CommandSubscribe.InitialPosition.Earliest,
+                false)).thenReturn(Mockito.mock(CompletableFuture.class));
+        Mockito.when(topic.createSubscription(queue, PulsarApi.CommandSubscribe.InitialPosition.Earliest,
+                false).get()).thenReturn(null);
+
+        QueueBindBody cmd = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
                 false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
@@ -179,10 +232,30 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(response instanceof QueueDeleteOkBody);
     }
 
+    @SneakyThrows
     @Test
     public void testQueueUnbind() {
-        QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString("queue"),
-                AMQShortString.createAMQShortString("test"), AMQShortString.createAMQShortString("key"), null);
+        String tenant = "public";
+        String namespace = "ns";
+        String exchange = "test";
+        String queue = "queue";
+        List<String> subs = new ArrayList<>();
+        subs.add(exchange);
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
+        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
+
+        Topic topic = Mockito.mock(Topic.class);
+        Mockito.when(connection.getExchangeTopicManager().
+                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                thenReturn(topic);
+        Mockito.when(topic.getSubscription(queue)).thenReturn(Mockito.mock(Subscription.class));
+        Mockito.when(topic.getSubscription(queue).delete()).thenReturn(Mockito.mock(CompletableFuture.class));
+        Mockito.when(topic.getSubscription(queue).delete().get()).thenReturn(null);
+
+        QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString(queue),
+                AMQShortString.createAMQShortString(exchange), AMQShortString.createAMQShortString("key"), null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();

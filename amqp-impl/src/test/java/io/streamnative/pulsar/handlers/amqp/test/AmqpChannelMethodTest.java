@@ -25,6 +25,8 @@ import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -106,11 +108,12 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         String exchange = "test";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), exchange);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
         Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
         Mockito.when(connection.getExchangeTopicManager().
-                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), true)).
+                getOrCreateTopic(topicName.toString(), true)).
                 thenReturn(Mockito.mock(Topic.class));
         ExchangeDeclareBody cmd = methodRegistry
                 .createExchangeDeclareBody(0, exchange, "fanout", true, true, false, false, false, null);
@@ -128,12 +131,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         String exchange = "test";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), exchange);
         Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
 
         Topic topic = Mockito.mock(Topic.class);
         Mockito.when(connection.getExchangeTopicManager().
-                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                getOrCreateTopic(topicName.toString(), false)).
                 thenReturn(topic);
 
         Mockito.when(topic.delete()).thenReturn(Mockito.mock(CompletableFuture.class));
@@ -155,12 +159,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), exchange);
         Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
 
         Topic topic = Mockito.mock(Topic.class);
         Mockito.when(connection.getExchangeTopicManager().
-                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                getOrCreateTopic(topicName.toString(), false)).
                 thenReturn(topic);
         Mockito.when(topic.getSubscriptions()).thenReturn(Mockito.mock(ConcurrentOpenHashMap.class));
         Mockito.when(topic.getSubscriptions().keys()).thenReturn(subs);
@@ -193,12 +198,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), exchange);
         Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
 
         Topic topic = Mockito.mock(Topic.class);
         Mockito.when(connection.getExchangeTopicManager().
-                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                getOrCreateTopic(topicName.toString(), false)).
                 thenReturn(topic);
         Mockito.when(topic.createSubscription(queue, PulsarApi.CommandSubscribe.InitialPosition.Earliest,
                 false)).thenReturn(Mockito.mock(CompletableFuture.class));
@@ -244,12 +250,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), exchange);
         Mockito.when(connection.getAmqpConfig().getAmqpTenant()).thenReturn(tenant);
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(Mockito.mock(BrokerService.class));
 
         Topic topic = Mockito.mock(Topic.class);
         Mockito.when(connection.getExchangeTopicManager().
-                getOrCreateTopic(String.format("persistent://%s/%s/%s", tenant, namespace, exchange), false)).
+                getOrCreateTopic(topicName.toString(), false)).
                 thenReturn(topic);
         Mockito.when(topic.getSubscription(queue)).thenReturn(Mockito.mock(Subscription.class));
         Mockito.when(topic.getSubscription(queue).delete()).thenReturn(Mockito.mock(CompletableFuture.class));

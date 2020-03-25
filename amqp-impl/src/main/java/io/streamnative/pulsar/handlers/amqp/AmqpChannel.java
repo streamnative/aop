@@ -21,6 +21,8 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;
@@ -120,15 +122,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
             // create new exchange, on first step, we just create a Pulsar Topic.
             if (PulsarService.State.Started == connection.getPulsarService().getState()) {
-                String topicName = "";
+                TopicName topicName;
                 if (durable) {
-                    topicName = String.format("persistent://%s/%s/%s", connection.getAmqpConfig().getAmqpTenant(),
-                            connection.getNamespaceName().getLocalName(), name);
+                    topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), name);
                 } else {
-                    topicName = String.format("non-persistent://%s/%s/%s", connection.getAmqpConfig().getAmqpTenant(),
-                            connection.getNamespaceName().getLocalName(), name);
+                    topicName = TopicName.get(TopicDomain.non_persistent.value(), connection.getNamespaceName(), name);
                 }
-                Topic topic = exchangeTopicManager.getOrCreateTopic(topicName, true);
+                Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), true);
                 if (null == topic) {
                     connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
                 } else {
@@ -147,18 +147,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     nowait);
         }
         if (isDefaultExchange(exchange)) {
-            connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Default Exchange cannot be deleted", channelId);
+            connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Default Exchange cannot be deleted. ", channelId);
         } else {
-            final String exchangeName = exchange.toString();
+            TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                    connection.getNamespaceName(), exchange.toString());
 
-            String topicName = String.format("persistent://%s/%s/%s", connection.getAmqpConfig().getAmqpTenant(),
-                    connection.getNamespaceName().getLocalName(), exchangeName);
-            Topic topic = exchangeTopicManager.getOrCreateTopic(topicName, false);
+            Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), false);
             if (null == topic) {
                 closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
             } else {
                 if (ifUnused && topic.getSubscriptions().isEmpty()) {
-                    closeChannel(ErrorCodes.IN_USE, "Exchange has bindings");
+                    closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                 } else {
                     try {
                         topic.delete().get();
@@ -181,10 +180,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         int replyCode;
         String replyText;
-        String topicName = String.format("persistent://%s/%s/%s", connection.getAmqpConfig().getAmqpTenant(),
-                connection.getNamespaceName().getLocalName(), exchange);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                connection.getNamespaceName(), exchange.toString());
 
-        Topic topic = exchangeTopicManager.getOrCreateTopic(topicName, false);
+        Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
             replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
             replyText = "Exchange '" + exchange + "' not found";
@@ -227,9 +226,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
                     channelId, exchange, bindingKey, nowait, arguments);
         }
-        String topicName = String.format("persistent://%s/%s/%s", connection.getAmqpConfig().getAmqpTenant(),
-                connection.getNamespaceName().getLocalName(), exchange);
-        Topic topic = exchangeTopicManager.getOrCreateTopic(topicName, false);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                connection.getNamespaceName(), exchange.toString());
+
+        Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {
@@ -280,9 +280,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
                     exchange, bindingKey, arguments);
         }
-        String topicName = String.format("persistent://%s/%s/%s", connection.getAmqpConfig().getAmqpTenant(),
-                connection.getNamespaceName().getLocalName(), exchange);
-        Topic topic = exchangeTopicManager.getOrCreateTopic(topicName, false);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                connection.getNamespaceName(), exchange.toString());
+
+        Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
             connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "exchange not found.", channelId);
         } else {

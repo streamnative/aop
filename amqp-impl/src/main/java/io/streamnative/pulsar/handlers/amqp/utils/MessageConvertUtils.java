@@ -191,6 +191,7 @@ public final class MessageConvertUtils {
         BasicContentHeaderProperties props = new BasicContentHeaderProperties();
         Map<String, Object> headers = new HashMap<>();
         MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
+
         for (PulsarApi.KeyValue keyValue : propertiesList) {
             switch (keyValue.getKey()) {
                 case PROP_CONTENT_TYPE:

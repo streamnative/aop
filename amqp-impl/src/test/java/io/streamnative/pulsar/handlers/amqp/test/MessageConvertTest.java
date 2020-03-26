@@ -64,9 +64,12 @@ public class MessageConvertTest {
         BasicContentHeaderProperties originProps = new BasicContentHeaderProperties();
         originProps.setTimestamp(System.currentTimeMillis());
         originProps.setContentType("json");
+        originProps.setEncoding("html/json");
+        originProps.setPriority((byte) '1');
         Map<String, Object> originHeaders = new HashMap<>();
         originHeaders.put("string", "string");
         originHeaders.put("int", 1);
+        originHeaders.put("float", 0.1);
         originHeaders.put("boolean", true);
         originProps.setHeaders(FieldTableFactory.createFieldTable(originHeaders));
         incomingMessage.setContentHeaderBody(new ContentHeaderBody(originProps));
@@ -99,6 +102,8 @@ public class MessageConvertTest {
         // check
         assertEquals(originProps.getTimestamp(), props.getTimestamp());
         assertEquals(originProps.getContentType(), props.getContentType());
+        assertEquals(originProps.getPriority(), props.getPriority());
+        assertEquals(originProps.getEncoding(), props.getEncoding());
         for (Map.Entry<String, Object> mapEntry : originHeaders.entrySet()) {
             assertEquals(String.valueOf(mapEntry.getValue()), String.valueOf(headers.get(mapEntry.getKey())));
         }

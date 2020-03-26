@@ -19,15 +19,11 @@ import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.toP
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
-
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.io.UnsupportedEncodingException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.Topic.PublishContext;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
-import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
-import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 
 
 /**
@@ -79,7 +75,8 @@ public final class MessagePublishContext implements PublishContext {
     /**
      * publish amqp message to pulsar topic, no batch.
      */
-    public static void publishMessages(IncomingMessage incomingMessage, Topic topic) {
+    public static void publishMessages(IncomingMessage incomingMessage, Topic topic)
+                                                                        throws UnsupportedEncodingException {
         ByteBuf headerAndPayload = messageToByteBuf(toPulsarMessage(incomingMessage));
         topic.publishMessage(headerAndPayload,
                 MessagePublishContext.get(topic, System.nanoTime()));

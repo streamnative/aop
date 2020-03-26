@@ -13,12 +13,15 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.admin.PulsarAdminException;
@@ -128,15 +131,15 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         // TODO create nonPersistent Topic for nonDurable Exchange.
                     }
                 } catch (PulsarAdminException e) {
-                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                    connection.sendConnectionClose(INTERNAL_ERROR,
                             "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
                 } catch (PulsarServerException e) {
-                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                    connection.sendConnectionClose(INTERNAL_ERROR,
                             "Catch a PulsarServerException: " + e.getMessage() + ". ", channelId);
                 }
                 connection.writeFrame(declareOkBody.generateFrame(channelId));
             } else {
-                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "PulsarService not start.", channelId);
+                connection.sendConnectionClose(INTERNAL_ERROR, "PulsarService not start.", channelId);
             }
         }
     }
@@ -170,10 +173,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     }
                 }
             } catch (PulsarAdminException e) {
-                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                connection.sendConnectionClose(INTERNAL_ERROR,
                         "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
             } catch (PulsarServerException e) {
-                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                connection.sendConnectionClose(INTERNAL_ERROR,
                         "Catch a PulsarServerException: " + e.getMessage() + ". ", channelId);
             }
         }
@@ -416,23 +419,33 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private void deliverCurrentMessageIfComplete() {
         if (currentMessage.allContentReceived()) {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
-//            String routingKey = AMQShortString.toString(info.getRoutingKey());
+            String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
 
             try {
+                String topic;
+                if (StringUtils.isEmpty(exchangeName)) {
+                    topic = routingKey;
+                } else {
+                    topic = exchangeName;
+                }
                 // TODO send message to pulsar topic
                 connection.getExchangeTopicManager()
-                        .getTopic(exchangeName)
+                        .getTopic(topic)
                         .whenComplete((mockTopic, throwable) -> {
                             if (throwable != null) {
 
                             } else {
-                                MessagePublishContext.publishMessages(currentMessage, mockTopic);
-                                long deliveryTag = 1;
-                                BasicAckBody body = connection.getMethodRegistry()
-                                        .createBasicAckBody(
-                                                deliveryTag, false);
-                                connection.writeFrame(body.generateFrame(channelId));
+                                try {
+                                    MessagePublishContext.publishMessages(currentMessage, mockTopic);
+                                    long deliveryTag = 1;
+                                    BasicAckBody body = connection.getMethodRegistry()
+                                            .createBasicAckBody(
+                                                    deliveryTag, false);
+                                    connection.writeFrame(body.generateFrame(channelId));
+                                } catch (UnsupportedEncodingException e) {
+                                    connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
+                                }
                             }
                 });
             } finally {

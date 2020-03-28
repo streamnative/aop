@@ -27,6 +27,7 @@ import io.streamnative.pulsar.handlers.amqp.test.frame.ToServerByteBufferSender;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.client.admin.Namespaces;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -78,7 +79,10 @@ public abstract class AmqpProtocolTestBase {
         //   ToClientByteBufferSender and decodes by ClientDecoder, then the decoder add decoded protocol body to the
         //   client channel. So, we can get a response from the client channel straightforward.
         connection.setBufferSender(new ToClientByteBufferSender(new ClientDecoder
-                (new AmqpClientMethodProcessor(clientChannel))));
+            (new AmqpClientMethodProcessor(clientChannel))));
+        ServerCnx serverCnx = Mockito.mock(ServerCnx.class);
+        connection.setPulsarServerCnx(serverCnx);
+
         initProtocol();
     }
 
@@ -102,6 +106,7 @@ public abstract class AmqpProtocolTestBase {
         public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
             return channelMethodProcessor;
         }
+
     }
 
     /**

@@ -12,9 +12,7 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp;
-
 import static java.nio.charset.StandardCharsets.US_ASCII;
-
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -26,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.QpidException;
@@ -79,6 +78,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private final Object channelAddRemoveLock = new Object();
     private AtomicBoolean blocked = new AtomicBoolean();
     private ExchangeTopicManager exchangeTopicManager;
+    private final AmqpOutputConverter amqpOutputConverter;
+    private ServerCnx pulsarServerCnx;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
@@ -91,6 +92,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
         this.exchangeTopicManager = new ExchangeTopicManager(this);
+        this.amqpOutputConverter = new AmqpOutputConverter(this);
+        //this.pulsarServerCnx=new ServerCnx(pulsarService);
     }
 
     @Override
@@ -568,5 +571,25 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public ExchangeTopicManager getExchangeTopicManager() {
         return exchangeTopicManager;
+    }
+
+    public boolean isCompressionSupported() {
+        return true;
+    }
+
+    public int getMessageCompressionThreshold() {
+        return 102400;
+    }
+
+    public AmqpOutputConverter getAmqpOutputConverter() {
+        return amqpOutputConverter;
+    }
+
+    public ServerCnx getServerCnx() {
+        return pulsarServerCnx;
+    }
+
+    public void setPulsarServerCnx(ServerCnx pulsarServerCnx) {
+        this.pulsarServerCnx = pulsarServerCnx;
     }
 }

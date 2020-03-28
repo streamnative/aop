@@ -13,10 +13,15 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
+import io.streamnative.pulsar.handlers.amqp.AmqpConsumer;
+import io.streamnative.pulsar.handlers.amqp.UnacknowledgedMessageMap;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import lombok.SneakyThrows;
+import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.Topics;
@@ -27,6 +32,10 @@ import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicGetOkBody;
@@ -199,6 +208,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         props.setContentType("text/html");
         props.setTimestamp(System.currentTimeMillis());
         props.setHeaders(FieldTableFactory.createFieldTable(Collections.singletonMap("Test", "MST")));
+        //props.set
 
         ContentHeaderBody headerBody = new ContentHeaderBody(props, contentBytes.length);
         ContentHeaderBody.createAMQFrame(1, props, contentBytes.length).writePayload(toServerSender);
@@ -210,6 +220,64 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
         AMQBody response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof BasicAckBody);
+    }
+
+    @Test
+    public void testBasicConsume() {
+        SocketAddress socketAddress = Mockito.mock(SocketAddress.class);
+        Mockito.when(connection.getServerCnx().clientAddress()).thenReturn(socketAddress);
+        BasicConsumeBody basicConsumeBody = methodRegistry.createBasicConsumeBody(0, "exchangName",
+            "consumerTag1", false, true, false, false, null);
+        basicConsumeBody.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof BasicConsumeOkBody);
+    }
+
+    @Test
+    public void testBasicCancel() {
+        testBasicConsume();
+        BasicCancelBody basicCancelBody = methodRegistry.
+            createBasicCancelBody(AMQShortString.createAMQShortString("consumerTag1"), false);
+        basicCancelBody.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof BasicCancelOkBody);
+    }
+
+    @Test
+    public void testBasicAckOne() {
+        testBasicConsume();
+        AmqpChannel channel = (AmqpChannel) connection.getChannelMethodProcessor(0);
+        AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap().get("consumerTag1");
+        Assert.assertTrue(consumer != null);
+        UnacknowledgedMessageMap unacknowledgedMessageMap = channel.getUnacknowledgedMessageMap();
+        unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(2, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(3, PositionImpl.get(1, 1), consumer);
+        BasicAckBody basicAckBody = methodRegistry.createBasicAckBody(1, false);
+        basicAckBody.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        Assert.assertTrue(unacknowledgedMessageMap.size() == 2);
+        Assert.assertTrue(!unacknowledgedMessageMap.getMap().containsKey(1));
+    }
+
+    @Test
+    public void testBasicAckBatch() {
+        testBasicConsume();
+        AmqpChannel channel = (AmqpChannel) connection.getChannelMethodProcessor(0);
+        AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap().get("consumerTag1");
+        Assert.assertTrue(consumer != null);
+        UnacknowledgedMessageMap unacknowledgedMessageMap = channel.getUnacknowledgedMessageMap();
+        unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(2, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(3, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(4, PositionImpl.get(1, 1), consumer);
+        BasicAckBody basicAckBody = methodRegistry.createBasicAckBody(3, true);
+        basicAckBody.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+        Assert.assertTrue(unacknowledgedMessageMap.size() == 1);
+        Assert.assertTrue(!unacknowledgedMessageMap.getMap().containsKey(3));
     }
 
 }

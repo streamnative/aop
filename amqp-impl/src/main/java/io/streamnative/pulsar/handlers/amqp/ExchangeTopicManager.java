@@ -13,11 +13,13 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.BrokerService;
+import org.apache.pulsar.broker.service.Topic;
 
 
 /**
@@ -51,6 +53,11 @@ public class ExchangeTopicManager {
             topicCompletableFuture.complete(mockTopic);
             return topicCompletableFuture;
         });
+    }
+
+    public Topic getOrCreateTopic(String exchangeName, boolean createIfMissing) {
+        return amqpConnection.getPulsarService().getBrokerService().
+                getTopic(exchangeName, createIfMissing).thenApply(Optional::get).join();
     }
 
 }

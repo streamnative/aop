@@ -199,7 +199,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         MethodRegistry methodRegistry = connection.getMethodRegistry();
         ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
-                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText.toString()));
+                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
         connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
     }
 

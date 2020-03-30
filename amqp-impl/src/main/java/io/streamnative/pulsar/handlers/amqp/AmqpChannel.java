@@ -14,34 +14,29 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
-import static org.apache.qpid.server.protocol.v0_8.AMQShortString.createAMQShortString;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
-import org.apache.pulsar.broker.PulsarServerException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.service.Topic;
-import org.apache.pulsar.common.api.proto.PulsarApi;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
-import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;
@@ -65,6 +60,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+
+
 
 
 
@@ -166,7 +163,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
                 Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), true);
                 if (null == topic) {
-                    connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
+                    connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
                 } else {
                     connection.writeFrame(declareOkBody.generateFrame(channelId));
                 }
@@ -200,7 +197,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
                         connection.writeFrame(responseBody.generateFrame(channelId));
                     } catch (Exception e) {
-                        connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                        connection.sendConnectionClose(INTERNAL_ERROR,
                                 "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
                     }
                 }
@@ -277,7 +274,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));
             } catch (Exception e) {
-                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
+                connection.sendConnectionClose(INTERNAL_ERROR,
                         "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
             }
         }
@@ -321,14 +318,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
-            connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "exchange not found.", channelId);
+            connection.sendConnectionClose(INTERNAL_ERROR, "exchange not found.", channelId);
         } else {
             try {
                 topic.getSubscription(queue.toString()).delete().get();
                 final AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));
             } catch (Exception e) {
-                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR, "unbind failed:" + e.getMessage(), channelId);
+                connection.sendConnectionClose(INTERNAL_ERROR, "unbind failed:" + e.getMessage(), channelId);
             }
         }
     }
@@ -361,7 +358,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue, '" + queueName + "'");
                 } else {
                     try {
-                        String consumerTag1 = subscirbe(AMQShortString.toString(consumerTag),
+                        String consumerTag1 = subscribe(AMQShortString.toString(consumerTag),
                             topic, noAck, arguments, exclusive, noLocal);
                         if (!nowait) {
                             MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -376,7 +373,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             });
     }
 
-    private String subscirbe(String consumerTag, Topic topic, boolean ack,
+    private String subscribe(String consumerTag, Topic topic, boolean ack,
         FieldTable arguments, boolean exclusive, boolean noLocal) throws ConsumerTagInUseException,
         InterruptedException, ExecutionException, BrokerServiceException {
         if (consumerTag == null) {
@@ -610,7 +607,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 positions.add((PositionImpl) association.getPosition());
             });
             positionMap.entrySet().stream().forEach(entry -> {
-                entry.getKey().redeliverAMQMessages(entry.getValue());
+                entry.getKey().redeliverAmqpMessages(entry.getValue());
             });
         }
     }

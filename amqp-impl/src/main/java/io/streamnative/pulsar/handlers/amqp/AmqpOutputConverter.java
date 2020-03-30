@@ -47,7 +47,7 @@ public class AmqpOutputConverter {
         this.connection = connection;
     }
 
-    public long writeDeliver(final AMQMessage message, int channelId,
+    public long writeDeliver(final AmqpMessageData message, int channelId,
         boolean isRedelivered, long deliveryTag,
         AMQShortString consumerTag) {
 
@@ -55,18 +55,18 @@ public class AmqpOutputConverter {
         return writeMessageDelivery(message, channelId, deliverBody);
     }
 
-    private long writeMessageDelivery(AMQMessage message, int channelId, AMQBody deliverBody) {
-        return writeMessageDelivery(message, message.getContentHeader(), channelId, deliverBody);
+    private long writeMessageDelivery(AmqpMessageData message, int channelId, AMQBody deliverBody) {
+        return writeMessageDelivery(message, message.getContentHeaderBody(), channelId, deliverBody);
     }
 
     interface DisposableMessageContentSource extends MessageContentSource {
         void dispose();
     }
 
-    private long writeMessageDelivery(AMQMessage message, ContentHeaderBody contentHeaderBody, int channelId,
+    private long writeMessageDelivery(AmqpMessageData message, ContentHeaderBody contentHeaderBody, int channelId,
         AMQBody deliverBody) {
 
-        int bodySize = (int) message.getSize();
+        int bodySize = (int) message.getContentHeaderBody().getSize();
         boolean msgCompressed = isCompressed(contentHeaderBody);
         AmqpOutputConverter.DisposableMessageContentSource modifiedContent = null;
 
@@ -105,7 +105,7 @@ public class AmqpOutputConverter {
         return length;
     }
 
-    private AmqpOutputConverter.DisposableMessageContentSource deflateIfPossible(AMQMessage message) {
+    private AmqpOutputConverter.DisposableMessageContentSource deflateIfPossible(AmqpMessageData message) {
         try (QpidByteBuffer contentBuffers = message.getContentBody().getPayload()) {
             return new AmqpOutputConverter.ModifiedContentSource(QpidByteBuffer.deflate(contentBuffers));
         } catch (IOException e) {
@@ -114,7 +114,7 @@ public class AmqpOutputConverter {
         }
     }
 
-    private AmqpOutputConverter.DisposableMessageContentSource inflateIfPossible(AMQMessage message) {
+    private AmqpOutputConverter.DisposableMessageContentSource inflateIfPossible(AmqpMessageData message) {
         try (QpidByteBuffer contentBuffers = message.getContentBody().getPayload()) {
             return new AmqpOutputConverter.ModifiedContentSource(QpidByteBuffer.inflate(contentBuffers));
         } catch (IOException e) {
@@ -207,16 +207,16 @@ public class AmqpOutputConverter {
 
     }
 
-    public long writeGetOk(final AMQMessage amqMessage,
+    public long writeGetOk(final AmqpMessageData message,
         final InstanceProperties props,
         int channelId,
         long deliveryTag,
         int queueSize) {
-        AMQBody deliver = createEncodedGetOkBody(amqMessage, props, deliveryTag, queueSize);
-        return writeMessageDelivery(amqMessage, channelId, deliver);
+        AMQBody deliver = createEncodedGetOkBody(message, props, deliveryTag, queueSize);
+        return writeMessageDelivery(message, channelId, deliver);
     }
 
-    private AMQBody createEncodedDeliverBody(AMQMessage message,
+    private AMQBody createEncodedDeliverBody(AmqpMessageData message,
         boolean isRedelivered,
         final long deliveryTag,
         final AMQShortString consumerTag) {
@@ -290,7 +290,7 @@ public class AmqpOutputConverter {
         }
     }
 
-    private AMQBody createEncodedGetOkBody(AMQMessage message, InstanceProperties props, long deliveryTag,
+    private AMQBody createEncodedGetOkBody(AmqpMessageData message, InstanceProperties props, long deliveryTag,
         int queueSize) {
         final AMQShortString exchangeName;
         final AMQShortString routingKey;
@@ -318,7 +318,7 @@ public class AmqpOutputConverter {
             messagePublishInfo.getRoutingKey());
     }
 
-    public void writeReturn(MessagePublishInfo messagePublishInfo, ContentHeaderBody header, AMQMessage message,
+    public void writeReturn(MessagePublishInfo messagePublishInfo, ContentHeaderBody header, AmqpMessageData message,
         int channelId, int replyCode, AMQShortString replyText) {
 
         AMQBody returnFrame = createEncodedReturnFrame(messagePublishInfo, replyCode, replyText);

@@ -15,9 +15,9 @@ package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConsumer;
+import io.streamnative.pulsar.handlers.amqp.ExchangeTopicManager;
 import io.streamnative.pulsar.handlers.amqp.UnacknowledgedMessageMap;
 import java.net.SocketAddress;
-import io.streamnative.pulsar.handlers.amqp.ExchangeTopicManager;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -305,6 +305,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testBasicConsume() {
+        connection.setExchangeTopicManager(new ExchangeTopicManager(connection));
         SocketAddress socketAddress = Mockito.mock(SocketAddress.class);
         Mockito.when(connection.getServerCnx().clientAddress()).thenReturn(socketAddress);
         BasicConsumeBody basicConsumeBody = methodRegistry.createBasicConsumeBody(0, "exchangName",

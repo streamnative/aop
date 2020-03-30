@@ -14,6 +14,8 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.channel.ChannelPromise;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -76,9 +78,14 @@ public class AmqpConsumer extends Consumer {
                     continue;
                 }
                 long deliveryTag = channel.getNextDeliveryTag();
-                connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entriesToAmqpBody(entry),
-                    channel.getChannelId(), false, channel.getNextDeliveryTag(),
-                    AMQShortString.createAMQShortString(consumerTag));
+                try {
+                    connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entryToAmqpBody(entry),
+                        channel.getChannelId(), false, channel.getNextDeliveryTag(),
+                        AMQShortString.createAMQShortString(consumerTag));
+                } catch (UnsupportedEncodingException e) {
+                    log.error("sendMessages UnsupportedEncodingException", e.getMessage());
+                    break;
+                }
                 if (autoAck) {
                     // TODO confirm
                     autoAcks.add(entry.getPosition());
@@ -101,7 +108,7 @@ public class AmqpConsumer extends Consumer {
         getSubscription().acknowledgeMessage(positions, ackType, properties);
     }
 
-    public void redeliverAMQMessages(List<PositionImpl> positions) {
+    public void redeliverAmqpMessages(List<PositionImpl> positions) {
         getSubscription().redeliverUnacknowledgedMessages(this, positions);
     }
 

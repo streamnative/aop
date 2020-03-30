@@ -13,17 +13,22 @@
  */
 package io.streamnative.pulsar.handlers.amqp.utils;
 
-
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
+import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
+import java.io.UnsupportedEncodingException;
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javafx.util.Pair;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.Entry;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.CompressionType;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.Schema;
@@ -33,11 +38,15 @@ import org.apache.pulsar.client.impl.TypedMessageBuilderImpl;
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.compression.CompressionCodecProvider;
 import org.apache.pulsar.common.protocol.Commands;
+import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
+import org.apache.qpid.server.protocol.v0_8.AMQShortString;
+import org.apache.qpid.server.protocol.v0_8.FieldTableFactory;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
+import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 
 
 /**
@@ -47,13 +56,12 @@ import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 @Slf4j
 public final class MessageConvertUtils {
 
-    private static final int DEFAULT_FETCH_BUFFER_SIZE = 1024 * 1024;
-    private static final int MAX_RECORDS_BUFFER_SIZE = 100 * 1024 * 1024;
     private static final String FAKE_AMQP_PRODUCER_NAME = "fake_amqp_producer_name";
-
+    private static final String DEFAULT_CHARSET_NAME = "ISO8859-1";
     private static final String PROP_DELIMITER = ".";
     private static final String BASIC_PROP_PRE = "_bp_" + PROP_DELIMITER;
     private static final String BASIC_PROP_HEADER_PRE = "_bph_" + PROP_DELIMITER;
+    private static final String BASIC_PUBLISH_INFO_PRE = "_pi_" + PROP_DELIMITER;
 
     private static final String PROP_CONTENT_TYPE = BASIC_PROP_PRE + "content_type";
     private static final String PROP_ENCODING = BASIC_PROP_PRE + "encoding";
@@ -70,22 +78,30 @@ public final class MessageConvertUtils {
     private static final String PROP_CLUSTER_ID = BASIC_PROP_PRE + "cluster_id";
     private static final String PROP_PROPERTY_FLAGS = BASIC_PROP_PRE + "property_flags";
 
+    private static final String PROP_EXCHANGE = BASIC_PUBLISH_INFO_PRE + "exchange";
+    private static final String PROP_IMMEDIATE = BASIC_PUBLISH_INFO_PRE + "immediate";
+    private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
+    private static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
+
     private static final Clock clock = Clock.systemDefaultZone();
 
     // convert qpid IncomingMessage to Pulsar MessageImpl
-    public static MessageImpl<byte[]> toPulsarMessage(IncomingMessage incomingMessage) {
+    public static MessageImpl<byte[]> toPulsarMessage(IncomingMessage incomingMessage)
+            throws UnsupportedEncodingException {
         @SuppressWarnings("unchecked")
         TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
 
         // value
         if (incomingMessage.getBodyCount() > 0) {
-            ByteBuf byteBuf = Unpooled.buffer(incomingMessage.getBodyCount());
+            ByteBuf byteBuf = Unpooled.buffer();
             for (int i = 0; i < incomingMessage.getBodyCount(); i++) {
                 byteBuf.writeBytes(
-                        ((SingleQpidByteBuffer) incomingMessage.getContentChunk(i).getPayload().duplicate())
+                        ((SingleQpidByteBuffer) incomingMessage.getContentChunk(i).getPayload())
                                 .getUnderlyingBuffer());
             }
-            builder.value(byteBuf.array());
+            byte[] bytes = new byte[byteBuf.writerIndex()];
+            byteBuf.readBytes(bytes, 0, byteBuf.writerIndex());
+            builder.value(bytes);
         } else {
             builder.value(new byte[0]);
         }
@@ -117,12 +133,22 @@ public final class MessageConvertUtils {
             }
         }
 
+        setProp(builder, PROP_EXCHANGE, incomingMessage.getMessagePublishInfo().getExchange());
+        setProp(builder, PROP_IMMEDIATE, incomingMessage.getMessagePublishInfo().isImmediate());
+        setProp(builder, PROP_MANDATORY, incomingMessage.getMessagePublishInfo().isMandatory());
+        setProp(builder, PROP_ROUTING_KEY, incomingMessage.getMessagePublishInfo().getRoutingKey());
+
         return (MessageImpl<byte[]>) builder.getMessage();
     }
 
-    private void setProp(TypedMessageBuilder builder, String propName, Object value) {
+    private void setProp(TypedMessageBuilder builder, String propName, Object value)
+            throws UnsupportedEncodingException {
         if (value != null) {
-            builder.property(propName, String.valueOf(value));
+            if (value instanceof Byte) {
+                builder.property(propName, byteToString((byte) value));
+            } else {
+                builder.property(propName, String.valueOf(value));
+            }
         }
     }
 
@@ -160,15 +186,126 @@ public final class MessageConvertUtils {
         return buf;
     }
 
-    public static BasicContentHeaderProperties getPropertiesFromMetadata(List<PulsarApi.KeyValue> propertiesList) {
-        // TODO convert PulsarApi.KeyValue list to BasicContentHeaderProperties
-        return null;
+    public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
+                                List<PulsarApi.KeyValue> propertiesList) throws UnsupportedEncodingException {
+        BasicContentHeaderProperties props = new BasicContentHeaderProperties();
+        Map<String, Object> headers = new HashMap<>();
+        MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
+
+        for (PulsarApi.KeyValue keyValue : propertiesList) {
+            switch (keyValue.getKey()) {
+                case PROP_CONTENT_TYPE:
+                    props.setContentType(keyValue.getValue());
+                    break;
+                case PROP_ENCODING:
+                    props.setEncoding(keyValue.getValue());
+                    break;
+                case PROP_DELIVERY_MODE:
+                    props.setDeliveryMode(stringToByte(keyValue.getValue()));
+                    break;
+                case PROP_PRIORITY_PRIORITY:
+                    props.setPriority(stringToByte(keyValue.getValue()));
+                    break;
+                case PROP_CORRELATION_ID:
+                    props.setCorrelationId(keyValue.getValue());
+                    break;
+                case PROP_REPLY_TO:
+                    props.setReplyTo(keyValue.getValue());
+                    break;
+                case PROP_EXPIRATION:
+                    props.setExpiration(Long.parseLong(keyValue.getValue()));
+                    break;
+                case PROP_MESSAGE_ID:
+                    props.setMessageId(keyValue.getValue());
+                    break;
+                case PROP_TIMESTAMP:
+                    props.setTimestamp(Long.parseLong(keyValue.getValue()));
+                    break;
+                case PROP_TYPE:
+                    props.setType(keyValue.getValue());
+                    break;
+                case PROP_USER_ID:
+                    props.setUserId(keyValue.getValue());
+                    break;
+                case PROP_APP_ID:
+                    props.setAppId(keyValue.getValue());
+                    break;
+                case PROP_CLUSTER_ID:
+                    props.setClusterId(keyValue.getValue());
+                    break;
+                case PROP_PROPERTY_FLAGS:
+                    props.setPropertyFlags(Integer.parseInt(keyValue.getValue()));
+                    break;
+                case PROP_EXCHANGE:
+                    messagePublishInfo.setExchange(AMQShortString.createAMQShortString(keyValue.getValue()));
+                    break;
+                case PROP_IMMEDIATE:
+                    messagePublishInfo.setImmediate(Boolean.parseBoolean(keyValue.getValue()));
+                    break;
+                case PROP_MANDATORY:
+                    messagePublishInfo.setMandatory(Boolean.parseBoolean(keyValue.getValue()));
+                    break;
+                case PROP_ROUTING_KEY:
+                    messagePublishInfo.setRoutingKey(AMQShortString.createAMQShortString(keyValue.getValue()));
+                    break;
+                default:
+                    headers.put(keyValue.getKey().substring(BASIC_PROP_HEADER_PRE.length()), keyValue.getValue());
+            }
+        }
+        props.setHeaders(FieldTableFactory.createFieldTable(headers));
+        return Pair.of(props, messagePublishInfo);
     }
 
-    public static List<Pair<ContentHeaderBody, ContentBody>> entriesToAmqpBodyList(
-                                            List<org.apache.bookkeeper.mledger.Entry> entries) {
+    public static List<AmqpMessageData> entriesToAmqpBodyList(List<Entry> entries)
+                                                                throws UnsupportedEncodingException {
+        ImmutableList.Builder<AmqpMessageData> builder = ImmutableList.builder();
         // TODO convert bk entries to amqpbody,
         //  then assemble deliver body with ContentHeaderBody and ContentBody
+        for (Entry entry : entries) {
+            // each entry is a batched message
+            ByteBuf metadataAndPayload = entry.getDataBuffer();
+            PulsarApi.MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
+            int numMessages = msgMetadata.getNumMessagesInBatch();
+            boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
+            ByteBuf payload = metadataAndPayload.retain();
+
+            if (log.isDebugEnabled()) {
+                log.debug("entriesToRecords.  NumMessagesInBatch: {}, isBatchMessage: {}, entries in list: {}."
+                                + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
+                        numMessages, !notBatchMessage, entries.size(), entry.getLedgerId(),
+                        entry.getEntryId(), payload.readerIndex(), payload.writerIndex());
+            }
+
+            // need handle encryption
+            checkState(msgMetadata.getEncryptionKeysCount() == 0);
+
+            if (notBatchMessage) {
+                Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
+                        getPropertiesFromMetadata(msgMetadata.getPropertiesList());
+
+                byte[] data = new byte[payload.readableBytes()];
+                payload.readBytes(data);
+                builder.add(AmqpMessageData.builder()
+                        .messagePublishInfo(metaData.getRight())
+                        .contentHeaderBody(new ContentHeaderBody(metaData.getLeft()))
+                        .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
+                        .build());
+            } else {
+                // currently, no consider for batch
+            }
+        }
+        return builder.build();
+    }
+
+    private static String byteToString(byte b) throws UnsupportedEncodingException {
+        byte[] bytes = {b};
+        return new String(bytes, DEFAULT_CHARSET_NAME);
+    }
+
+    private static Byte stringToByte(String string) throws UnsupportedEncodingException {
+        if (string != null && string.length() > 0) {
+            return string.getBytes(DEFAULT_CHARSET_NAME)[0];
+        }
         return null;
     }
 

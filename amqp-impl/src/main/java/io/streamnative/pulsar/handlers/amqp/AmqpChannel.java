@@ -179,19 +179,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     routingKey, queueName);
         }
         int replyCode;
-        String replyText;
+        StringBuilder replyText = new StringBuilder();
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
         Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
             replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
-            replyText = "Exchange '" + exchange + "' not found";
+            replyText = replyText.insert(0, "Exchange '").append(exchange).append("' not found");
         } else {
             List<String> subs = topic.getSubscriptions().keys();
             if (null == subs || subs.isEmpty()) {
                 replyCode = ExchangeBoundOkBody.QUEUE_NOT_FOUND;
-                replyText = "Queue '" + queueName + "' not found";
+                replyText = replyText.insert(0, "Queue '").append(queueName).append("' not found");
             } else {
                 replyCode = ExchangeBoundOkBody.OK;
                 replyText = null;
@@ -199,7 +199,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         MethodRegistry methodRegistry = connection.getMethodRegistry();
         ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
-                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
+                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText.toString()));
         connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
     }
 

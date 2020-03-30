@@ -78,7 +78,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private final Object channelAddRemoveLock = new Object();
     private AtomicBoolean blocked = new AtomicBoolean();
     private ExchangeTopicManager exchangeTopicManager;
-    private final AmqpOutputConverter amqpOutputConverter;
+    private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
@@ -94,6 +94,21 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.exchangeTopicManager = new ExchangeTopicManager(this);
         this.amqpOutputConverter = new AmqpOutputConverter(this);
         //this.pulsarServerCnx=new ServerCnx(pulsarService);
+    }
+
+    @VisibleForTesting
+    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
+                          ExchangeTopicManager exchangeTopicManager) {
+        super(pulsarService, amqpConfig);
+        this.channels = new ConcurrentLongHashMap<>();
+        this.protocolVersion = ProtocolVersion.v0_91;
+        this.methodRegistry = new MethodRegistry(this.protocolVersion);
+        this.bufferSender = new AmqpByteBufferSenderImpl(this);
+        this.amqpConfig = amqpConfig;
+        this.maxChannels = amqpConfig.getMaxNoOfChannels();
+        this.maxFrameSize = amqpConfig.getMaxFrameSize();
+        this.heartBeat = amqpConfig.getHeartBeat();
+        this.exchangeTopicManager = exchangeTopicManager;
     }
 
     @Override
@@ -571,6 +586,24 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public ExchangeTopicManager getExchangeTopicManager() {
         return exchangeTopicManager;
+    }
+
+
+
+
+    @VisibleForTesting
+    public void setExchangeTopicManager(ExchangeTopicManager exchangeTopicManager) {
+        this.exchangeTopicManager = exchangeTopicManager;
+    }
+
+    public NamespaceName getNamespaceName() {
+        return namespaceName;
+    }
+
+
+    @VisibleForTesting
+    public void setNamespaceName(NamespaceName namespaceName){
+        this.namespaceName = namespaceName;
     }
 
     public boolean isCompressionSupported() {

@@ -19,6 +19,7 @@ import io.netty.channel.ChannelPipeline;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
+import io.streamnative.pulsar.handlers.amqp.ExchangeTopicManager;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
@@ -94,7 +95,8 @@ public abstract class AmqpProtocolTestBase {
         private MockChannel channelMethodProcessor;
 
         public MockConnection() throws PulsarServerException {
-            super(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class));
+            super(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class),
+                    Mockito.mock(ExchangeTopicManager.class));
             PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
             Namespaces namespaces = Mockito.mock(Namespaces.class);
             Mockito.when(getPulsarService().getAdminClient()).thenReturn(adminClient);

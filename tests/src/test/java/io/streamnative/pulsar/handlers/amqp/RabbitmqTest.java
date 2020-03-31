@@ -85,7 +85,8 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         connectionFactory.setVirtualHost("vhost1");
 
         final String queueName = "testQueue";
-        final String message = "Hello World!";
+        final String message = "Hello AOP!";
+        final int messagesNum = 10;
 
         @Cleanup PulsarAdmin pulsarAdmin = PulsarAdmin.builder().serviceHttpUrl("http://127.0.0.1:"
                 + brokerWebservicePort).build();
@@ -94,8 +95,10 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         try (Connection connection = connectionFactory.newConnection();
              Channel channel = connection.createChannel()) {
             channel.queueDeclare(queueName, false, false, false, null);
-            channel.basicPublish("", queueName, null, message.getBytes());
-            System.out.println("send message: " + message);
+            for (int i = 0; i < messagesNum; i++) {
+                channel.basicPublish("", queueName, null, message.getBytes());
+                System.out.println("send message: " + message);
+            }
         }
 
         Thread.sleep(1000 * 3);
@@ -109,8 +112,12 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
                 .subscriptionName("test")
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .subscribe();
-        Message<byte[]> msg = consumer.receive();
-        Assert.assertEquals(new String(msg.getData()), message);
+
+        for (int i = 0; i < messagesNum; i++) {
+            Message<byte[]> msg = consumer.receive();
+            System.out.println("receive msg: " + new String(msg.getData()));
+            Assert.assertEquals(new String(msg.getData()), message);
+        }
     }
 
 }

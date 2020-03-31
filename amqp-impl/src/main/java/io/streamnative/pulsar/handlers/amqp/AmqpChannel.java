@@ -550,21 +550,21 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             String exchangeName = AMQShortString.toString(info.getExchange());
 
             try {
-                String topic;
+                String topicName;
                 if (StringUtils.isEmpty(exchangeName)) {
-                    topic = routingKey;
+                    topicName = routingKey;
                 } else {
-                    topic = exchangeName;
+                    topicName = exchangeName;
                 }
                 // TODO send message to pulsar topic
                 connection.getExchangeTopicManager()
-                        .getTopic(topic)
-                        .whenComplete((mockTopic, throwable) -> {
+                        .getTopic(connection.getNamespaceName() + "/" + topicName)
+                        .whenComplete((topic, throwable) -> {
                             if (throwable != null) {
 
                             } else {
                                 try {
-                                    MessagePublishContext.publishMessages(currentMessage, mockTopic);
+                                    MessagePublishContext.publishMessages(currentMessage, topic);
                                     long deliveryTag = 1;
                                     BasicAckBody body = connection.getMethodRegistry()
                                             .createBasicAckBody(

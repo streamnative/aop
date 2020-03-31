@@ -297,6 +297,46 @@ public final class MessageConvertUtils {
         return builder.build();
     }
 
+    public static AmqpMessageData entryToAmqpBody(Entry entry)
+        throws UnsupportedEncodingException {
+        AmqpMessageData amqpMessage = null;
+        // TODO convert bk entries to amqpbody,
+        //  then assemble deliver body with ContentHeaderBody and ContentBody
+
+        ByteBuf metadataAndPayload = entry.getDataBuffer();
+        PulsarApi.MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
+        int numMessages = msgMetadata.getNumMessagesInBatch();
+        boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
+        ByteBuf payload = metadataAndPayload.retain();
+
+        if (log.isDebugEnabled()) {
+            log.debug("entryToRecord.  NumMessagesInBatch: {}, isBatchMessage: {}."
+                    + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
+                numMessages, !notBatchMessage, entry.getLedgerId(),
+                entry.getEntryId(), payload.readerIndex(), payload.writerIndex());
+        }
+
+        // need handle encryption
+        checkState(msgMetadata.getEncryptionKeysCount() == 0);
+
+        if (notBatchMessage) {
+            Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
+                getPropertiesFromMetadata(msgMetadata.getPropertiesList());
+
+            byte[] data = new byte[payload.readableBytes()];
+            payload.readBytes(data);
+            amqpMessage = AmqpMessageData.builder()
+                .messagePublishInfo(metaData.getRight())
+                .contentHeaderBody(new ContentHeaderBody(metaData.getLeft()))
+                .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
+                .build();
+        } else {
+            // currently, no consider for batch
+        }
+
+        return amqpMessage;
+    }
+
     private static String byteToString(byte b) throws UnsupportedEncodingException {
         byte[] bytes = {b};
         return new String(bytes, DEFAULT_CHARSET_NAME);

@@ -45,6 +45,8 @@ import org.apache.pulsar.utils.StatsOutputStream;
  */
 public class MockTopic implements Topic {
 
+    ConcurrentOpenHashMap<String, ? extends Subscription> subscriptions = new ConcurrentOpenHashMap<>();
+
     @Override
     public void publishMessage(ByteBuf byteBuf, PublishContext publishContext) {
 
@@ -89,7 +91,7 @@ public class MockTopic implements Topic {
 
     @Override
     public ConcurrentOpenHashMap<String, ? extends Subscription> getSubscriptions() {
-        return null;
+        return subscriptions;
     }
 
     @Override
@@ -104,7 +106,7 @@ public class MockTopic implements Topic {
 
     @Override
     public String getName() {
-        return null;
+        return "persistent://public/topic";
     }
 
     @Override
@@ -203,7 +205,11 @@ public class MockTopic implements Topic {
 
     @Override
     public Subscription getSubscription(String s) {
-        return null;
+        Subscription subscription = subscriptions.get(s);
+        if (subscription == null) {
+            subscription = new MockSubscription();
+        }
+        return subscription;
     }
 
     @Override

@@ -48,7 +48,6 @@ import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
-import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
@@ -549,35 +548,53 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
 
-            try {
-                String topicName;
-                if (StringUtils.isEmpty(exchangeName)) {
-                    topicName = routingKey;
-                } else {
-                    topicName = exchangeName;
-                }
-                // TODO send message to pulsar topic
-                connection.getExchangeTopicManager()
-                        .getTopic(connection.getNamespaceName() + "/" + topicName)
-                        .whenComplete((topic, throwable) -> {
-                            if (throwable != null) {
-
-                            } else {
-                                try {
-                                    MessagePublishContext.publishMessages(currentMessage, topic);
-                                    long deliveryTag = 1;
-                                    BasicAckBody body = connection.getMethodRegistry()
-                                            .createBasicAckBody(
-                                                    deliveryTag, false);
-                                    connection.writeFrame(body.generateFrame(channelId));
-                                } catch (UnsupportedEncodingException e) {
-                                    connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
-                                }
-                            }
-                });
-            } finally {
-                currentMessage = null;
+            String topicName;
+            if (StringUtils.isEmpty(exchangeName)) {
+                topicName = "persistent://" + connection.getNamespaceName() + "/" + routingKey;
+            } else {
+                topicName = "persistent://" + connection.getNamespaceName() + "/" + exchangeName;
             }
+            // TODO send message to pulsar topic
+
+            Topic topic = null;
+            try {
+                topic = connection.getExchangeTopicManager().getTopic(topicName).get();
+                if (topic == null) {
+                    currentMessage = null;
+                    connection.sendConnectionClose(INTERNAL_ERROR,
+                            "Create topic (" + topicName + ") failed.", channelId);
+                } else {
+                    try {
+                        MessagePublishContext.publishMessages(currentMessage, topic);
+                    } catch (UnsupportedEncodingException e) {
+                        log.error("Publish message failed!", e);
+                        connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
+                    }
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                log.error("Publish message failed!", e);
+                connection.sendConnectionClose(INTERNAL_ERROR,
+                        "Get topic (" + topicName + ") failed.", channelId);
+            }
+
+//            connection.getExchangeTopicManager()
+//                .getTopic(topicName)
+//                .whenComplete((topic, throwable) -> {
+//                    if (throwable != null) {
+//                        throwable.printStackTrace();
+//                    } else {
+//                        try {
+//                            MessagePublishContext.publishMessages(currentMessage, topic);
+//                            long deliveryTag = 1;
+//                            BasicAckBody body = connection.getMethodRegistry()
+//                                    .createBasicAckBody(
+//                                            deliveryTag, false);
+//                            connection.writeFrame(body.generateFrame(channelId));
+//                        } catch (UnsupportedEncodingException e) {
+//                            connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
+//                        }
+//                    }
+//                });
         }
     }
 

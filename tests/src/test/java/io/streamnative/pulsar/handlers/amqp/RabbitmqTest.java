@@ -101,10 +101,6 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
             }
         }
 
-        Thread.sleep(1000 * 3);
-
-        log.info("topics: {}", pulsarAdmin.topics().getList("public/vhost1"));
-
         @Cleanup PulsarClient pulsarClient = PulsarClient.builder()
                 .serviceUrl("pulsar://localhost:" + brokerPort).build();
         @Cleanup org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()

@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -26,6 +29,7 @@ import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor
 import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToServerByteBufferSender;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -46,10 +50,6 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 
-import java.util.concurrent.CompletableFuture;
-
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 
 /**
  * Base test for AMQP protocol tests.

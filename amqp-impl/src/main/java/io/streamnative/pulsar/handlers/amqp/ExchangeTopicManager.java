@@ -60,14 +60,11 @@ public class ExchangeTopicManager {
     public CompletableFuture<Topic> getTopic(String topicName) {
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
 
-        int channelId = 1;
-
         return topics.computeIfAbsent(topicName,
             t -> {
                 getTopicBroker(t).whenCompleteAsync((ignore, th) -> {
                     if (th != null || ignore == null) {
-                        log.warn("[{}] Failed getTopicBroker {}, return null PersistentTopic. throwable: ",
-                                1, t, th);
+                        log.warn("Failed getTopicBroker {}, return null PersistentTopic. throwable: ", t, th);
 
                         // get topic broker returns null. topic should be removed from LookupCache.
                         if (ignore == null) {
@@ -79,16 +76,14 @@ public class ExchangeTopicManager {
                     }
 
                     if (log.isDebugEnabled()) {
-                        log.debug("[{}] getTopicBroker for {} in KafkaTopicManager. brokerAddress: {}",
-                                channelId, t, ignore);
+                        log.debug("GetTopicBroker for {} in ExchangeTopicManager. brokerAddress: {}", t, ignore);
                     }
 
                     brokerService
                         .getTopic(t, true)
                         .whenComplete((t2, throwable) -> {
                             if (throwable != null) {
-                                log.error("[{}] Failed to getTopic {}. exception: {}",
-                                        channelId, t, throwable);
+                                log.error("Failed to getTopic {}. exception: {}", t, throwable);
                                 // failed to getTopic from current broker, remove cache, which added in getTopicBroker.
                                 removeLookupCache(t);
                                 topicCompletableFuture.complete(null);
@@ -100,13 +95,11 @@ public class ExchangeTopicManager {
                                     PersistentTopic persistentTopic = (PersistentTopic) t2.get();
                                     topicCompletableFuture.complete(persistentTopic);
                                 } else {
-                                    log.error("[{}]Get empty topic for name {}",
-                                            channelId, t);
+                                    log.error("Get empty topic for name {}", t);
                                     topicCompletableFuture.complete(null);
                                 }
                             } catch (Exception e) {
-                                log.error("[{}] Failed to get client in registerInPersistentTopic {}. exception:",
-                                        channelId, t, e);
+                                log.error("Failed to get client in registerInPersistentTopic {}. exception:", t, e);
                                 topicCompletableFuture.complete(null);
                             }
                         });
@@ -121,8 +114,7 @@ public class ExchangeTopicManager {
 
         return LOOKUP_CACHE.computeIfAbsent(topicName, t -> {
             if (log.isDebugEnabled()) {
-                log.debug("[{}] topic {} not in Lookup_cache, call lookupBroker",
-                        1, topicName);
+                log.debug("Topic {} not in Lookup_cache, call lookupBroker", topicName);
             }
             CompletableFuture<InetSocketAddress> returnFuture = new CompletableFuture<>();
             Backoff backoff = new Backoff(
@@ -151,8 +143,8 @@ public class ExchangeTopicManager {
                         long waitTimeMs = backoff.next();
 
                         if (backoff.isMandatoryStopMade()) {
-                            log.warn("[{}] getBroker for topic {} failed, retried too many times, waitTimeMs: {},"
-                                    + " return null. throwable: {}", 1, topicName, waitTimeMs, th);
+                            log.warn("GetBroker for topic {} failed, retried too many times, waitTimeMs: {},"
+                                    + " return null. throwable: {}", topicName, waitTimeMs, th);
                             retFuture.complete(null);
                         } else {
                             log.warn("[{}] getBroker for topic failed, will retry in {} ms. throwable: {}",
@@ -165,8 +157,7 @@ public class ExchangeTopicManager {
                         return null;
                     });
         } catch (PulsarServerException e) {
-            log.error("[{}] getTopicBroker for topic {} failed get pulsar client, return null. throwable: ",
-                    1, topicName, e);
+            log.error("GetTopicBroker for topic {} failed get pulsar client, return null. throwable: ", topicName, e);
             retFuture.complete(null);
         }
     }

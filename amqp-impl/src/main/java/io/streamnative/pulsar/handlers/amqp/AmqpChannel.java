@@ -549,17 +549,16 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
 
-            String topicName;
+            TopicName topicName;
             if (StringUtils.isEmpty(exchangeName)) {
-                topicName = "persistent://" + connection.getNamespaceName() + "/" + routingKey;
+                topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), routingKey);
             } else {
-                topicName = "persistent://" + connection.getNamespaceName() + "/" + exchangeName;
+                topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
             }
-            // TODO send message to pulsar topic
 
             Topic topic = null;
             try {
-                topic = connection.getExchangeTopicManager().getTopic(topicName).get();
+                topic = connection.getExchangeTopicManager().getTopic(topicName.toString()).get();
                 if (topic == null) {
                     currentMessage = null;
                     connection.sendConnectionClose(INTERNAL_ERROR,
@@ -580,25 +579,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 connection.sendConnectionClose(INTERNAL_ERROR,
                         "Get topic (" + topicName + ") failed.", channelId);
             }
-
-//            connection.getExchangeTopicManager()
-//                .getTopic(topicName)
-//                .whenComplete((topic, throwable) -> {
-//                    if (throwable != null) {
-//                        throwable.printStackTrace();
-//                    } else {
-//                        try {
-//                            MessagePublishContext.publishMessages(currentMessage, topic);
-//                            long deliveryTag = 1;
-//                            BasicAckBody body = connection.getMethodRegistry()
-//                                    .createBasicAckBody(
-//                                            deliveryTag, false);
-//                            connection.writeFrame(body.generateFrame(channelId));
-//                        } catch (UnsupportedEncodingException e) {
-//                            connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
-//                        }
-//                    }
-//                });
         }
     }
 

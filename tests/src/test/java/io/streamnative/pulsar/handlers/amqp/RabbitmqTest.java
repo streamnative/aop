@@ -88,7 +88,8 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         final String message = "Hello AOP!";
         final int messagesNum = 10;
 
-        @Cleanup PulsarAdmin pulsarAdmin = PulsarAdmin.builder().serviceHttpUrl("http://127.0.0.1:"
+        @Cleanup
+        PulsarAdmin pulsarAdmin = PulsarAdmin.builder().serviceHttpUrl("http://127.0.0.1:"
                 + brokerWebservicePort).build();
         log.info("topics: {}", pulsarAdmin.topics());
 
@@ -101,9 +102,11 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
             }
         }
 
-        @Cleanup PulsarClient pulsarClient = PulsarClient.builder()
+        @Cleanup
+        PulsarClient pulsarClient = PulsarClient.builder()
                 .serviceUrl("pulsar://localhost:" + brokerPort).build();
-        @Cleanup org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()
+        @Cleanup
+        org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()
                 .topic("persistent://public/vhost1/" + queueName)
                 .subscriptionName("test")
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)

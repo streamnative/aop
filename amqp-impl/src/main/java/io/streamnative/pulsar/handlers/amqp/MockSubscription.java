@@ -84,7 +84,9 @@ public class MockSubscription implements Subscription {
     }
 
     @Override public CompletableFuture<Void> delete() {
-        return null;
+        CompletableFuture<Void> completableFuture = new CompletableFuture<>();
+        completableFuture.complete(null);
+        return completableFuture;
     }
 
     @Override public CompletableFuture<Void> disconnect() {

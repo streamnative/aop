@@ -20,6 +20,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.ExchangeTopicManager;
+import io.streamnative.pulsar.handlers.amqp.MockTopic;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
@@ -29,6 +30,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
+import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.admin.Namespaces;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -43,6 +45,11 @@ import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
+
+import java.util.concurrent.CompletableFuture;
+
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 
 /**
  * Base test for AMQP protocol tests.
@@ -97,10 +104,18 @@ public abstract class AmqpProtocolTestBase {
         public MockConnection() throws PulsarServerException {
             super(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class),
                     Mockito.mock(ExchangeTopicManager.class));
+
             PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
             Namespaces namespaces = Mockito.mock(Namespaces.class);
             Mockito.when(getPulsarService().getAdminClient()).thenReturn(adminClient);
             Mockito.when(getPulsarService().getAdminClient().namespaces()).thenReturn(namespaces);
+
+            ExchangeTopicManager exchangeTopicManager = Mockito.mock(ExchangeTopicManager.class);
+            CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
+            completableFuture.complete(new MockTopic());
+            Mockito.when(exchangeTopicManager.getTopic(anyString())).thenReturn(completableFuture);
+            Mockito.when(exchangeTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(new MockTopic());
+            super.setExchangeTopicManager(exchangeTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 

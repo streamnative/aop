@@ -48,6 +48,7 @@ import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
@@ -566,6 +567,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 } else {
                     try {
                         MessagePublishContext.publishMessages(currentMessage, topic);
+                        BasicAckBody body = connection.getMethodRegistry()
+                                .createBasicAckBody(deliveryTag, false);
+                        connection.writeFrame(body.generateFrame(channelId));
                     } catch (UnsupportedEncodingException e) {
                         log.error("Publish message failed!", e);
                         connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);

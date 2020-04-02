@@ -223,6 +223,9 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testBasicPublish() {
+        NamespaceName namespaceName = NamespaceName.get("public", "vhost1");
+        connection.setNamespaceName(namespaceName);
+
         BasicPublishBody methodBody = methodRegistry.createBasicPublishBody(0, "test", "", false, false);
         methodBody.generateFrame(1).writePayload(toServerSender);
 

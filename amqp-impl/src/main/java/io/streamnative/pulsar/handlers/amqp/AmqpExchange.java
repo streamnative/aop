@@ -99,15 +99,15 @@ public interface AmqpExchange {
     CompletableFuture<Position> getMarkDeleteAsync(String queueName);
 
     /**
-     * Bind a queue {@link AmqpQueue} to the exchange.
+     * Add a queue {@link AmqpQueue} to the exchange.
      * @param queue AMQP queue.
      */
-    void bindQueue(AmqpQueue queue);
+    void addQueue(AmqpQueue queue);
 
     /**
-     * UnBind a queue {@link AmqpQueue} from the exchange.
+     * Remove a queue {@link AmqpQueue} from the exchange.
      * @param queue AMQP queue.
      */
-    void unBindQueue(AmqpQueue queue);
+    void removeQueue(AmqpQueue queue);
 
 }

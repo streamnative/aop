@@ -32,12 +32,12 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     }
 
     @Override
-    public void bindQueue(AmqpQueue queue) {
+    public void addQueue(AmqpQueue queue) {
         queues.add(queue);
     }
 
     @Override
-    public void unBindQueue(AmqpQueue queue) {
+    public void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
     }
 

@@ -61,12 +61,12 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
         router.setExchange(exchange);
         router.setQueue(this);
         this.routers.put(router.getExchange().getName(), router);
-        exchange.bindQueue(this);
+        exchange.addQueue(this);
     }
 
     @Override
     public void unbindExchange(AmqpExchange exchange) {
-        exchange.unBindQueue(this);
+        exchange.removeQueue(this);
         this.routers.remove(exchange.getName());
     }
 }

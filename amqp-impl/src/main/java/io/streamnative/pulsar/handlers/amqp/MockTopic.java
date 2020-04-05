@@ -81,7 +81,9 @@ public class MockTopic implements Topic {
     @Override
     public CompletableFuture<Subscription> createSubscription(String s,
                                             PulsarApi.CommandSubscribe.InitialPosition initialPosition, boolean b) {
-        return null;
+        CompletableFuture<Subscription> completableFuture = new CompletableFuture<>();
+        completableFuture.complete(null);
+        return completableFuture;
     }
 
     @Override
@@ -96,7 +98,9 @@ public class MockTopic implements Topic {
 
     @Override
     public CompletableFuture<Void> delete() {
-        return null;
+        CompletableFuture<Void> completableFuture = new CompletableFuture<>();
+        completableFuture.complete(null);
+        return completableFuture;
     }
 
     @Override

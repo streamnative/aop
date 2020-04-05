@@ -110,7 +110,9 @@ public final class MessageConvertUtils {
         ContentHeaderBody contentHeaderBody = incomingMessage.getContentHeader();
         BasicContentHeaderProperties props = contentHeaderBody.getProperties();
         if (props != null) {
-            builder.eventTime(props.getTimestamp());
+            if (props.getTimestamp() > 0) {
+                builder.eventTime(props.getTimestamp());
+            }
 
             setProp(builder, PROP_CONTENT_TYPE, props.getContentTypeAsString());
             setProp(builder, PROP_ENCODING, props.getEncodingAsString());

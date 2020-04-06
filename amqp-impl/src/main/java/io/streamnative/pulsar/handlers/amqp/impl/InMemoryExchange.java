@@ -53,7 +53,8 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     public CompletableFuture<Position> writeMessageAsync(IncomingMessage incomingMessage) {
         try {
             MessageImpl<byte[]> pulsarMessage = MessageConvertUtils.toPulsarMessage(incomingMessage);
-            Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, pulsarMessage.getDataBuffer());
+            Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId,
+                    MessageConvertUtils.messageToByteBuf(pulsarMessage));
             PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
             messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
             List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
@@ -83,7 +84,9 @@ public class InMemoryExchange extends AbstractAmqpExchange {
         if (!cursor.containsKey(position)) {
             return CompletableFuture.completedFuture(null);
         }
-        return CompletableFuture.completedFuture(messageStore.get(position));
+        Entry entry = messageStore.get(position);
+        entry.getDataBuffer().resetReaderIndex();
+        return CompletableFuture.completedFuture(entry);
     }
 
     @Override

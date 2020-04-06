@@ -33,6 +33,25 @@ public interface AmqpExchange {
         Fanout,
         Topic,
         Headers;
+
+        public static Type value(String type) {
+            if (type == null || type.length() == 0) {
+                return null;
+            }
+            switch (type) {
+                case "direct":
+                    return Direct;
+                case "fanout":
+                    return Fanout;
+                case "topic":
+                    return Topic;
+                case "headers":
+                    return Headers;
+                default:
+                    return null;
+            }
+        }
+
     }
 
     /**

@@ -325,11 +325,14 @@ public final class MessageConvertUtils {
             Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
                 getPropertiesFromMetadata(msgMetadata.getPropertiesList());
 
+            ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
+            contentHeaderBody.setBodySize(payload.readableBytes());
+
             byte[] data = new byte[payload.readableBytes()];
             payload.readBytes(data);
             amqpMessage = AmqpMessageData.builder()
                 .messagePublishInfo(metaData.getRight())
-                .contentHeaderBody(new ContentHeaderBody(metaData.getLeft()))
+                .contentHeaderBody(contentHeaderBody)
                 .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
                 .build();
         } else {

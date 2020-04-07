@@ -71,20 +71,6 @@ public class InMemoryExchange extends AbstractAmqpExchange {
         }
     }
 
-    public CompletableFuture<Position> writeMessageAsync(ByteBuf byteBuf) {
-        Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, byteBuf);
-        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
-        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
-        List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
-        for (AmqpQueue queue : queues) {
-            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
-            cursor.put(position, null);
-            routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
-                    position.getEntryId()));
-        }
-        return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
-    }
-
     @Override
     public CompletableFuture<Entry> readEntryAsync(String queueName, long ledgerId, long entryId) {
         return readEntryAsync(queueName, PositionImpl.get(ledgerId, entryId));
@@ -147,4 +133,21 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     public int getMessages() {
         return messageStore.size();
     }
+
+    @VisibleForTesting
+    public CompletableFuture<Position> writeMessageAsync(ByteBuf byteBuf) {
+        Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, byteBuf);
+        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
+        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
+        List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
+        for (AmqpQueue queue : queues) {
+            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
+            cursor.put(position, null);
+            routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
+                    position.getEntryId()));
+        }
+        return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
+    }
+
+
 }

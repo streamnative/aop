@@ -141,15 +141,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         final MethodRegistry methodRegistry = connection.getMethodRegistry();
         final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
 
-        // in-memory integration
-//        if (!durable) {
-//            InMemoryExchange inMemoryExchange = new InMemoryExchange(
-//                    exchange.toString(), AmqpExchange.Type.value(type.toString()));
-//            connection.putExchange(exchange.toString(), inMemoryExchange);
-//            connection.writeFrame(declareOkBody.generateFrame(channelId));
-//            return;
-//        }
-
         if (isDefaultExchange(exchange)) {
             if (!AMQShortString.createAMQShortString(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).equals(type)) {
                 StringBuffer sb = new StringBuffer();

@@ -17,7 +17,6 @@ import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.streamnative.pulsar.handlers.amqp.impl.FanoutMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -143,13 +142,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
 
         // in-memory integration
-        if (!durable) {
-            InMemoryExchange inMemoryExchange = new InMemoryExchange(
-                    exchange.toString(), AmqpExchange.Type.value(type.toString()));
-            connection.putExchange(exchange.toString(), inMemoryExchange);
-            connection.writeFrame(declareOkBody.generateFrame(channelId));
-            return;
-        }
+//        if (!durable) {
+//            InMemoryExchange inMemoryExchange = new InMemoryExchange(
+//                    exchange.toString(), AmqpExchange.Type.value(type.toString()));
+//            connection.putExchange(exchange.toString(), inMemoryExchange);
+//            connection.writeFrame(declareOkBody.generateFrame(channelId));
+//            return;
+//        }
 
         if (isDefaultExchange(exchange)) {
             if (!AMQShortString.createAMQShortString(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).equals(type)) {
@@ -158,6 +157,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).append("to").append(type).append(".");
                 connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, sb.toString(), channelId);
             } else {
+                // in-memory integration
+                if (!durable) {
+                    InMemoryExchange inMemoryExchange = new InMemoryExchange(
+                            exchange.toString(), AmqpExchange.Type.value(type.toString()));
+                    connection.putExchange(exchange.toString(), inMemoryExchange);
+                }
+
                 // if declare a default exchange, return success.
                 connection.writeFrame(declareOkBody.generateFrame(channelId));
             }
@@ -166,12 +172,24 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
             // create new exchange, on first step, we just create a Pulsar Topic.
             if (PulsarService.State.Started == connection.getPulsarService().getState()) {
-                TopicName topicName;
-                if (durable) {
-                    topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), name);
-                } else {
-                    topicName = TopicName.get(TopicDomain.non_persistent.value(), connection.getNamespaceName(), name);
+
+                if (!durable) {
+                    // in-memory integration
+                    InMemoryExchange inMemoryExchange = new InMemoryExchange(
+                            exchange.toString(), AmqpExchange.Type.value(type.toString()));
+                    connection.putExchange(exchange.toString(), inMemoryExchange);
+                    connection.writeFrame(declareOkBody.generateFrame(channelId));
+                    return;
                 }
+
+                TopicName topicName = TopicName.get(
+                        TopicDomain.persistent.value(), connection.getNamespaceName(), name);
+//                if (durable) {
+//                    topicName = TopicName.get(TopicDomain.persistent.value(), connection.getNamespaceName(), name);
+//                } else {
+//                    topicName = TopicName.get(
+//                            TopicDomain.non_persistent.value(), connection.getNamespaceName(), name);
+//                }
                 Topic topic = exchangeTopicManager.getOrCreateTopic(topicName.toString(), true);
                 if (null == topic) {
                     connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
@@ -284,9 +302,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         AmqpQueue amqpQueue = connection.getQueue(queue.toString());
         AmqpExchange amqpExchange = connection.getExchange(exchange.toString());
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-            AmqpMessageRouter messageRouter = null;
-            if (amqpExchange.getType().equals(AmqpExchange.Type.Fanout)) {
-                messageRouter = new FanoutMessageRouter();
+            AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
+            if (messageRouter == null) {
+                connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
+                return;
             }
             amqpQueue.bindExchange(amqpExchange, messageRouter);
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
@@ -417,7 +436,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                         getNextDeliveryTag(),
                                         AMQShortString.createAMQShortString(consumerTag1));
                             } catch (Exception e) {
-                                e.printStackTrace();
+                                closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
                             }
                         }
                     });

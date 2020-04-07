@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
@@ -68,6 +69,20 @@ public class InMemoryExchange extends AbstractAmqpExchange {
         } catch (UnsupportedEncodingException e) {
             return FutureUtil.failedFuture(e);
         }
+    }
+
+    public CompletableFuture<Position> writeMessageAsync(ByteBuf byteBuf) {
+        Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, byteBuf);
+        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
+        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
+        List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
+        for (AmqpQueue queue : queues) {
+            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
+            cursor.put(position, null);
+            routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
+                    position.getEntryId()));
+        }
+        return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
     }
 
     @Override

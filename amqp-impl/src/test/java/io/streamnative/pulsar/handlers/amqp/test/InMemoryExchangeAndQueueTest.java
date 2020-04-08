@@ -14,13 +14,14 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.impl.FanoutMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 /**
  * Unit test for InMemoryExchange and InMemoryQueue.
  */
@@ -58,18 +60,19 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testWriteAndRead() throws ExecutionException, InterruptedException {
+    public void testWriteAndRead() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct);
         AmqpQueue queue = new InMemoryQueue(queueName);
         queue.bindExchange(exchange, new FanoutMessageRouter());
 
-        ByteBuf expectedContentByteBuf = Unpooled.buffer();
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-        expectedContentByteBuf.writeBytes(singleContent);
+        IncomingMessage incomingMessage = generateMessage(exchangeName, singleContent);
+        ByteBuf expectedContentByteBuf = MessageConvertUtils.messageToByteBuf(
+                MessageConvertUtils.toPulsarMessage(incomingMessage));
 
-        Position position = exchange.writeMessageAsync(generateMessage(exchangeName, singleContent)).get();
+        Position position = ((InMemoryExchange) exchange).writeMessageAsync(expectedContentByteBuf).get();
         Assert.assertNotNull(position);
 
         // Test read entry from exchange directly.

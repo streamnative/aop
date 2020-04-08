@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
@@ -53,7 +54,8 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     public CompletableFuture<Position> writeMessageAsync(IncomingMessage incomingMessage) {
         try {
             MessageImpl<byte[]> pulsarMessage = MessageConvertUtils.toPulsarMessage(incomingMessage);
-            Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, pulsarMessage.getDataBuffer());
+            Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId,
+                    MessageConvertUtils.messageToByteBuf(pulsarMessage));
             PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
             messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
             List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
@@ -83,7 +85,9 @@ public class InMemoryExchange extends AbstractAmqpExchange {
         if (!cursor.containsKey(position)) {
             return CompletableFuture.completedFuture(null);
         }
-        return CompletableFuture.completedFuture(messageStore.get(position));
+        Entry entry = messageStore.get(position);
+        entry.getDataBuffer().resetReaderIndex();
+        return CompletableFuture.completedFuture(entry);
     }
 
     @Override
@@ -129,4 +133,21 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     public int getMessages() {
         return messageStore.size();
     }
+
+    @VisibleForTesting
+    public CompletableFuture<Position> writeMessageAsync(ByteBuf byteBuf) {
+        Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, byteBuf);
+        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
+        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
+        List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
+        for (AmqpQueue queue : queues) {
+            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
+            cursor.put(position, null);
+            routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
+                    position.getEntryId()));
+        }
+        return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
+    }
+
+
 }

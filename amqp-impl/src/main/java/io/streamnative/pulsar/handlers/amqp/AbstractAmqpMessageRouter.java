@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.impl.FanoutMessageRouter;
+
 /**
  * Base class for AMQP message router.
  */
@@ -50,4 +52,25 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     public AmqpQueue getQueue() {
         return queue;
     }
+
+    public static AmqpMessageRouter generateRouter(AmqpExchange.Type type) {
+
+        if (type == null) {
+            return null;
+        }
+
+        switch (type) {
+            case Direct:
+                return null;
+            case Fanout:
+                return new FanoutMessageRouter();
+            case Topic:
+                return null;
+            case Headers:
+                return null;
+            default:
+                return null;
+        }
+    }
+
 }

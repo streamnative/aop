@@ -441,7 +441,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         String queueName = AMQShortString.toString(queue);
         // TODO Temporarily treat queue as exchange
         connection.getExchangeTopicManager()
-            .getTopic(queueName)
+            .getTopic(queueName, true)
             .whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue, '" + queueName + "'");
@@ -657,7 +657,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
             Topic topic = null;
             try {
-                topic = connection.getExchangeTopicManager().getTopic(topicName.toString()).get();
+                topic = connection.getExchangeTopicManager().getTopic(topicName.toString(), true).get();
                 if (topic == null) {
                     currentMessage = null;
                     connection.sendConnectionClose(INTERNAL_ERROR,

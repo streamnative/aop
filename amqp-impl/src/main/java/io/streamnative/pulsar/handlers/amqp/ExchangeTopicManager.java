@@ -181,6 +181,7 @@ public class ExchangeTopicManager {
                             whenComplete((addr, th) -> {
                                 if (th != null || addr == null || addr.get() == null) {
                                     log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", t, th);
+                                    topicCompletableFuture.complete(null);
                                     return;
                                 }
                                 if (log.isDebugEnabled()) {

@@ -28,6 +28,7 @@ import java.util.Map;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.CompressionType;
 import org.apache.pulsar.client.api.Message;
@@ -352,6 +353,24 @@ public final class MessageConvertUtils {
             return string.getBytes(DEFAULT_CHARSET_NAME)[0];
         }
         return null;
+    }
+
+    // Currently, one entry consist of on PositionImpl info
+    public static MessageImpl<byte[]> toPulsarMessage(PositionImpl position) {
+        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
+        ByteBuf byteBuf = Unpooled.buffer();
+        byteBuf.writeLong(position.getLedgerId());
+        byteBuf.writeLong(position.getEntryId());
+        builder.value(byteBuf.array());
+        return (MessageImpl<byte[]>) builder.getMessage();
+    }
+
+    // Currently, one entry consist of on PositionImpl info
+    public static PositionImpl entryToPosition(Entry entry) {
+        ByteBuf metadataAndPayload = entry.getDataBuffer();
+        Commands.parseMessageMetadata(metadataAndPayload);
+        ByteBuf payload = metadataAndPayload.retain();
+        return PositionImpl.get(payload.readLong(), payload.readLong());
     }
 
 }

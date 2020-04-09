@@ -12,15 +12,20 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp;
+
 import static java.nio.charset.StandardCharsets.US_ASCII;
+
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
@@ -28,7 +33,10 @@ import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.protocol.ErrorCodes;
@@ -80,7 +88,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private NamespaceName namespaceName;
     private final Object channelAddRemoveLock = new Object();
     private AtomicBoolean blocked = new AtomicBoolean();
-    private ExchangeTopicManager exchangeTopicManager;
+    private AmqpTopicManager amqpTopicManager;
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
     private Map<String, AmqpExchange> exchangeMap = new ConcurrentHashMap<>();
@@ -96,14 +104,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
-        this.exchangeTopicManager = new ExchangeTopicManager(this);
+        this.amqpTopicManager = new AmqpTopicManager(this);
         this.amqpOutputConverter = new AmqpOutputConverter(this);
         //this.pulsarServerCnx=new ServerCnx(pulsarService);
     }
 
     @VisibleForTesting
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                          ExchangeTopicManager exchangeTopicManager) {
+                          AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
@@ -113,7 +121,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
-        this.exchangeTopicManager = exchangeTopicManager;
+        this.amqpTopicManager = amqpTopicManager;
     }
 
     @Override
@@ -235,6 +243,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
+        defaultExchangeInit();
 //        } else {
 //            sendConnectionClose(ErrorCodes.NOT_FOUND,
 //                "Unknown virtual host: '" + virtualHostStr + "'", 0);
@@ -589,16 +598,16 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
 
-    public ExchangeTopicManager getExchangeTopicManager() {
-        return exchangeTopicManager;
+    public AmqpTopicManager getAmqpTopicManager() {
+        return amqpTopicManager;
     }
 
 
 
 
     @VisibleForTesting
-    public void setExchangeTopicManager(ExchangeTopicManager exchangeTopicManager) {
-        this.exchangeTopicManager = exchangeTopicManager;
+    public void setAmqpTopicManager(AmqpTopicManager amqpTopicManager) {
+        this.amqpTopicManager = amqpTopicManager;
     }
 
     public NamespaceName getNamespaceName() {
@@ -632,7 +641,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     public void putExchange(String exchangeName, AmqpExchange amqpExchange) {
-        exchangeMap.put(exchangeName, amqpExchange);
+        exchangeMap.computeIfAbsent(exchangeName, name -> amqpExchange);
     }
 
     public AmqpExchange getExchange(String exchangeName) {
@@ -643,7 +652,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     public void putQueue(String queueName, AmqpQueue amqpQueue) {
-        queueMap.put(queueName, amqpQueue);
+        queueMap.computeIfAbsent(queueName, name -> amqpQueue);
     }
 
     public AmqpQueue getQueue(String queueName) {
@@ -651,6 +660,23 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             return null;
         }
         return queueMap.getOrDefault(queueName, null);
+    }
+
+    public void defaultExchangeInit() {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+        PersistentTopic persistentTopic = null;
+        try {
+            persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Create default exchange topic failed!");
+        }
+        exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
+                AmqpExchange.Type.Direct, persistentTopic));
+
+        exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE,
+                new InMemoryExchange("", AmqpExchange.Type.Direct));
+
     }
 
 }

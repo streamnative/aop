@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 
 /**
  * Base class for AMQP queue.
@@ -23,15 +24,22 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractAmqpQueue implements AmqpQueue {
 
     protected final String queueName;
+    protected final boolean durable;
     protected final Map<String, AmqpMessageRouter> routers = new ConcurrentHashMap<>();
 
-    protected AbstractAmqpQueue(String queueName) {
+    protected AbstractAmqpQueue(String queueName, boolean durable) {
         this.queueName = queueName;
+        this.durable = durable;
     }
 
     @Override
     public String getName() {
         return queueName;
+    }
+
+    @Override
+    public boolean getDurable() {
+        return durable;
     }
 
     @Override
@@ -57,7 +65,7 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     }
 
     @Override
-    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router) {
+    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, PersistentTopic persistentTopic) {
         router.setExchange(exchange);
         router.setQueue(this);
         this.routers.put(router.getExchange().getName(), router);

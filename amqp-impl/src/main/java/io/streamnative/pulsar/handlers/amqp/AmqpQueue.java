@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 
 /**
  * Interface of the AMQP queue.
@@ -28,6 +29,8 @@ public interface AmqpQueue {
      * @return name of the queue.
      */
     String getName();
+
+    boolean getDurable();
 
     /**
      * Write the index message into the queue.
@@ -58,7 +61,7 @@ public interface AmqpQueue {
     /**
      * Bind to a exchange {@link AmqpExchange}.
      */
-    void bindExchange(AmqpExchange exchange, AmqpMessageRouter router);
+    void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, PersistentTopic persistentTopic);
 
     /**
      * UnBind a exchange for the queue.

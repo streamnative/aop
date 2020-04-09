@@ -18,6 +18,9 @@ import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
@@ -28,6 +31,8 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
+import org.apache.pulsar.client.impl.MessageIdImpl;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
@@ -35,7 +40,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
 
 /**
  * RabbitMQ client test.
@@ -153,7 +157,7 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
                 .serviceUrl("pulsar://localhost:" + brokerPort).build();
         @Cleanup
         org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()
-                .topic("persistent://public/vhost1/" + queueName)
+                .topic("persistent://public/vhost1/" + AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)
                 .subscriptionName("test")
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .subscribe();
@@ -163,6 +167,79 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
             System.out.println("receive msg: " + new String(msg.getData()));
             Assert.assertEquals(new String(msg.getData()), message);
         }
+    }
+
+    @Test
+    private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException {
+        final String vhost = "vhost1";
+        final String exchangeName = "ex";
+        final String queueName1 = "ex-q1";
+        final String queueName2 = "ex-q2";
+
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.setHost("localhost");
+        connectionFactory.setPort(5672);
+        connectionFactory.setVirtualHost(vhost);
+
+        @Cleanup
+        Connection connection = connectionFactory.newConnection();
+        @Cleanup
+        Channel channel = connection.createChannel();
+
+        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+        channel.queueDeclare(queueName1, true, false, false, null);
+        channel.queueBind(queueName1, exchangeName, "");
+        channel.queueDeclare(queueName2, true, false, false, null);
+        channel.queueBind(queueName2, exchangeName, "");
+
+        String contentMsg = "Hello AOP!";
+        channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+
+        @Cleanup
+        PulsarClient pulsarClient = PulsarClient.builder().serviceUrl("pulsar://localhost:" + brokerPort).build();
+        String exchangeTopic = "persistent://public/vhost1/ex";
+        NamespaceName namespaceName = NamespaceName.get("public", vhost);
+        String queueIndexTopic1 = PersistentQueue.getIndexTopicName(namespaceName, exchangeName, queueName1);
+        String queueIndexTopic2 = PersistentQueue.getIndexTopicName(namespaceName, exchangeName, queueName2);
+
+        @Cleanup
+        org.apache.pulsar.client.api.Consumer<byte[]> exchangeConsumer =
+                pulsarClient.newConsumer()
+                        .topic(exchangeTopic)
+                        .subscriptionName("test-sub")
+                        .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                        .subscribe();
+        @Cleanup
+        org.apache.pulsar.client.api.Consumer<byte[]> queueIndexConsumer1 =
+                pulsarClient.newConsumer()
+                        .topic(queueIndexTopic1)
+                        .subscriptionName("test-sub")
+                        .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                        .subscribe();
+        @Cleanup
+        org.apache.pulsar.client.api.Consumer<byte[]> queueIndexConsumer2 =
+                pulsarClient.newConsumer()
+                        .topic(queueIndexTopic2)
+                        .subscriptionName("test-sub")
+                        .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                        .subscribe();
+
+        Message<byte[]> message = exchangeConsumer.receive();
+        final long ledgerId = ((MessageIdImpl) message.getMessageId()).getLedgerId();
+        final long entryId = ((MessageIdImpl) message.getMessageId()).getEntryId();
+        log.info("[{}] receive messageId: {}, msg: {}",
+                exchangeTopic, message.getMessageId(), new String(message.getData()));
+        Assert.assertEquals(new String(message.getData()), contentMsg);
+
+        message = queueIndexConsumer1.receive();
+        ByteBuf byteBuf1 = Unpooled.wrappedBuffer(message.getData());
+        Assert.assertEquals(ledgerId, byteBuf1.readLong());
+        Assert.assertEquals(entryId, byteBuf1.readLong());
+
+        message = queueIndexConsumer2.receive();
+        ByteBuf byteBuf2 = Unpooled.wrappedBuffer(message.getData());
+        Assert.assertEquals(ledgerId, byteBuf2.readLong());
+        Assert.assertEquals(entryId, byteBuf2.readLong());
     }
 
 }

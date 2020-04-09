@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
+import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
@@ -111,6 +112,28 @@ public class MessageConvertTest {
         ByteBuf byteBuf = Unpooled.wrappedBuffer(
                 ((SingleQpidByteBuffer) amqpMessageData.getContentBody().getPayload()).getUnderlyingBuffer().array());
         assertEquals(expectedContentByteBuf, byteBuf);
+    }
+
+    @Test
+    private void positionConvert() {
+        MessageImpl<byte[]> message;
+        PositionImpl p1 = PositionImpl.earliest;
+        message = MessageConvertUtils.toPulsarMessage(p1);
+        PositionImpl p1Converted = MessageConvertUtils.entryToPosition(
+                EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
+        assertEquals(p1, p1Converted);
+
+        PositionImpl p2 = PositionImpl.latest;
+        message = MessageConvertUtils.toPulsarMessage(p2);
+        PositionImpl p2Converted = MessageConvertUtils.entryToPosition(
+                EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
+        assertEquals(p2, p2Converted);
+
+        PositionImpl p3 = PositionImpl.get(10, 1);
+        message = MessageConvertUtils.toPulsarMessage(p3);
+        PositionImpl p3Converted = MessageConvertUtils.entryToPosition(
+                EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
+        assertEquals(p3, p3Converted);
     }
 
 }

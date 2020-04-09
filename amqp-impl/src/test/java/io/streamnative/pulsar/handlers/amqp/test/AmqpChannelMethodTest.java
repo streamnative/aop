@@ -172,12 +172,24 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
+
+        exchangeDeclare(exchange, true);
+
+        queueDeclare(queue, true);
 
         QueueBindBody cmd = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
                 false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+
         AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueBindOkBody);
     }
 
@@ -225,8 +237,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testBasicPublish() {
         NamespaceName namespaceName = NamespaceName.get("public", "vhost1");
         connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
-        BasicPublishBody methodBody = methodRegistry.createBasicPublishBody(0, "test", "", false, false);
+        final String exchange = "test";
+
+        exchangeDeclare(exchange, true);
+
+        BasicPublishBody methodBody = methodRegistry.createBasicPublishBody(0, exchange, "", false, false);
         methodBody.generateFrame(1).writePayload(toServerSender);
 
         BasicContentHeaderProperties props = new BasicContentHeaderProperties();
@@ -235,7 +252,6 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         props.setTimestamp(System.currentTimeMillis());
         props.setHeaders(FieldTableFactory.createFieldTable(Collections.singletonMap("Test", "MST")));
 
-        ContentHeaderBody headerBody = new ContentHeaderBody(props, contentBytes.length);
         ContentHeaderBody.createAMQFrame(1, props, contentBytes.length).writePayload(toServerSender);
 
         QpidByteBuffer qpidByteBuffer = QpidByteBuffer.wrap(contentBytes);
@@ -244,7 +260,23 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         toServerSender.flush();
 
         AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof BasicAckBody);
+    }
+
+    private void exchangeDeclare(String exchange, boolean durable) {
+        ExchangeDeclareBody exchangeDeclareBody = methodRegistry
+                .createExchangeDeclareBody(0, exchange, "fanout", true, durable,
+                        false, false, false, null);
+        exchangeDeclareBody.generateFrame(1).writePayload(toServerSender);
+    }
+
+    private void queueDeclare(String queue, boolean durable) {
+        QueueDeclareBody queueDeclareBody = methodRegistry.createQueueDeclareBody(0, queue,
+                false, durable, false, false, false, null);
+        queueDeclareBody.generateFrame(1).writePayload(toServerSender);
     }
 
     @Test

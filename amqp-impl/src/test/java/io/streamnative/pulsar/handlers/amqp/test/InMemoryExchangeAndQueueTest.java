@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.client.api.Message;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTableFactory;
@@ -52,7 +53,7 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName = "test";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct);
         AmqpQueue queue = new InMemoryQueue("test");
-        queue.bindExchange(exchange, new FanoutMessageRouter());
+        queue.bindExchange(exchange, new FanoutMessageRouter(), null);
         Assert.assertNotNull(queue.getRouter(exchangeName));
         Assert.assertEquals(queue.getRouter(exchangeName).getExchange(), exchange);
         Assert.assertEquals(queue.getRouter(exchangeName).getType(), AmqpMessageRouter.Type.Fanout);
@@ -65,12 +66,11 @@ public class InMemoryExchangeAndQueueTest {
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct);
         AmqpQueue queue = new InMemoryQueue(queueName);
-        queue.bindExchange(exchange, new FanoutMessageRouter());
+        queue.bindExchange(exchange, new FanoutMessageRouter(), null);
 
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-        IncomingMessage incomingMessage = generateMessage(exchangeName, singleContent);
-        ByteBuf expectedContentByteBuf = MessageConvertUtils.messageToByteBuf(
-                MessageConvertUtils.toPulsarMessage(incomingMessage));
+        Message<byte[]> message = generateMessage(exchangeName, singleContent);
+        ByteBuf expectedContentByteBuf = MessageConvertUtils.messageToByteBuf(message);
 
         Position position = ((InMemoryExchange) exchange).writeMessageAsync(expectedContentByteBuf).get();
         Assert.assertNotNull(position);
@@ -88,16 +88,16 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testMarkDelete() throws ExecutionException, InterruptedException {
+    public void testMarkDelete() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct);
         AmqpQueue queue = new InMemoryQueue(queueName);
-        queue.bindExchange(exchange, new FanoutMessageRouter());
+        queue.bindExchange(exchange, new FanoutMessageRouter(), null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positions = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
-            positions.add(exchange.writeMessageAsync(generateMessage(exchangeName, singleContent)).get());
+            positions.add(exchange.writeMessageAsync(generateMessage(exchangeName, singleContent), "").get());
         }
         Assert.assertEquals(positions.size(), 10);
         for (Position position : positions) {
@@ -116,16 +116,16 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testQueueAcknowledge() throws ExecutionException, InterruptedException {
+    public void testQueueAcknowledge() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct);
         AmqpQueue queue = new InMemoryQueue(queueName);
-        queue.bindExchange(exchange, new FanoutMessageRouter());
+        queue.bindExchange(exchange, new FanoutMessageRouter(), null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positions = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
-            positions.add(exchange.writeMessageAsync(generateMessage(exchangeName, singleContent)).get());
+            positions.add(exchange.writeMessageAsync(generateMessage(exchangeName, singleContent), "").get());
         }
         Assert.assertEquals(positions.size(), 10);
         for (Position position : positions) {
@@ -166,10 +166,10 @@ public class InMemoryExchangeAndQueueTest {
         AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct);
         AmqpQueue queue1 = new InMemoryQueue(queueName1);
         AmqpQueue queue2 = new InMemoryQueue(queueName2);
-        queue1.bindExchange(exchange1, new FanoutMessageRouter());
-        queue1.bindExchange(exchange2, new FanoutMessageRouter());
-        queue2.bindExchange(exchange1, new FanoutMessageRouter());
-        queue2.bindExchange(exchange2, new FanoutMessageRouter());
+        queue1.bindExchange(exchange1, new FanoutMessageRouter(), null);
+        queue1.bindExchange(exchange2, new FanoutMessageRouter(), null);
+        queue2.bindExchange(exchange1, new FanoutMessageRouter(), null);
+        queue2.bindExchange(exchange2, new FanoutMessageRouter(), null);
         Assert.assertNotNull(queue1.getRouter(exchangeName1));
         Assert.assertNotNull(queue1.getRouter(exchangeName2));
         Assert.assertNotNull(queue2.getRouter(exchangeName1));
@@ -189,7 +189,8 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testMultipleBindWriteReadAndAcknowledge() throws ExecutionException, InterruptedException {
+    public void testMultipleBindWriteReadAndAcknowledge() throws
+            ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName1 = "test-exchange-1";
         String exchangeName2 = "test-exchange-2";
         String queueName1 = "test-queue-1";
@@ -198,20 +199,22 @@ public class InMemoryExchangeAndQueueTest {
         AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct);
         AmqpQueue queue1 = new InMemoryQueue(queueName1);
         AmqpQueue queue2 = new InMemoryQueue(queueName2);
-        queue1.bindExchange(exchange1, new FanoutMessageRouter());
-        queue1.bindExchange(exchange2, new FanoutMessageRouter());
-        queue2.bindExchange(exchange1, new FanoutMessageRouter());
-        queue2.bindExchange(exchange2, new FanoutMessageRouter());
+        queue1.bindExchange(exchange1, new FanoutMessageRouter(), null);
+        queue1.bindExchange(exchange2, new FanoutMessageRouter(), null);
+        queue2.bindExchange(exchange1, new FanoutMessageRouter(), null);
+        queue2.bindExchange(exchange2, new FanoutMessageRouter(), null);
 
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positionsForExchange1 = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
-            positionsForExchange1.add(exchange1.writeMessageAsync(generateMessage(exchangeName1, singleContent)).get());
+            positionsForExchange1.add(exchange1.writeMessageAsync(
+                    generateMessage(exchangeName1, singleContent), "").get());
         }
 
         List<Position> positionsForExchange2 = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
-            positionsForExchange2.add(exchange2.writeMessageAsync(generateMessage(exchangeName2, singleContent)).get());
+            positionsForExchange2.add(exchange2.writeMessageAsync(
+                    generateMessage(exchangeName2, singleContent), "").get());
         }
 
         PositionImpl ackPosition = (PositionImpl) positionsForExchange1.get(2);
@@ -234,7 +237,7 @@ public class InMemoryExchangeAndQueueTest {
         Assert.assertEquals(((InMemoryExchange) exchange1).getMessages(), 9);
     }
 
-    private IncomingMessage generateMessage(String exchangeName, byte[] payload) {
+    private Message<byte[]> generateMessage(String exchangeName, byte[] payload) throws UnsupportedEncodingException {
 
         boolean immediate = true;
         boolean mandatory = false;
@@ -262,6 +265,6 @@ public class InMemoryExchangeAndQueueTest {
         incomingMessage.setContentHeaderBody(new ContentHeaderBody(originProps));
         incomingMessage.addContentBodyFrame(new ContentBody(QpidByteBuffer.wrap(payload)));
 
-        return incomingMessage;
+        return MessageConvertUtils.toPulsarMessage(incomingMessage);
     }
 }

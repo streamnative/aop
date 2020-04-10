@@ -65,7 +65,7 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     }
 
     @Override
-    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, PersistentTopic persistentTopic) {
+    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router) {
         router.setExchange(exchange);
         router.setQueue(this);
         this.routers.put(router.getExchange().getName(), router);

@@ -61,7 +61,7 @@ public interface AmqpQueue {
     /**
      * Bind to a exchange {@link AmqpExchange}.
      */
-    void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, PersistentTopic persistentTopic);
+    void bindExchange(AmqpExchange exchange, AmqpMessageRouter router);
 
     /**
      * UnBind a exchange for the queue.

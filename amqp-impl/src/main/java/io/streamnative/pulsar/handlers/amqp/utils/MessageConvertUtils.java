@@ -21,10 +21,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
@@ -355,22 +358,23 @@ public final class MessageConvertUtils {
         return null;
     }
 
-    // Currently, one entry consist of on PositionImpl info
-    public static MessageImpl<byte[]> toPulsarMessage(PositionImpl position) {
+    // Currently, one entry consist of one IndexMessage info
+    public static MessageImpl<byte[]> toPulsarMessage(IndexMessage indexMessage) {
         TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
-        ByteBuf byteBuf = Unpooled.buffer();
-        byteBuf.writeLong(position.getLedgerId());
-        byteBuf.writeLong(position.getEntryId());
-        builder.value(byteBuf.array());
+        builder.value(indexMessage.encode());
         return (MessageImpl<byte[]>) builder.getMessage();
     }
 
-    // Currently, one entry consist of on PositionImpl info
-    public static PositionImpl entryToPosition(Entry entry) {
+    // Currently, one entry consist of one IndexMessage info
+    public static IndexMessage entryToIndexMessage(Entry entry) {
         ByteBuf metadataAndPayload = entry.getDataBuffer();
         Commands.parseMessageMetadata(metadataAndPayload);
         ByteBuf payload = metadataAndPayload.retain();
-        return PositionImpl.get(payload.readLong(), payload.readLong());
+
+        long ledgerId = payload.readLong();
+        long entryId = payload.readLong();
+        String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1).toString();
+        return IndexMessage.create(exchangeName, ledgerId, entryId);
     }
 
 }

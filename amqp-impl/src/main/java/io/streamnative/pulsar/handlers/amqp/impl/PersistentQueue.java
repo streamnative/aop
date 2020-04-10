@@ -16,13 +16,11 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -34,21 +32,23 @@ import org.apache.pulsar.common.naming.TopicName;
  */
 public class PersistentQueue extends AbstractAmqpQueue {
 
-    private Map<String, PersistentTopic> indexTopics;
+    private PersistentTopic indexTopic;
 
-    public PersistentQueue(String queueName) {
+    public PersistentQueue(String queueName, PersistentTopic indexTopic) {
         super(queueName, true);
-        indexTopics = new ConcurrentHashMap<>();
+        this.indexTopic = indexTopic;
     }
 
     @Override
     public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId) {
-        CompletableFuture<Void> completableFuture = new CompletableFuture<>();
-
-        PersistentTopic persistentTopic = indexTopics.get(exchangeName);
-        MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(PositionImpl.get(ledgerId, entryId));
-        MessagePublishContext.publishMessages(message, persistentTopic, new CompletableFuture<>());
-        completableFuture.complete(null);
+        CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
+        try {
+            IndexMessage indexMessage = IndexMessage.create(exchangeName, ledgerId, entryId);
+            MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(indexMessage);
+            MessagePublishContext.publishMessages(message, indexTopic, new CompletableFuture<>());
+        } catch (Exception e) {
+            completableFuture.completeExceptionally(e);
+        }
         return completableFuture;
     }
 
@@ -63,14 +63,13 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
     @Override
-    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, PersistentTopic persistentTopic) {
-        super.bindExchange(exchange, router, persistentTopic);
-        indexTopics.computeIfAbsent(exchange.getName(), exchangeName -> persistentTopic);
+    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router) {
+        super.bindExchange(exchange, router);
     }
 
-    public static String getIndexTopicName(NamespaceName namespaceName, String exchangeName, String queueName) {
+    public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {
         return TopicName.get(TopicDomain.persistent.value(),
-                namespaceName, exchangeName + "|" + queueName).toString();
+                namespaceName, "__index__" + queueName).toString();
     }
 
 }

@@ -19,6 +19,7 @@ import static org.testng.Assert.assertNotNull;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
+import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 
 import java.io.UnsupportedEncodingException;
@@ -117,23 +118,11 @@ public class MessageConvertTest {
     @Test
     private void positionConvert() {
         MessageImpl<byte[]> message;
-        PositionImpl p1 = PositionImpl.earliest;
-        message = MessageConvertUtils.toPulsarMessage(p1);
-        PositionImpl p1Converted = MessageConvertUtils.entryToPosition(
+        IndexMessage indexMessage = IndexMessage.create("test-exchange", 1L, 1L);
+        message = MessageConvertUtils.toPulsarMessage(indexMessage);
+        IndexMessage indexMessageConverted = MessageConvertUtils.entryToIndexMessage(
                 EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
-        assertEquals(p1, p1Converted);
-
-        PositionImpl p2 = PositionImpl.latest;
-        message = MessageConvertUtils.toPulsarMessage(p2);
-        PositionImpl p2Converted = MessageConvertUtils.entryToPosition(
-                EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
-        assertEquals(p2, p2Converted);
-
-        PositionImpl p3 = PositionImpl.get(10, 1);
-        message = MessageConvertUtils.toPulsarMessage(p3);
-        PositionImpl p3Converted = MessageConvertUtils.entryToPosition(
-                EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
-        assertEquals(p3, p3Converted);
+        assertEquals(indexMessage, indexMessageConverted);
     }
 
 }

@@ -153,6 +153,8 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testQueueDeclare() {
+        NamespaceName namespaceName = NamespaceName.get("public", "vhost1");
+        connection.setNamespaceName(namespaceName);
         QueueDeclareBody cmd = methodRegistry.createQueueDeclareBody(0, "queue", false, true,
                 false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);

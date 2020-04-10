@@ -277,7 +277,15 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             // in-memory integration
             amqpQueue = new InMemoryQueue(queue.toString());
         } else {
-            amqpQueue = new PersistentQueue(queue.toString());
+            try {
+                PersistentTopic indexTopic = amqpTopicManager.getTopic(
+                            PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queue.toString())).get();
+                amqpQueue = new PersistentQueue(queue.toString(), indexTopic);
+            } catch (ExecutionException | InterruptedException e) {
+                log.error(channelId + "Exchange declare failed! queueName: {}", queue.toString());
+                connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
+                return;
+            }
         }
         connection.putQueue(queue.toString(), amqpQueue);
 
@@ -309,7 +317,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         // in-memory integration
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-            amqpQueue.bindExchange(amqpExchange, messageRouter, null);
+            amqpQueue.bindExchange(amqpExchange, messageRouter);
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
             return;
@@ -321,10 +329,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         } else {
             // create a new sub to Pulsar Topic(exchange in AMQP)
             try {
-                PersistentTopic indexTopic = amqpTopicManager.getTopic(
-                        PersistentQueue.getIndexTopicName(
-                                connection.getNamespaceName(), exchange.toString(), queue.toString())).get();
-                amqpQueue.bindExchange(amqpExchange, messageRouter, indexTopic);
+                amqpQueue.bindExchange(amqpExchange, messageRouter);
                 topic.createSubscription(queue.toString(),
                         PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -542,20 +547,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             if (amqpQueue.getRouter("") == null) {
                 AmqpMessageRouter amqpMessageRouter = new DirectMessageRouter(
                         AmqpMessageRouter.Type.Direct, routingKey.toString());
-                if (amqpExchange.getDurable()) {
-                    try {
-                        String indexTopicName = PersistentQueue.getIndexTopicName(connection.getNamespaceName(),
-                                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, routingKey.toString());
-                        PersistentTopic persistentTopic = amqpTopicManager.getTopic(indexTopicName).get();
-                        amqpQueue.bindExchange(amqpExchange, amqpMessageRouter, persistentTopic);
-                    } catch (InterruptedException | ExecutionException e) {
-                        log.error("Get Queue[{}] index topic failed!", routingKey.toString());
-                        connection.sendConnectionClose(NOT_FOUND, "Exchange or queue not found.", channelId);
-                        return;
-                    }
-                } else {
-                    amqpQueue.bindExchange(amqpExchange, amqpMessageRouter, null);
-                }
+                amqpQueue.bindExchange(amqpExchange, amqpMessageRouter);
             }
         }
         MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);

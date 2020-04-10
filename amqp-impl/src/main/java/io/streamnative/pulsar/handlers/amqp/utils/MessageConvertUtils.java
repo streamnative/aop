@@ -20,18 +20,16 @@ import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
+import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.CompressionType;
 import org.apache.pulsar.client.api.Message;
@@ -51,7 +49,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperti
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
-
 
 /**
  * Util for convert message between Pulsar and AMQP.

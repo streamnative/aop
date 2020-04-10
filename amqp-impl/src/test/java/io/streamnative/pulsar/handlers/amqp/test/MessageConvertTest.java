@@ -21,14 +21,12 @@ import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;

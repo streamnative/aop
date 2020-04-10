@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 
 /**
  * Base class for AMQP queue.

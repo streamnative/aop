@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 
 /**
  * Interface of the AMQP queue.

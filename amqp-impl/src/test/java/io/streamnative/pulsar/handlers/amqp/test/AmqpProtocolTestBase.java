@@ -121,7 +121,7 @@ public abstract class AmqpProtocolTestBase {
             AmqpTopicManager amqpTopicManager = Mockito.mock(AmqpTopicManager.class);
             CompletableFuture<PersistentTopic> completableFuture = new CompletableFuture<>();
             completableFuture.complete(persistentTopic);
-            Mockito.when(amqpTopicManager.getTopic(anyString(), anyBoolean())).thenReturn(completableFuture);
+            Mockito.when(amqpTopicManager.getTopic(anyString())).thenReturn(completableFuture);
             Mockito.when(amqpTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(new MockTopic());
             super.setAmqpTopicManager(amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);

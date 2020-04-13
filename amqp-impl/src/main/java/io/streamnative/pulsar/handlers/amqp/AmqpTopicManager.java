@@ -14,9 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static com.google.common.base.Preconditions.checkState;
-
 import java.net.InetSocketAddress;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -48,12 +46,14 @@ public class AmqpTopicManager {
 
     // cache for topics: <topicName, persistentTopic>
     private final ConcurrentHashMap<String, CompletableFuture<PersistentTopic>> topics;
+    private final ConcurrentHashMap<String, CompletableFuture<Topic>> exchangeTopics;
 
     public AmqpTopicManager(AmqpConnection amqpConnection) {
         this.amqpConnection = amqpConnection;
         this.pulsarService = amqpConnection.getPulsarService();
         this.brokerService = pulsarService.getBrokerService();
         topics = new ConcurrentHashMap<>();
+        exchangeTopics = new ConcurrentHashMap<>();
     }
 
     public CompletableFuture<PersistentTopic> getTopic(String topicName) {
@@ -165,9 +165,50 @@ public class AmqpTopicManager {
         LOOKUP_CACHE.remove(topicName);
     }
 
-    public Topic getOrCreateTopic(String exchangeName, boolean createIfMissing) {
-        return amqpConnection.getPulsarService().getBrokerService().
-                getTopic(exchangeName, createIfMissing).thenApply(Optional::get).join();
+    public Topic getOrCreateTopic(String topicName, boolean createIfMissing) {
+        return getTopic(topicName, createIfMissing).join();
     }
 
+    public CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing) {
+
+        CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
+        return exchangeTopics.computeIfAbsent(topicName,
+                t -> {
+                    // setup ownership of service unit to this broker
+                    pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), true).
+                            whenComplete((addr, th) -> {
+                                if (th != null || addr == null || addr.get() == null) {
+                                    log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", t, th);
+                                    topicCompletableFuture.complete(null);
+                                    return;
+                                }
+                                if (log.isDebugEnabled()) {
+                                    log.debug("getBrokerServiceUrl for {} in ExchangeTopicManager. brokerAddress: {}",
+                                            t, addr.get().getLookupData().getBrokerUrl());
+                                }
+                                brokerService.getTopic(t, createIfMissing)
+                                        .whenComplete((topicOptional, throwable) -> {
+                                            if (throwable != null) {
+                                                log.error("Failed to getTopic {}. exception: {}", t, throwable);
+                                                topicCompletableFuture.complete(null);
+                                                return;
+                                            }
+                                            try {
+                                                if (topicOptional.isPresent()) {
+                                                    Topic topic = topicOptional.get();
+                                                    topicCompletableFuture.complete(topic);
+                                                } else {
+                                                    log.error("Get empty topic for name {}", t);
+                                                    topicCompletableFuture.complete(null);
+                                                }
+                                            } catch (Exception e) {
+                                                log.error("Failed to get client in registerInPersistentTopic {}. "
+                                                        + "exception:", t, e);
+                                                topicCompletableFuture.complete(null);
+                                            }
+                                        });
+                            });
+                    return topicCompletableFuture;
+                });
+    }
 }

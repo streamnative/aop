@@ -20,7 +20,9 @@ import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
+import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +49,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperti
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
-
 
 /**
  * Util for convert message between Pulsar and AMQP.
@@ -352,6 +353,25 @@ public final class MessageConvertUtils {
             return string.getBytes(DEFAULT_CHARSET_NAME)[0];
         }
         return null;
+    }
+
+    // Currently, one entry consist of one IndexMessage info
+    public static MessageImpl<byte[]> toPulsarMessage(IndexMessage indexMessage) {
+        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
+        builder.value(indexMessage.encode());
+        return (MessageImpl<byte[]>) builder.getMessage();
+    }
+
+    // Currently, one entry consist of one IndexMessage info
+    public static IndexMessage entryToIndexMessage(Entry entry) {
+        ByteBuf metadataAndPayload = entry.getDataBuffer();
+        Commands.parseMessageMetadata(metadataAndPayload);
+        ByteBuf payload = metadataAndPayload.retain();
+
+        long ledgerId = payload.readLong();
+        long entryId = payload.readLong();
+        String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1).toString();
+        return IndexMessage.create(exchangeName, ledgerId, entryId);
     }
 
 }

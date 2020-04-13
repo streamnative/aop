@@ -12,10 +12,11 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp;
+
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
+import org.apache.pulsar.client.api.Message;
 
 /**
  * Interface of the AMQP exchange.
@@ -61,6 +62,8 @@ public interface AmqpExchange {
      */
     String getName();
 
+    boolean getDurable();
+
     /**
      * Get the type {@link Type} of the exchange.
      * @return the type of the exchange.
@@ -70,9 +73,10 @@ public interface AmqpExchange {
     /**
      * Write AMQP message to the exchange.
      *
-     * @param incomingMessage AMQP message
+     * @param message Pulsar message
+     * @param routingKey
      */
-    CompletableFuture<Position> writeMessageAsync(IncomingMessage incomingMessage);
+    CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey);
 
     /**
      * Read entry {@link Entry} from the exchange.

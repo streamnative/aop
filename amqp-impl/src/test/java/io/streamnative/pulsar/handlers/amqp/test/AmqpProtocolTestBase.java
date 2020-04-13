@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 
@@ -22,7 +23,7 @@ import io.netty.channel.ChannelPipeline;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
-import io.streamnative.pulsar.handlers.amqp.ExchangeTopicManager;
+import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.MockTopic;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
@@ -34,7 +35,8 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
-import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.Subscription;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.admin.Namespaces;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -103,19 +105,25 @@ public abstract class AmqpProtocolTestBase {
 
         public MockConnection() throws PulsarServerException {
             super(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class),
-                    Mockito.mock(ExchangeTopicManager.class));
+                    Mockito.mock(AmqpTopicManager.class));
 
             PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
             Namespaces namespaces = Mockito.mock(Namespaces.class);
             Mockito.when(getPulsarService().getAdminClient()).thenReturn(adminClient);
             Mockito.when(getPulsarService().getAdminClient().namespaces()).thenReturn(namespaces);
 
-            ExchangeTopicManager exchangeTopicManager = Mockito.mock(ExchangeTopicManager.class);
-            CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
-            completableFuture.complete(new MockTopic());
-            Mockito.when(exchangeTopicManager.getTopic(anyString(), anyBoolean())).thenReturn(completableFuture);
-            Mockito.when(exchangeTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(new MockTopic());
-            super.setExchangeTopicManager(exchangeTopicManager);
+            PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
+            CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
+            subFuture.complete(Mockito.mock(Subscription.class));
+            Mockito.when(persistentTopic.createSubscription(anyString(), any(), anyBoolean())).thenReturn(subFuture);
+            Mockito.when(persistentTopic.getName()).thenReturn("persistent://public/default/mock");
+
+            AmqpTopicManager amqpTopicManager = Mockito.mock(AmqpTopicManager.class);
+            CompletableFuture<PersistentTopic> completableFuture = new CompletableFuture<>();
+            completableFuture.complete(persistentTopic);
+            Mockito.when(amqpTopicManager.getTopic(anyString(), anyBoolean())).thenReturn(completableFuture);
+            Mockito.when(amqpTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(new MockTopic());
+            super.setAmqpTopicManager(amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 

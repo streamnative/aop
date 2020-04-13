@@ -29,6 +29,8 @@ public interface AmqpQueue {
      */
     String getName();
 
+    boolean getDurable();
+
     /**
      * Write the index message into the queue.
      */

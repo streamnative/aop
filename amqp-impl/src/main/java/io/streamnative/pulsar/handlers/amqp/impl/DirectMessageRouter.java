@@ -14,20 +14,27 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
-
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Fanout message router.
+ * Direct message router.
  */
-public class FanoutMessageRouter extends AbstractAmqpMessageRouter {
+public class DirectMessageRouter extends AbstractAmqpMessageRouter {
 
-    public FanoutMessageRouter() {
-        super(Type.Fanout);
+    private String routingKey;
+
+    public DirectMessageRouter(Type type, String routingKey) {
+        super(type);
+        this.routingKey = routingKey;
     }
 
     @Override
     public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey) {
-        return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
+        if (Objects.equals(routingKey, this.routingKey)) {
+            return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
+        } else {
+            return CompletableFuture.completedFuture(null);
+        }
     }
 }

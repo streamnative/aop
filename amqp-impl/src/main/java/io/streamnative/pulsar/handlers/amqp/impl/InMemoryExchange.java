@@ -19,7 +19,6 @@ import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,9 +30,8 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
-import org.apache.pulsar.client.impl.MessageImpl;
+import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.util.FutureUtil;
-import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 
 /**
  * In-memory implementation for {@link AmqpExchange}.
@@ -46,29 +44,24 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     private long currentEntryId;
 
     public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType) {
-        super(exchangeName, exchangeType, new HashSet<>());
+        super(exchangeName, exchangeType, new HashSet<>(), false);
         this.currentLedgerId = 1L;
     }
 
     @Override
-    public CompletableFuture<Position> writeMessageAsync(IncomingMessage incomingMessage) {
-        try {
-            MessageImpl<byte[]> pulsarMessage = MessageConvertUtils.toPulsarMessage(incomingMessage);
-            Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId,
-                    MessageConvertUtils.messageToByteBuf(pulsarMessage));
-            PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
-            messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
-            List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
-            for (AmqpQueue queue : queues) {
-                TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
-                cursor.put(position, null);
-                routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
-                        position.getEntryId()));
-            }
-            return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
-        } catch (UnsupportedEncodingException e) {
-            return FutureUtil.failedFuture(e);
+    public CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey) {
+        Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId,
+                MessageConvertUtils.messageToByteBuf(message));
+        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
+        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
+        List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
+        for (AmqpQueue queue : queues) {
+            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
+            cursor.put(position, null);
+            routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
+                    position.getEntryId(), routingKey));
         }
+        return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
     }
 
     @Override
@@ -144,7 +137,7 @@ public class InMemoryExchange extends AbstractAmqpExchange {
             TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
             cursor.put(position, null);
             routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
-                    position.getEntryId()));
+                    position.getEntryId(), ""));
         }
         return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
     }

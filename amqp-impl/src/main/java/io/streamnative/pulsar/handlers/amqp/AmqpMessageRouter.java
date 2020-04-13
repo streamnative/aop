@@ -72,7 +72,8 @@ public interface AmqpMessageRouter {
      *
      * @param ledgerId ledger ID
      * @param entryId entry ID
+     * @param routingKey
      */
-    CompletableFuture<Void> routingMessage(long ledgerId, long entryId);
+    CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey);
 
 }

@@ -19,8 +19,8 @@ import static org.testng.Assert.assertNotNull;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
+import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -111,6 +111,16 @@ public class MessageConvertTest {
         ByteBuf byteBuf = Unpooled.wrappedBuffer(
                 ((SingleQpidByteBuffer) amqpMessageData.getContentBody().getPayload()).getUnderlyingBuffer().array());
         assertEquals(expectedContentByteBuf, byteBuf);
+    }
+
+    @Test
+    private void positionConvert() {
+        MessageImpl<byte[]> message;
+        IndexMessage indexMessage = IndexMessage.create("test-exchange", 1L, 1L);
+        message = MessageConvertUtils.toPulsarMessage(indexMessage);
+        IndexMessage indexMessageConverted = MessageConvertUtils.entryToIndexMessage(
+                EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));
+        assertEquals(indexMessage, indexMessageConverted);
     }
 
 }

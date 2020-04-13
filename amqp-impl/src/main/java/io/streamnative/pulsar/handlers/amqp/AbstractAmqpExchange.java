@@ -24,11 +24,16 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     protected final String exchangeName;
     protected final AmqpExchange.Type exchangeType;
     protected Set<AmqpQueue> queues;
+    protected boolean durable;
+    public static final String DEFAULT_EXCHANGE = "__default_ex__";
+    public static final String DEFAULT_EXCHANGE_DURABLE = "__default_ex_durable__";
 
-    protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType, Set<AmqpQueue> queues) {
+    protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType,
+                                   Set<AmqpQueue> queues, boolean durable) {
         this.exchangeName = exchangeName;
         this.exchangeType = exchangeType;
         this.queues = queues;
+        this.durable = durable;
     }
 
     @Override
@@ -44,6 +49,11 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     @Override
     public String getName() {
         return exchangeName;
+    }
+
+    @Override
+    public boolean getDurable() {
+        return durable;
     }
 
     @Override

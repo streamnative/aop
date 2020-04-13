@@ -23,15 +23,22 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractAmqpQueue implements AmqpQueue {
 
     protected final String queueName;
+    protected final boolean durable;
     protected final Map<String, AmqpMessageRouter> routers = new ConcurrentHashMap<>();
 
-    protected AbstractAmqpQueue(String queueName) {
+    protected AbstractAmqpQueue(String queueName, boolean durable) {
         this.queueName = queueName;
+        this.durable = durable;
     }
 
     @Override
     public String getName() {
         return queueName;
+    }
+
+    @Override
+    public boolean getDurable() {
+        return durable;
     }
 
     @Override

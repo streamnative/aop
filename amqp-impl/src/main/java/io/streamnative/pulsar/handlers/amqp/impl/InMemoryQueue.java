@@ -30,7 +30,7 @@ public class InMemoryQueue extends AbstractAmqpQueue {
     private final Map<String, LinkedList<PositionImpl>> indexStore = new ConcurrentHashMap<>();
 
     public InMemoryQueue(String queueName) {
-        super(queueName);
+        super(queueName, false);
     }
 
     @Override

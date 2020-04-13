@@ -35,7 +35,7 @@ import org.apache.pulsar.common.naming.TopicName;
  * Exchange topic manager.
  */
 @Slf4j
-public class ExchangeTopicManager {
+public class AmqpTopicManager {
 
     private PulsarService pulsarService;
 
@@ -47,18 +47,17 @@ public class ExchangeTopicManager {
             LOOKUP_CACHE = new ConcurrentHashMap<>();
 
     // cache for topics: <topicName, persistentTopic>
-    // TODO change the MockTopic to PersistentTopic
-    private final ConcurrentHashMap<String, CompletableFuture<Topic>> topics;
+    private final ConcurrentHashMap<String, CompletableFuture<PersistentTopic>> topics;
 
-    public ExchangeTopicManager(AmqpConnection amqpConnection) {
+    public AmqpTopicManager(AmqpConnection amqpConnection) {
         this.amqpConnection = amqpConnection;
         this.pulsarService = amqpConnection.getPulsarService();
         this.brokerService = pulsarService.getBrokerService();
         topics = new ConcurrentHashMap<>();
     }
 
-    public CompletableFuture<Topic> getTopic(String topicName) {
-        CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
+    public CompletableFuture<PersistentTopic> getTopic(String topicName) {
+        CompletableFuture<PersistentTopic> topicCompletableFuture = new CompletableFuture<>();
 
         return topics.computeIfAbsent(topicName,
             t -> {

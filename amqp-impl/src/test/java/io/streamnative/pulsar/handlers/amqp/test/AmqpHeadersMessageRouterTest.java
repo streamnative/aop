@@ -78,7 +78,7 @@ public class AmqpHeadersMessageRouterTest {
         Assert.assertTrue(headersMessageRouter.isMatch(headers));
 
         Map<String, Object> headers2 = new HashMap<>();
-        headers2.put("format", "pdf");
+        headers2.put("format", "pdf111");
         headers2.put("type", "error");
         Assert.assertFalse(headersMessageRouter.isMatch(headers2));
     }

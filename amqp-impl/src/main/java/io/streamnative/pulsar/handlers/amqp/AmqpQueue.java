@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 
@@ -60,7 +61,8 @@ public interface AmqpQueue {
     /**
      * Bind to a exchange {@link AmqpExchange}.
      */
-    void bindExchange(AmqpExchange exchange, AmqpMessageRouter router);
+    void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
+                      Map<String, Object> arguments);
 
     /**
      * UnBind a exchange for the queue.

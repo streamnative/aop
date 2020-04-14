@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -68,12 +69,28 @@ public interface AmqpMessageRouter {
     AmqpQueue getQueue();
 
     /**
+     * bindingKey is the value when create bind.
+     *
+     * @param bindingKey bindingKey
+     */
+    void addBindingKey(String bindingKey);
+
+    /**
+     * header properties.
+     *
+     * @param arguments header properties
+     */
+    void setArguments(Map<String, Object> arguments);
+
+    /**
      * Routes the message ID to the queue.
      *
-     * @param ledgerId ledger ID
-     * @param entryId entry ID
-     * @param routingKey
+     * @param ledgerId   ledger ID
+     * @param entryId    entry ID
+     * @param routingKey routingKey
+     * @param properties header properties
      */
-    CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey);
+    CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
+                                           Map<String, Object> properties);
 
 }

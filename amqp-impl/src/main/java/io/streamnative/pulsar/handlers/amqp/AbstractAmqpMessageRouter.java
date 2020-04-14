@@ -13,7 +13,13 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.impl.DirectMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.FanoutMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.impl.HeadersMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.impl.TopicMessageRouter;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Base class for AMQP message router.
@@ -23,9 +29,12 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     protected AmqpExchange exchange;
     protected AmqpQueue queue;
     protected final AmqpMessageRouter.Type routerType;
+    protected Set<String> bindingKeys;
+    protected Map<String, Object> arguments;
 
     protected AbstractAmqpMessageRouter(Type routerType) {
         this.routerType = routerType;
+        this.bindingKeys = new HashSet<>();
     }
 
     @Override
@@ -53,6 +62,16 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
         return queue;
     }
 
+    @Override
+    public void addBindingKey(String bindingKey) {
+        this.bindingKeys.add(bindingKey);
+    }
+
+    @Override
+    public void setArguments(Map<String, Object> arguments) {
+        this.arguments = arguments;
+    }
+
     public static AmqpMessageRouter generateRouter(AmqpExchange.Type type) {
 
         if (type == null) {
@@ -61,13 +80,13 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
 
         switch (type) {
             case Direct:
-                return null;
+                return new DirectMessageRouter();
             case Fanout:
                 return new FanoutMessageRouter();
             case Topic:
-                return null;
+                return new TopicMessageRouter();
             case Headers:
-                return null;
+                return new HeadersMessageRouter();
             default:
                 return null;
         }

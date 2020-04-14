@@ -59,7 +59,7 @@ public class InMemoryExchange extends AbstractAmqpExchange {
             TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
             cursor.put(position, null);
             routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
-                    position.getEntryId(), routingKey));
+                    position.getEntryId(), routingKey, null));
         }
         return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
     }
@@ -137,7 +137,7 @@ public class InMemoryExchange extends AbstractAmqpExchange {
             TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
             cursor.put(position, null);
             routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
-                    position.getEntryId(), ""));
+                    position.getEntryId(), "", null));
         }
         return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
     }

@@ -54,12 +54,12 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String exchangeName, long ledgerId, long entryId) {
-        return null;
+        return getRouter(exchangeName).getExchange().readEntryAsync(getName(), ledgerId, entryId);
     }
 
     @Override
     public CompletableFuture<Void> acknowledgeAsync(String exchangeName, long ledgerId, long entryId) {
-        return null;
+        return getRouter(exchangeName).getExchange().markDeleteAsync(getName(), ledgerId, entryId);
     }
 
     @Override
@@ -69,7 +69,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {
         return TopicName.get(TopicDomain.persistent.value(),
-                namespaceName, "__index__" + queueName).toString();
+            namespaceName, "__index__" + queueName).toString();
     }
 
 }

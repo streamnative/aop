@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
-
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -56,6 +55,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
+
+
 
 /**
  * Amqp server level method processor.
@@ -106,12 +107,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.heartBeat = amqpConfig.getHeartBeat();
         this.amqpTopicManager = new AmqpTopicManager(this);
         this.amqpOutputConverter = new AmqpOutputConverter(this);
-        //this.pulsarServerCnx=new ServerCnx(pulsarService);
     }
 
     @VisibleForTesting
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                          AmqpTopicManager amqpTopicManager) {
+        AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
@@ -131,6 +131,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.ctx = ctx;
         isActive.set(true);
         this.brokerDecoder = new AmqpBrokerDecoder(this);
+        this.pulsarServerCnx = new AmqpPulsarServerCnx(getPulsarService(), ctx);
     }
 
     @Override
@@ -585,25 +586,21 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 //        return getPulsarService().getConfigurationCache().policiesCache()
 //            .get(AdminResource.path(POLICIES, namespaceName.toString())).orElse(null);
 
-    public int getMaxChannels () {
+    public int getMaxChannels() {
         return maxChannels;
     }
 
-    public int getMaxFrameSize () {
+    public int getMaxFrameSize() {
         return maxFrameSize;
     }
 
-    public int getHeartBeat () {
+    public int getHeartBeat() {
         return heartBeat;
     }
-
 
     public AmqpTopicManager getAmqpTopicManager() {
         return amqpTopicManager;
     }
-
-
-
 
     @VisibleForTesting
     public void setAmqpTopicManager(AmqpTopicManager amqpTopicManager) {
@@ -614,9 +611,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         return namespaceName;
     }
 
-
     @VisibleForTesting
-    public void setNamespaceName(NamespaceName namespaceName){
+    public void setNamespaceName(NamespaceName namespaceName) {
         this.namespaceName = namespaceName;
     }
 
@@ -664,7 +660,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public void defaultExchangeInit() {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+            getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
         PersistentTopic persistentTopic = null;
         try {
             persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
@@ -672,10 +668,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             log.error("Create default exchange topic failed!");
         }
         exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
-                AmqpExchange.Type.Direct, persistentTopic));
+            AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager));
 
         exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE,
-                new InMemoryExchange("", AmqpExchange.Type.Direct));
+            new InMemoryExchange("", AmqpExchange.Type.Direct));
 
     }
 

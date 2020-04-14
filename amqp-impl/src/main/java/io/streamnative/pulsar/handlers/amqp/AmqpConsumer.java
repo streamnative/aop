@@ -16,9 +16,10 @@ package io.streamnative.pulsar.handlers.amqp;
 import io.netty.channel.ChannelPromise;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
@@ -44,18 +45,21 @@ public class AmqpConsumer extends Consumer {
 
     private final String consumerTag;
 
+    private final String queueName;
+
     public AmqpConsumer(Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
         String appId, Map<String, String> metadata, boolean readCompacted,
         PulsarApi.CommandSubscribe.InitialPosition subscriptionInitialPosition,
-        PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag,
+        PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta);
         this.channel = channel;
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
+        this.queueName = queueName;
     }
 
     @Override public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes, int totalMessages,
@@ -70,32 +74,41 @@ public class AmqpConsumer extends Consumer {
         }
 
         connection.ctx.channel().eventLoop().execute(() -> {
-            List<Position> autoAcks = new ArrayList<>();
             for (int i = 0; i < entries.size(); i++) {
-                Entry entry = entries.get(i);
-                if (entry == null) {
+                Entry index = entries.get(i);
+                if (index == null) {
                     // Entry was filtered out
                     continue;
                 }
-                long deliveryTag = channel.getNextDeliveryTag();
-                try {
-                    connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entryToAmqpBody(entry),
-                        channel.getChannelId(), false, channel.getNextDeliveryTag(),
-                        AMQShortString.createAMQShortString(consumerTag));
-                } catch (UnsupportedEncodingException e) {
-                    log.error("sendMessages UnsupportedEncodingException", e.getMessage());
-                    break;
+                IndexMessage indexMessage = MessageConvertUtils.entryToIndexMessage(index);
+                if (indexMessage == null) {
+                    continue;
                 }
-                if (autoAck) {
-                    // TODO confirm
-                    autoAcks.add(entry.getPosition());
-                } else {
-                    channel.getUnacknowledgedMessageMap().add(deliveryTag, entry.getPosition(), this);
-                }
-                entry.release();
-            }
-            if (autoAck) {
-                messagesAck(autoAcks, PulsarApi.CommandAck.AckType.Individual, null);
+                CompletableFuture<Entry> entryCompletableFuture = getQueue().readEntryAsync(
+                    indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId());
+                entryCompletableFuture.whenComplete((entry, ex) -> {
+                    if (ex == null) {
+                        long deliveryTag = channel.getNextDeliveryTag();
+                        try {
+                            connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entryToAmqpBody(entry),
+                                channel.getChannelId(), false, deliveryTag,
+                                AMQShortString.createAMQShortString(consumerTag));
+                        } catch (UnsupportedEncodingException e) {
+                            log.error("sendMessages UnsupportedEncodingException", e.getMessage());
+                        }
+                        if (autoAck) {
+
+                            messagesAck(entry.getPosition(), indexMessage.getExchangeName(),
+                                PulsarApi.CommandAck.AckType.Individual, null);
+                        } else {
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                entry.getPosition(), indexMessage.getExchangeName(), this);
+                        }
+                    }
+                    entry.release();
+                });
+                index.release();
+                indexMessage.recycle();
             }
             batchSizes.recyle();
         });
@@ -103,13 +116,19 @@ public class AmqpConsumer extends Consumer {
         return null;
     }
 
-    public void messagesAck(List<Position> positions, PulsarApi.CommandAck.AckType ackType,
+    public void messagesAck(Position position, String exchangeName, PulsarApi.CommandAck.AckType ackType,
         Map<String, Long> properties) {
-        getSubscription().acknowledgeMessage(positions, ackType, properties);
+        getSubscription().acknowledgeMessage(Collections.singletonList(position), ackType, properties);
+        getQueue().acknowledgeAsync(exchangeName, ((PositionImpl) position).getLedgerId(),
+            ((PositionImpl) position).getEntryId());
     }
 
     public void redeliverAmqpMessages(List<PositionImpl> positions) {
         getSubscription().redeliverUnacknowledgedMessages(this, positions);
+    }
+
+    public AmqpQueue getQueue() {
+        return channel.getConnection().getQueue(queueName);
     }
 
     @Override public boolean equals(Object obj) {

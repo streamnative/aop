@@ -317,7 +317,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         // in-memory integration
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-            amqpQueue.bindExchange(amqpExchange, messageRouter, bindingKey.toString(), arguments);
+            amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
             return;
@@ -328,7 +328,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {
             try {
-                amqpQueue.bindExchange(amqpExchange, messageRouter, bindingKey.toString(), arguments);
+                amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
                 AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));

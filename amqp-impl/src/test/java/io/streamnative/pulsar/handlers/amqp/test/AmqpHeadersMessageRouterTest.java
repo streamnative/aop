@@ -25,7 +25,7 @@ import org.testng.annotations.Test;
  */
 public class AmqpHeadersMessageRouterTest {
     @Test
-    public void matchTest1(){
+    public void testAllMatchWithNoEmptyValue(){
         HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "pdf");
@@ -45,7 +45,7 @@ public class AmqpHeadersMessageRouterTest {
     }
 
     @Test
-    public void matchTest2(){
+    public void testAllMatchWithEmptyValue(){
         HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "");
@@ -65,7 +65,7 @@ public class AmqpHeadersMessageRouterTest {
     }
 
     @Test
-    public void matchTest3(){
+    public void testAnyMatchWithNoEmptyValue(){
         HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "pdf");
@@ -84,7 +84,7 @@ public class AmqpHeadersMessageRouterTest {
     }
 
     @Test
-    public void matchTest4(){
+    public void testAnyMatchWithEmptyValue(){
         HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "");

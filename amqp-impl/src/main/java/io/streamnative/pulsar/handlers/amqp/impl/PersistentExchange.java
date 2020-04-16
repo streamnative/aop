@@ -75,13 +75,15 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return publishFuture;
     }
 
-    @Override public CompletableFuture<Entry> readEntryAsync(String queueName, long ledgerId, long entryId) {
+    @Override
+    public CompletableFuture<Entry> readEntryAsync(String queueName, long ledgerId, long entryId) {
         return readEntryAsync(queueName, PositionImpl.get(ledgerId, entryId));
     }
 
-    @Override public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
+    @Override
+    public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
         CompletableFuture<Entry> future = new CompletableFuture();
-
+        // TODO Temporarily put the creation operation here, and later put the operation in router
         ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
         if (cursor == null) {
             future.complete(null);
@@ -90,11 +92,13 @@ public class PersistentExchange extends AbstractAmqpExchange {
         ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();
 
         ledger.asyncReadEntry((PositionImpl) position, new AsyncCallbacks.ReadEntryCallback() {
-                @Override public void readEntryComplete(Entry entry, Object o) {
+                @Override
+                public void readEntryComplete(Entry entry, Object o) {
                     future.complete(entry);
                 }
 
-                @Override public void readEntryFailed(ManagedLedgerException e, Object o) {
+                @Override
+                public void readEntryFailed(ManagedLedgerException e, Object o) {
                     future.completeExceptionally(e);
                 }
             }
@@ -102,11 +106,13 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return future;
     }
 
-    @Override public CompletableFuture<Void> markDeleteAsync(String queueName, long ledgerId, long entryId) {
+    @Override
+    public CompletableFuture<Void> markDeleteAsync(String queueName, long ledgerId, long entryId) {
         return markDeleteAsync(queueName, PositionImpl.get(ledgerId, entryId));
     }
 
-    @Override public CompletableFuture<Void> markDeleteAsync(String queueName, Position position) {
+    @Override
+    public CompletableFuture<Void> markDeleteAsync(String queueName, Position position) {
         CompletableFuture<Void> future = new CompletableFuture();
         ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
         if (cursor == null) {
@@ -132,7 +138,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return future;
     }
 
-    @Override public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
+    @Override
+    public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
         CompletableFuture<Position> future = new CompletableFuture();
         ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
         if (cursor == null) {

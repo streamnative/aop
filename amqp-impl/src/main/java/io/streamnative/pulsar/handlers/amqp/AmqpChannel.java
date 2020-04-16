@@ -505,7 +505,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     false, PulsarApi.CommandSubscribe.InitialPosition.Earliest,
                     null, this, consumerTag, queueName, ack);
             subscription.addConsumer(consumer);
-            //consumer.flowPermits(1000);
+            // TODO Temporarily perform this operation here
+            subscription.getDispatcher().consumerFlow(consumer, 10000);
             tag2ConsumersMap.put(consumerTag, consumer);
         } catch (Exception e) {
             throw e;

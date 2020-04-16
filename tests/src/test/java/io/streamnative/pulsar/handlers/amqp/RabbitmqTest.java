@@ -277,7 +277,7 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         String contentMsg = "Hello AOP!";
         channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
 
-        final AtomicInteger count =new AtomicInteger(0);
+        final AtomicInteger count = new AtomicInteger(0);
 
         @Cleanup
         Channel channel1 = connection.createChannel();
@@ -304,8 +304,8 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
             }
         };
         channel2.basicConsume(queueName2, true, consumer2);
-        Thread.sleep(1000 );
-        //Assert.assertTrue(count.get() == 2);
+        Thread.sleep(1000);
+        Assert.assertTrue(count.get() == 2);
 
     }
 

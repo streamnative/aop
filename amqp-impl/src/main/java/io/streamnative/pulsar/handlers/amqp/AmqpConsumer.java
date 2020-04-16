@@ -62,7 +62,8 @@ public class AmqpConsumer extends Consumer {
         this.queueName = queueName;
     }
 
-    @Override public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes, int totalMessages,
+    @Override
+    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes, int totalMessages,
         long totalBytes, RedeliveryTracker redeliveryTracker) {
         final AmqpConnection connection = channel.getConnection();
         if (entries.isEmpty() || totalMessages == 0) {
@@ -131,11 +132,19 @@ public class AmqpConsumer extends Consumer {
         return channel.getConnection().getQueue(queueName);
     }
 
-    @Override public boolean equals(Object obj) {
+    @Override
+    public boolean equals(Object obj) {
         return super.equals(obj);
     }
 
-    @Override public int hashCode() {
+    @Override
+    public int hashCode() {
         return super.hashCode();
+    }
+
+    @Override
+    public int getAvailablePermits() {
+        //TODO Temporarily perform this operation here, This method will be overridden later in flow control impl
+        return 1;
     }
 }

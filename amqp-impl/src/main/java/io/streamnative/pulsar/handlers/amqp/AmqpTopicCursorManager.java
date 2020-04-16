@@ -19,11 +19,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import lombok.extern.log4j.Log4j2;
+import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
+import org.apache.pulsar.common.api.proto.PulsarApi;
 
 /**
  * exchange topic and queue cursor manager.
@@ -51,27 +52,67 @@ public class AmqpTopicCursorManager implements Closeable {
     }
 
     public ManagedCursor getOrCreateCursor(String name) {
-
-        return cursors.computeIfAbsent(name, cusrsor -> {
-
-            ManagedLedgerImpl ledger = (ManagedLedgerImpl) topic.getManagedLedger();
-            PositionImpl position = (PositionImpl) ledger.getLastConfirmedEntry();
-            if (log.isDebugEnabled()) {
-                log.debug("Create cursor {} for offset: {}. position:{}", name, position);
-            }
-            ManagedCursor newCursor;
-            try {
-                newCursor = ledger.newNonDurableCursor(position, name);
-                cursors.put(newCursor.getName(), newCursor);
-            } catch (ManagedLedgerException e) {
-                log.error("Error new cursor for topic {} at postion {} - {}. will cause fetch data error.",
-                    topic.getName(), position, e);
+        rwLock.readLock().lock();
+        try {
+            if (closed) {
                 return null;
             }
+            return cursors.computeIfAbsent(name, cusrsor -> {
 
-            return newCursor;
+                ManagedLedgerImpl ledger = (ManagedLedgerImpl) topic.getManagedLedger();
+                if (log.isDebugEnabled()) {
+                    log.debug("Create cursor {} for topic {}", name, topic.getName());
+                }
+                ManagedCursor newCursor;
+                try {
+                    newCursor = ledger.openCursor(name, PulsarApi.CommandSubscribe.InitialPosition.Latest);
+                    cursors.put(newCursor.getName(), newCursor);
+                } catch (ManagedLedgerException | InterruptedException e) {
+                    log.error("Error new cursor for topic {} - {}. will cause fetch data error.",
+                        topic.getName(), e);
+                    return null;
+                }
 
-        });
+                return newCursor;
+
+            });
+        } finally {
+            rwLock.readLock().unlock();
+        }
+
+    }
+
+    public ManagedCursor deleteCursor(String cursorName) {
+        rwLock.readLock().lock();
+        try {
+            if (closed) {
+                return null;
+            }
+            ManagedCursor cursor = cursors.remove(cursorName);
+            deleteCursorAsync(cursor);
+            return cursor;
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    public void deleteCursorAsync(ManagedCursor cursor) {
+        if (cursor != null) {
+            topic.getManagedLedger().asyncDeleteCursor(cursor.getName(), new AsyncCallbacks.DeleteCursorCallback() {
+                @Override
+                public void deleteCursorComplete(Object ctx) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Cursor {} for topic {} deleted successfully .", cursor.getName(), topic.getName());
+                    }
+                }
+
+                @Override
+                public void deleteCursorFailed(ManagedLedgerException exception, Object ctx) {
+                    log.error("[{}] Error deleting cursor {} for topic {} for reason: {}.",
+                        cursor.getName(), topic.getName(), exception);
+                }
+            }, null);
+        }
 
     }
 

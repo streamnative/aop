@@ -24,6 +24,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
+import io.streamnative.pulsar.handlers.amqp.MockDispatcher;
 import io.streamnative.pulsar.handlers.amqp.MockTopic;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
@@ -125,8 +126,10 @@ public abstract class AmqpProtocolTestBase {
 //            Mockito.when(serviceConfiguration.get).thenReturn(serviceConfiguration);
             PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
             CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
-            subFuture.complete(Mockito.mock(Subscription.class));
+            Subscription subscription = Mockito.mock(Subscription.class);
+            subFuture.complete(subscription);
             Mockito.when(persistentTopic.createSubscription(anyString(), any(), anyBoolean())).thenReturn(subFuture);
+            Mockito.when(subscription.getDispatcher()).thenReturn(Mockito.mock(MockDispatcher.class));
             Mockito.when(persistentTopic.getName()).thenReturn("persistent://public/default/mock");
 
             AmqpTopicManager amqpTopicManager = Mockito.mock(AmqpTopicManager.class);

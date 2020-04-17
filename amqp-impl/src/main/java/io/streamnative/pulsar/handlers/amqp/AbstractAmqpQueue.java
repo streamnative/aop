@@ -64,10 +64,19 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     }
 
     @Override
-    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router) {
-        router.setExchange(exchange);
-        router.setQueue(this);
-        this.routers.put(router.getExchange().getName(), router);
+    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
+                             Map<String, Object> arguments) {
+        // The same exchange and queue can have more than one binding,
+        // if router had been created, get it and add a new bindingKey.
+        if (isRouterExisted(exchange)) {
+            this.routers.get(exchange.getName()).addBindingKey(bindingKey);
+        } else {
+            router.setExchange(exchange);
+            router.setQueue(this);
+            router.addBindingKey(bindingKey);
+            router.setArguments(arguments);
+            this.routers.put(router.getExchange().getName(), router);
+        }
         exchange.addQueue(this);
     }
 
@@ -75,5 +84,13 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     public void unbindExchange(AmqpExchange exchange) {
         exchange.removeQueue(this);
         this.routers.remove(exchange.getName());
+    }
+
+    private boolean isRouterExisted(AmqpExchange exchange) {
+        if (null != routers.get(exchange.getName())) {
+            return true;
+        } else {
+            return false;
+        }
     }
 }

@@ -14,25 +14,49 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.apache.qpid.server.exchange.topic.TopicMatcherResult;
+import org.apache.qpid.server.exchange.topic.TopicParser;
 
 /**
- * Direct message router.
+ * Topic message router.
  */
-public class DirectMessageRouter extends AbstractAmqpMessageRouter {
+public class TopicMessageRouter extends AbstractAmqpMessageRouter {
 
-    public DirectMessageRouter() {
-        super(Type.Direct);
+    public TopicMessageRouter() {
+        super(Type.Topic);
     }
 
     @Override
     public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
                                                   Map<String, Object> properties) {
-        if (this.bindingKeys.contains(routingKey)) {
+        if (isMatch(routingKey)) {
             return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
         } else {
             return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    /**
+     * Use Qpid.
+     *
+     * @param routingKey
+     * @return
+     */
+    public boolean isMatch(String routingKey) {
+        TopicParser parser = new TopicParser();
+        Iterator iterator = this.bindingKeys.iterator();
+        while (iterator.hasNext()) {
+            parser.addBinding((String) iterator.next(), null);
+        }
+        Collection<TopicMatcherResult> results = parser.parse(routingKey);
+        if (results.size() > 0) {
+            return true;
+        } else {
+            return false;
         }
     }
 }

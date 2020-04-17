@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -27,7 +28,8 @@ public class FanoutMessageRouter extends AbstractAmqpMessageRouter {
     }
 
     @Override
-    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey) {
+    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
+                                                  Map<String, Object> properties) {
         return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
     }
 }

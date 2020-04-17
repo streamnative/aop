@@ -18,7 +18,6 @@ import static org.apache.qpid.server.protocol.ErrorCodes.NOT_FOUND;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.streamnative.pulsar.handlers.amqp.impl.DirectMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
@@ -298,11 +297,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-                                 boolean nowait, FieldTable arguments) {
+                                 boolean nowait, FieldTable argumentsTable) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
-                    channelId, queue, exchange, bindingKey, nowait, arguments);
+                    channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
+        Map<String, Object> arguments = FieldTable.convertToMap(argumentsTable);
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
@@ -317,7 +317,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         // in-memory integration
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-            amqpQueue.bindExchange(amqpExchange, messageRouter);
+            amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
             return;
@@ -327,11 +327,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (null == topic) {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {
-            // create a new sub to Pulsar Topic(exchange in AMQP)
             try {
-                amqpQueue.bindExchange(amqpExchange, messageRouter);
-                topic.createSubscription(queue.toString(),
-                        PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
+                amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
                 AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));
@@ -544,11 +541,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 return;
             }
 
-            if (amqpQueue.getRouter("") == null) {
-                AmqpMessageRouter amqpMessageRouter = new DirectMessageRouter(
-                        AmqpMessageRouter.Type.Direct, routingKey.toString());
-                amqpQueue.bindExchange(amqpExchange, amqpMessageRouter);
-            }
+//            if (amqpQueue.getRouter("") == null) {
+//                AmqpMessageRouter amqpMessageRouter = new DirectMessageRouter(
+//                        AmqpMessageRouter.Type.Direct, routingKey.toString());
+//                amqpQueue.bindExchange(amqpExchange, amqpMessageRouter);
+//            }
         }
         MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);
         setPublishFrame(info, null);

@@ -18,9 +18,11 @@ import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicCursorManager;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import lombok.extern.slf4j.Slf4j;
@@ -56,16 +58,17 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey) {
         CompletableFuture<Position> publishFuture = new CompletableFuture<>();
         List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
+        Map<String, Object> properties = MessageConvertUtils.getHeaders(message);
         publishFuture.whenComplete((position, throwable) -> {
             if (throwable != null) {
                 publishFuture.completeExceptionally(throwable);
             } else {
                 for (AmqpQueue queue : queues) {
                     routeFutures.add(
-                        queue.getRouter(getName()).routingMessage(
-                            ((PositionImpl) position).getLedgerId(),
-                            ((PositionImpl) position).getEntryId(),
-                            routingKey)
+                            queue.getRouter(getName()).routingMessage(
+                                    ((PositionImpl) position).getLedgerId(),
+                                    ((PositionImpl) position).getEntryId(),
+                                    routingKey, properties)
                     );
                 }
             }

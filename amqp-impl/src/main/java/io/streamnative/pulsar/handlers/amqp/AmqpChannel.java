@@ -17,7 +17,6 @@ import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.protocol.ErrorCodes.NOT_FOUND;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 import com.google.common.annotations.VisibleForTesting;
-import io.streamnative.pulsar.handlers.amqp.impl.DirectMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
@@ -67,6 +66,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+
+
 
 
 
@@ -135,12 +136,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
-        boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
+            boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
-                    + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
-                    + "nowait: {}, arguments: {} ]", channelId, exchange,
-                type, passive, durable, autoDelete, internal, nowait, arguments);
+                            + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
+                            + "nowait: {}, arguments: {} ]", channelId, exchange,
+                    type, passive, durable, autoDelete, internal, nowait, arguments);
         }
 
         final MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -150,13 +151,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             if (!AMQShortString.createAMQShortString(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).equals(type)) {
                 StringBuffer sb = new StringBuffer();
                 sb.append("Attempt to redeclare default exchange: of type")
-                    .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).append("to").append(type).append(".");
+                        .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).append("to").append(type).append(".");
                 connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, sb.toString(), channelId);
             } else {
                 // in-memory integration
                 if (!durable) {
                     InMemoryExchange inMemoryExchange = new InMemoryExchange(
-                        exchange.toString(), AmqpExchange.Type.value(type.toString()));
+                            exchange.toString(), AmqpExchange.Type.value(type.toString()));
                     connection.putExchange(exchange.toString(), inMemoryExchange);
                 }
 
@@ -172,14 +173,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 if (!durable) {
                     // in-memory integration
                     InMemoryExchange inMemoryExchange = new InMemoryExchange(
-                        name, AmqpExchange.Type.value(type.toString()));
+                            name, AmqpExchange.Type.value(type.toString()));
                     connection.putExchange(name, inMemoryExchange);
                     connection.writeFrame(declareOkBody.generateFrame(channelId));
                     return;
                 }
 
                 TopicName topicName = TopicName.get(
-                    TopicDomain.persistent.value(), connection.getNamespaceName(), name);
+                        TopicDomain.persistent.value(), connection.getNamespaceName(), name);
                 try {
                     PersistentTopic persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
                     if (persistentTopic == null) {
@@ -203,13 +204,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveExchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeDelete[ exchange: {}, ifUnused: {}, nowait:{} ]", channelId, exchange, ifUnused,
-                nowait);
+                    nowait);
         }
         if (isDefaultExchange(exchange)) {
             connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Default Exchange cannot be deleted. ", channelId);
         } else {
             TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                connection.getNamespaceName(), exchange.toString());
+                    connection.getNamespaceName(), exchange.toString());
 
             Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
             if (null == topic) {
@@ -224,7 +225,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         connection.writeFrame(responseBody.generateFrame(channelId));
                     } catch (Exception e) {
                         connection.sendConnectionClose(INTERNAL_ERROR,
-                            "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
+                                "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
                     }
                 }
             }
@@ -235,12 +236,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveExchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queueName) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeBound[ exchange: {}, routingKey: {}, queue:{} ]", channelId, exchange,
-                routingKey, queueName);
+                    routingKey, queueName);
         }
         int replyCode;
         StringBuilder replyText = new StringBuilder();
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-            connection.getNamespaceName(), exchange.toString());
+                connection.getNamespaceName(), exchange.toString());
 
         Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
@@ -258,7 +259,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         MethodRegistry methodRegistry = connection.getMethodRegistry();
         ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
-            .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
+                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
         connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
     }
 
@@ -267,9 +268,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         boolean autoDelete, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug(
-                "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
-                    + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
-                channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+                    "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
+                            + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
+                    channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }
 
         AmqpQueue amqpQueue;
@@ -279,7 +280,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         } else {
             try {
                 PersistentTopic indexTopic = amqpTopicManager.getTopic(
-                    PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queue.toString())).get();
+                            PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queue.toString())).get();
                 amqpQueue = new PersistentQueue(queue.toString(), indexTopic);
             } catch (ExecutionException | InterruptedException e) {
                 log.error(channelId + "Exchange declare failed! queueName: {}", queue.toString());
@@ -298,13 +299,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-        boolean nowait, FieldTable arguments) {
+                                 boolean nowait, FieldTable argumentsTable) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
-                channelId, queue, exchange, bindingKey, nowait, arguments);
+                    channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
+        Map<String, Object> arguments = FieldTable.convertToMap(argumentsTable);
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-            connection.getNamespaceName(), exchange.toString());
+                connection.getNamespaceName(), exchange.toString());
 
         AmqpQueue amqpQueue = connection.getQueue(queue.toString());
         AmqpExchange amqpExchange = connection.getExchange(exchange.toString());
@@ -317,7 +319,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         // in-memory integration
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-            amqpQueue.bindExchange(amqpExchange, messageRouter);
+            amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
             return;
@@ -327,17 +329,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (null == topic) {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {
-            // create a new sub to Pulsar Topic(exchange in AMQP)
             try {
-                amqpQueue.bindExchange(amqpExchange, messageRouter);
-                topic.createSubscription(queue.toString(),
-                    PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
+                amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
                 AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));
             } catch (Exception e) {
                 connection.sendConnectionClose(INTERNAL_ERROR,
-                    "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
+                        "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
             }
         }
     }
@@ -358,7 +357,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveQueueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
-                ifUnused, ifEmpty, nowait);
+                    ifUnused, ifEmpty, nowait);
         }
         // TODO
         // return success.
@@ -370,10 +369,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-        FieldTable arguments) {
+                                   FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
-                exchange, bindingKey, arguments);
+                    exchange, bindingKey, arguments);
         }
 
         // in-memory integration
@@ -386,7 +385,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-            connection.getNamespaceName(), exchange.toString());
+                connection.getNamespaceName(), exchange.toString());
 
         Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
@@ -530,10 +529,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveBasicPublish(AMQShortString exchangeName, AMQShortString routingKey, boolean mandatory,
-        boolean immediate) {
+            boolean immediate) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] BasicPublish[exchange: {} routingKey: {} mandatory: {} immediate: {}]",
-                channelId, exchangeName, routingKey, mandatory, immediate);
+                    channelId, exchangeName, routingKey, mandatory, immediate);
         }
 
         if (exchangeName == null || exchangeName.length() == 0) {
@@ -546,11 +545,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 return;
             }
 
-            if (amqpQueue.getRouter("") == null) {
-                AmqpMessageRouter amqpMessageRouter = new DirectMessageRouter(
-                    AmqpMessageRouter.Type.Direct, routingKey.toString());
-                amqpQueue.bindExchange(amqpExchange, amqpMessageRouter);
-            }
+//            if (amqpQueue.getRouter("") == null) {
+//                AmqpMessageRouter amqpMessageRouter = new DirectMessageRouter(
+//                        AmqpMessageRouter.Type.Direct, routingKey.toString());
+//                amqpQueue.bindExchange(amqpExchange, amqpMessageRouter);
+//            }
         }
         MessagePublishInfo info = new MessagePublishInfo(exchangeName, immediate, mandatory, routingKey);
         setPublishFrame(info, null);
@@ -612,7 +611,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             publishContentBody(new ContentBody(data));
         } else {
             connection.sendConnectionClose(ErrorCodes.COMMAND_INVALID,
-                "Attempt to send a content header without first sending a publish frame", channelId);
+                    "Attempt to send a content header without first sending a publish frame", channelId);
         }
     }
 
@@ -625,7 +624,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             long currentSize = currentMessage.addContentBodyFrame(contentBody);
             if (currentSize > currentMessage.getSize()) {
                 connection.sendConnectionClose(ErrorCodes.FRAME_ERROR,
-                    "More message data received than content header defined", channelId);
+                        "More message data received than content header defined", channelId);
             } else {
                 deliverCurrentMessageIfComplete();
             }
@@ -649,14 +648,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             if (bodySize > maxMessageSize) {
                 properties.dispose();
                 closeChannel(ErrorCodes.MESSAGE_TOO_LARGE,
-                    "Message size of " + bodySize + " greater than allowed maximum of " + maxMessageSize);
+                        "Message size of " + bodySize + " greater than allowed maximum of " + maxMessageSize);
             } else {
                 publishContentHeader(new ContentHeaderBody(properties, bodySize));
             }
         } else {
             properties.dispose();
             connection.sendConnectionClose(ErrorCodes.COMMAND_INVALID,
-                "Attempt to send a content header without first sending a publish frame", channelId);
+                    "Attempt to send a content header without first sending a publish frame", channelId);
         }
     }
 
@@ -675,6 +674,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
+
+
 
             Message<byte[]> message;
             try {

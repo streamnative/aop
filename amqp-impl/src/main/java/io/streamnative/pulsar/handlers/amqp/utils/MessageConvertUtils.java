@@ -374,4 +374,15 @@ public final class MessageConvertUtils {
         return IndexMessage.create(exchangeName, ledgerId, entryId);
     }
 
+    public static Map<String, Object> getHeaders(Message<byte[]> message) {
+        Map<String, Object> headers = new HashMap<>();
+
+        for (Map.Entry<String, String> entry : message.getProperties().entrySet()) {
+            if (entry.getKey().startsWith(BASIC_PROP_HEADER_PRE)) {
+                headers.put(entry.getKey().replaceFirst(BASIC_PROP_HEADER_PRE, ""), entry.getValue());
+            }
+        }
+        return headers;
+    }
+
 }

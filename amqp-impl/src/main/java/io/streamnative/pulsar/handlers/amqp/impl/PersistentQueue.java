@@ -19,6 +19,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -63,8 +64,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
     @Override
-    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router) {
-        super.bindExchange(exchange, router);
+    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
+                             Map<String, Object> arguments) {
+        super.bindExchange(exchange, router, bindingKey, arguments);
     }
 
     public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {

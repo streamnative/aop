@@ -87,7 +87,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
         CompletableFuture<Entry> future = new CompletableFuture();
         // TODO Temporarily put the creation operation here, and later put the operation in router
-        ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
+        ManagedCursor cursor = getTopicCursorManager().getOrCreateCursor(queueName);
         if (cursor == null) {
             future.complete(null);
             return future;

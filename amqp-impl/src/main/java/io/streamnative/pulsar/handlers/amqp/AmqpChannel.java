@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.protocol.ErrorCodes.NOT_FOUND;
 import static org.apache.qpid.server.transport.util.Functions.hex;
-
 import com.google.common.annotations.VisibleForTesting;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
@@ -33,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
-import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.BrokerServiceException;
@@ -68,6 +66,10 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+
+
+
+
 
 
 /**
@@ -186,7 +188,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         return;
                     }
                     connection.putExchange(name, new PersistentExchange(
-                            name, AmqpExchange.Type.value(type.toString()), persistentTopic));
+                        name, AmqpExchange.Type.value(type.toString()), persistentTopic, amqpTopicManager));
                     connection.writeFrame(declareOkBody.generateFrame(channelId));
                 } catch (Exception e) {
                     log.error(channelId + "Exchange declare failed! exchangeName: " + name, e);
@@ -417,37 +419,36 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] BasicConsume[queue:{} consumerTag:{} noLocal:{} noAck:{} exclusive:{} nowait:{}"
                 + "arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
         }
-
+        final String consumerTag1;
+        if (consumerTag == null) {
+            consumerTag1 = "consumerTag_" + getNextConsumerTag();
+        } else {
+            consumerTag1 = consumerTag.toString();
+        }
         // in-memory integration
         AmqpQueue amqpQueue = connection.getQueue(queue.toString());
         if (amqpQueue instanceof InMemoryQueue) {
             try {
-                final String consumerTag1;
-                if (consumerTag == null) {
-                    consumerTag1 = "consumerTag" + getNextConsumerTag();
-                } else {
-                    consumerTag1 = consumerTag.toString();
-                }
                 if (!nowait) {
                     MethodRegistry methodRegistry = connection.getMethodRegistry();
                     AMQMethodBody responseBody = methodRegistry.
-                            createBasicConsumeOkBody(AMQShortString.createAMQShortString(consumerTag1));
+                        createBasicConsumeOkBody(AMQShortString.createAMQShortString(consumerTag1));
                     connection.writeFrame(responseBody.generateFrame(channelId));
                     amqpQueue.readEntryAsync("ex1", 1, 1)
-                            .whenComplete((entry, throwable) -> {
-                        if (entry != null) {
-                            try {
-                                connection.getAmqpOutputConverter().writeDeliver(
+                        .whenComplete((entry, throwable) -> {
+                            if (entry != null) {
+                                try {
+                                    connection.getAmqpOutputConverter().writeDeliver(
                                         MessageConvertUtils.entryToAmqpBody(entry),
                                         channelId,
                                         false,
                                         getNextDeliveryTag(),
                                         AMQShortString.createAMQShortString(consumerTag1));
-                            } catch (Exception e) {
-                                closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
+                                } catch (Exception e) {
+                                    closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
+                                }
                             }
-                        }
-                    });
+                        });
                     return;
                 }
             } catch (Exception e) {
@@ -458,14 +459,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         String queueName = AMQShortString.toString(queue);
         // TODO Temporarily treat queue as exchange
         connection.getAmqpTopicManager()
-            .getTopic(queueName)
+            .getTopic(PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queueName))
             .whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue, '" + queueName + "'");
                 } else {
                     try {
-                        String consumerTag1 = subscribe(AMQShortString.toString(consumerTag),
-                            topic, noAck, arguments, exclusive, noLocal);
+                        subscribe(consumerTag1, queueName, topic, noAck, arguments, exclusive, noLocal);
                         if (!nowait) {
                             MethodRegistry methodRegistry = connection.getMethodRegistry();
                             AMQMethodBody responseBody = methodRegistry.
@@ -474,16 +474,18 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         }
                     } catch (Exception e) {
                         closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
+                        log.error("BasicConsume error queue:{} consumerTag:{} ex {}",
+                            queue, consumerTag, e.getMessage());
                     }
                 }
             });
     }
 
-    private String subscribe(String consumerTag, Topic topic, boolean ack,
+    private String subscribe(String consumerTag, String queueName, Topic topic, boolean ack,
         FieldTable arguments, boolean exclusive, boolean noLocal) throws ConsumerTagInUseException,
         InterruptedException, ExecutionException, BrokerServiceException {
         if (consumerTag == null) {
-            consumerTag = "consumerTag" + getNextConsumerTag();
+            consumerTag = "consumerTag_" + getNextConsumerTag();
         }
 
         if (tag2ConsumersMap.containsKey(consumerTag)) {
@@ -500,8 +502,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     PulsarApi.CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
                     consumerTag, 0, connection.getServerCnx(), "", null,
                     false, PulsarApi.CommandSubscribe.InitialPosition.Earliest,
-                null, this, defaultSubscription, ack);
+                    null, this, consumerTag, queueName, ack);
             subscription.addConsumer(consumer);
+            // TODO Temporarily perform this operation here
+            subscription.getDispatcher().consumerFlow(consumer, 10000);
             tag2ConsumersMap.put(consumerTag, consumer);
         } catch (Exception e) {
             throw e;
@@ -741,15 +745,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
             unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
-            Map<Subscription, List<Position>> positionMap = new HashMap<>();
-            ackedMessages.stream().forEach(association -> {
-                Subscription subscription = association.getConsumer().getSubscription();
-                List<Position> positions = positionMap.computeIfAbsent(subscription,
-                    list -> new ArrayList<>());
-                positions.add(association.getPosition());
-            });
-            positionMap.entrySet().stream().forEach(entry -> {
-                entry.getKey().acknowledgeMessage(entry.getValue(),
+            ackedMessages.stream().forEach(entry -> {
+                entry.getConsumer().messagesAck(entry.getPosition(), entry.getExchangeName(),
                     PulsarApi.CommandAck.AckType.Individual, null);
             });
         }

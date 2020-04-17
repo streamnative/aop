@@ -18,6 +18,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -27,6 +28,7 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.Backoff;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
+
 
 
 /**
@@ -42,11 +44,14 @@ public class AmqpTopicManager {
     private AmqpConnection amqpConnection;
 
     public static final ConcurrentHashMap<String, CompletableFuture<InetSocketAddress>>
-            LOOKUP_CACHE = new ConcurrentHashMap<>();
+        LOOKUP_CACHE = new ConcurrentHashMap<>();
 
     // cache for topics: <topicName, persistentTopic>
     private final ConcurrentHashMap<String, CompletableFuture<PersistentTopic>> topics;
     private final ConcurrentHashMap<String, CompletableFuture<Topic>> exchangeTopics;
+
+    @Getter
+    private final ConcurrentHashMap<String, CompletableFuture<AmqpTopicCursorManager>> topicCursorManagers;
 
     public AmqpTopicManager(AmqpConnection amqpConnection) {
         this.amqpConnection = amqpConnection;
@@ -54,6 +59,7 @@ public class AmqpTopicManager {
         this.brokerService = pulsarService.getBrokerService();
         topics = new ConcurrentHashMap<>();
         exchangeTopics = new ConcurrentHashMap<>();
+        topicCursorManagers = new ConcurrentHashMap<>();
     }
 
     public CompletableFuture<PersistentTopic> getTopic(String topicName) {
@@ -117,9 +123,9 @@ public class AmqpTopicManager {
             }
             CompletableFuture<InetSocketAddress> returnFuture = new CompletableFuture<>();
             Backoff backoff = new Backoff(
-                    100, TimeUnit.MILLISECONDS,
-                    30, TimeUnit.SECONDS,
-                    30, TimeUnit.SECONDS
+                100, TimeUnit.MILLISECONDS,
+                30, TimeUnit.SECONDS,
+                30, TimeUnit.SECONDS
             );
             lookupBroker(topicName, backoff, returnFuture);
             return returnFuture;
@@ -129,32 +135,32 @@ public class AmqpTopicManager {
     // this method do the real lookup into Pulsar broker.
     // retFuture will be completed with null when meet error.
     private void lookupBroker(String topicName,
-                              Backoff backoff,
-                              CompletableFuture<InetSocketAddress> retFuture) {
+        Backoff backoff,
+        CompletableFuture<InetSocketAddress> retFuture) {
         try {
             ((PulsarClientImpl) pulsarService.getClient()).getLookup()
-                    .getBroker(TopicName.get(topicName))
-                    .thenAccept(pair -> {
-                        checkState(pair.getLeft().equals(pair.getRight()));
-                        retFuture.complete(pair.getLeft());
-                    })
-                    .exceptionally(th -> {
-                        long waitTimeMs = backoff.next();
+                .getBroker(TopicName.get(topicName))
+                .thenAccept(pair -> {
+                    checkState(pair.getLeft().equals(pair.getRight()));
+                    retFuture.complete(pair.getLeft());
+                })
+                .exceptionally(th -> {
+                    long waitTimeMs = backoff.next();
 
-                        if (backoff.isMandatoryStopMade()) {
-                            log.warn("GetBroker for topic {} failed, retried too many times, waitTimeMs: {},"
-                                    + " return null. throwable: {}", topicName, waitTimeMs, th);
-                            retFuture.complete(null);
-                        } else {
-                            log.warn("[{}] getBroker for topic failed, will retry in {} ms. throwable: {}",
-                                    topicName, waitTimeMs, th);
-                            pulsarService.getExecutor()
-                                    .schedule(() -> lookupBroker(topicName, backoff, retFuture),
-                                            waitTimeMs,
-                                            TimeUnit.MILLISECONDS);
-                        }
-                        return null;
-                    });
+                    if (backoff.isMandatoryStopMade()) {
+                        log.warn("GetBroker for topic {} failed, retried too many times, waitTimeMs: {},"
+                            + " return null. throwable: {}", topicName, waitTimeMs, th);
+                        retFuture.complete(null);
+                    } else {
+                        log.warn("[{}] getBroker for topic failed, will retry in {} ms. throwable: {}",
+                            topicName, waitTimeMs, th);
+                        pulsarService.getExecutor()
+                            .schedule(() -> lookupBroker(topicName, backoff, retFuture),
+                                waitTimeMs,
+                                TimeUnit.MILLISECONDS);
+                    }
+                    return null;
+                });
         } catch (PulsarServerException e) {
             log.error("GetTopicBroker for topic {} failed get pulsar client, return null. throwable: ", topicName, e);
             retFuture.complete(null);
@@ -173,42 +179,65 @@ public class AmqpTopicManager {
 
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
         return exchangeTopics.computeIfAbsent(topicName,
-                t -> {
-                    // setup ownership of service unit to this broker
-                    pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), true).
-                            whenComplete((addr, th) -> {
-                                if (th != null || addr == null || addr.get() == null) {
-                                    log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", t, th);
+            t -> {
+                // setup ownership of service unit to this broker
+                pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), true).
+                    whenComplete((addr, th) -> {
+                        if (th != null || addr == null || addr.get() == null) {
+                            log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", t, th);
+                            topicCompletableFuture.complete(null);
+                            return;
+                        }
+                        if (log.isDebugEnabled()) {
+                            log.debug("getBrokerServiceUrl for {} in ExchangeTopicManager. brokerAddress: {}",
+                                t, addr.get().getLookupData().getBrokerUrl());
+                        }
+                        brokerService.getTopic(t, createIfMissing)
+                            .whenComplete((topicOptional, throwable) -> {
+                                if (throwable != null) {
+                                    log.error("Failed to getTopic {}. exception: {}", t, throwable);
                                     topicCompletableFuture.complete(null);
                                     return;
                                 }
-                                if (log.isDebugEnabled()) {
-                                    log.debug("getBrokerServiceUrl for {} in ExchangeTopicManager. brokerAddress: {}",
-                                            t, addr.get().getLookupData().getBrokerUrl());
+                                try {
+                                    if (topicOptional.isPresent()) {
+                                        Topic topic = topicOptional.get();
+                                        topicCompletableFuture.complete(topic);
+                                    } else {
+                                        log.error("Get empty topic for name {}", t);
+                                        topicCompletableFuture.complete(null);
+                                    }
+                                } catch (Exception e) {
+                                    log.error("Failed to get client in registerInPersistentTopic {}. "
+                                        + "exception:", t, e);
+                                    topicCompletableFuture.complete(null);
                                 }
-                                brokerService.getTopic(t, createIfMissing)
-                                        .whenComplete((topicOptional, throwable) -> {
-                                            if (throwable != null) {
-                                                log.error("Failed to getTopic {}. exception: {}", t, throwable);
-                                                topicCompletableFuture.complete(null);
-                                                return;
-                                            }
-                                            try {
-                                                if (topicOptional.isPresent()) {
-                                                    Topic topic = topicOptional.get();
-                                                    topicCompletableFuture.complete(topic);
-                                                } else {
-                                                    log.error("Get empty topic for name {}", t);
-                                                    topicCompletableFuture.complete(null);
-                                                }
-                                            } catch (Exception e) {
-                                                log.error("Failed to get client in registerInPersistentTopic {}. "
-                                                        + "exception:", t, e);
-                                                topicCompletableFuture.complete(null);
-                                            }
-                                        });
                             });
-                    return topicCompletableFuture;
+                    });
+                return topicCompletableFuture;
+            });
+    }
+
+    public CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(String topicName) {
+        return topicCursorManagers.computeIfAbsent(
+            topicName,
+            t -> {
+                CompletableFuture<PersistentTopic> topic = getTopic(t);
+                checkState(topic != null);
+
+                return topic.thenApply(t2 -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug(" Call getTopicCursorManager for {}, and create TCM for {}.",
+                            topicName, t2);
+                    }
+
+                    if (t2 == null) {
+                        return null;
+                    }
+                    // return consumer manager
+                    return new AmqpTopicCursorManager((PersistentTopic) t2);
                 });
+            }
+        );
     }
 }

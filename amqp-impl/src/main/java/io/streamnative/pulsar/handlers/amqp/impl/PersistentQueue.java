@@ -13,27 +13,42 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.util.ObjectMapperFactory;
 
 /**
  * Persistent queue.
  */
+@Slf4j
 public class PersistentQueue extends AbstractAmqpQueue {
+    public static final String QUEUE = "QUEUE";
+    public static final String ROUTERS = "ROUTERS";
 
     private PersistentTopic indexTopic;
+
+    private ObjectMapper jsonMapper = ObjectMapperFactory.create();
 
     public PersistentQueue(String queueName, PersistentTopic indexTopic) {
         super(queueName, true);
@@ -67,11 +82,48 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
                              Map<String, Object> arguments) {
         super.bindExchange(exchange, router, bindingKey, arguments);
+        Map<String, String> properties = new HashMap<>();
+        try {
+            properties.put(ROUTERS, jsonMapper.writeValueAsString(getQueueProperties(routers)));
+            properties.put(QUEUE, queueName);
+        } catch (JsonProcessingException e) {
+            log.error("[{}] covert map of routers to String error: {}", queueName, e.getMessage());
+            return;
+        }
+        indexTopic.getManagedLedger().asyncSetProperties(properties, new AsyncCallbacks.SetPropertiesCallback() {
+            @Override
+            public void setPropertiesComplete(Map<String, String> map, Object o) {
+                if (log.isDebugEnabled()) {
+                    log.debug("[{}] set properties succeed, properties:{}", queueName, properties);
+                }
+            }
+
+            @Override
+            public void setPropertiesFailed(ManagedLedgerException e, Object o) {
+                log.error("[{}] set properties failed message: {}, properties:{}",
+                        queueName, e.getMessage(), properties);
+            }
+        }, null);
     }
 
     public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {
         return TopicName.get(TopicDomain.persistent.value(),
             namespaceName, "__index__" + queueName).toString();
+    }
+
+    private List<AmqpQueueProperties> getQueueProperties(Map<String, AmqpMessageRouter> routers){
+        List<AmqpQueueProperties> propertiesList = new ArrayList<>();
+        for (Map.Entry<String, AmqpMessageRouter> router : routers.entrySet()) {
+            AmqpQueueProperties amqpQueueProperties = new AmqpQueueProperties();
+
+            amqpQueueProperties.setExchangeName(router.getKey());
+            amqpQueueProperties.setType(router.getValue().getType());
+            amqpQueueProperties.setArguments(router.getValue().getArgument());
+            amqpQueueProperties.setBindingKeys(router.getValue().getBindingKey());
+
+            propertiesList.add(amqpQueueProperties);
+        }
+        return propertiesList;
     }
 
 }

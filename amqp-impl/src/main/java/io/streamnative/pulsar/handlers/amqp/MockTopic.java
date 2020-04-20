@@ -30,6 +30,7 @@ import org.apache.pulsar.broker.stats.NamespaceStats;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.policies.data.BacklogQuota;
+import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
 import org.apache.pulsar.common.policies.data.PersistentTopicInternalStats;
 import org.apache.pulsar.common.policies.data.Policies;
 import org.apache.pulsar.common.policies.data.TopicStats;
@@ -119,14 +120,15 @@ public class MockTopic implements Topic {
     }
 
     @Override
-    public CompletableFuture<Void> close() {
+    public CompletableFuture<Void> close(boolean b) {
         return null;
     }
 
     @Override
-    public void checkGC(int i) {
+    public void checkGC(int i, InactiveTopicDeleteMode inactiveTopicDeleteMode) {
 
     }
+
 
     @Override
     public void checkInactiveSubscriptions() {
@@ -222,7 +224,7 @@ public class MockTopic implements Topic {
     }
 
     @Override
-    public TopicStats getStats() {
+    public TopicStats getStats(boolean b) {
         return null;
     }
 
@@ -232,7 +234,12 @@ public class MockTopic implements Topic {
     }
 
     @Override
-    public Position getLastMessageId() {
+    public Position getLastPosition() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<MessageId> getLastMessageId() {
         return null;
     }
 

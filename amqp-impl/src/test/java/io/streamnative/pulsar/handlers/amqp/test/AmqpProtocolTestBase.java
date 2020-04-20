@@ -25,6 +25,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.MockDispatcher;
+import io.streamnative.pulsar.handlers.amqp.MockManagedLedger;
 import io.streamnative.pulsar.handlers.amqp.MockTopic;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
@@ -137,6 +138,7 @@ public abstract class AmqpProtocolTestBase {
             completableFuture.complete(persistentTopic);
             Mockito.when(amqpTopicManager.getTopic(anyString())).thenReturn(completableFuture);
             Mockito.when(amqpTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(new MockTopic());
+            Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
             super.setAmqpTopicManager(amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }

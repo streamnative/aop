@@ -1,10 +1,30 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.streamnative.pulsar.handlers.amqp;
 
 import static com.github.fridujo.rabbitmq.mock.configuration.QueueDeclarator.queue;
 import static com.github.fridujo.rabbitmq.mock.tool.Exceptions.runAndEatExceptions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
-
+import com.google.common.collect.Sets;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
+import com.rabbitmq.client.GetResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,15 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import com.google.common.collect.Sets;
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DefaultConsumer;
-import com.rabbitmq.client.Envelope;
-import com.rabbitmq.client.GetResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.policies.data.ClusterData;
@@ -184,12 +195,14 @@ class IntegrationTest extends AmqpProtocolHandlerTestBase{
 
         waitForCancellation.acquire();
         assertThat(atomicInteger.get())
-                .describedAs("After connection closed, and Consumer cancellation, no message should be delivered anymore")
+                .describedAs("After connection closed, and Consumer cancellation, "
+                        + "no message should be delivered anymore")
                 .isZero();
     }
 
     @Test
-    void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException, InterruptedException {
+    void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException,
+            InterruptedException {
         try (Connection conn = getConnection()) {
             CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
             try (Channel channel = conn.createChannel()) {
@@ -202,11 +215,11 @@ class IntegrationTest extends AmqpProtocolHandlerTestBase{
                                                Envelope envelope,
                                                AMQP.BasicProperties properties,
                                                byte[] body) {
-                        if(messagesToBeProcessed.getCount() == 1){
+                        if (messagesToBeProcessed.getCount() == 1){
                             redeliveredMessageEnvelope.set(envelope);
                             runAndEatExceptions(messagesToBeProcessed::countDown);
 
-                        }else{
+                        } else {
                             runAndEatExceptions(() -> channel.basicNack(envelope.getDeliveryTag(), false, true));
                             runAndEatExceptions(messagesToBeProcessed::countDown);
                         }

@@ -1,21 +1,22 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.streamnative.pulsar.handlers.amqp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Collections;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.collect.Sets;
 import com.rabbitmq.client.AMQP;
@@ -26,14 +27,28 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.GetResponse;
-import com.rabbitmq.client.ShutdownSignalException;
 import com.rabbitmq.client.MessageProperties;
-import com.rabbitmq.client.RpcClient;
-import com.rabbitmq.client.RpcClientParams;
-import com.rabbitmq.client.UnroutableRpcRequestException;
+import com.rabbitmq.client.Return;
 import com.rabbitmq.client.ReturnCallback;
 import com.rabbitmq.client.ReturnListener;
-import com.rabbitmq.client.Return;
+import com.rabbitmq.client.RpcClient;
+import com.rabbitmq.client.RpcClientParams;
+import com.rabbitmq.client.ShutdownSignalException;
+import com.rabbitmq.client.UnroutableRpcRequestException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.policies.data.ClusterData;
@@ -47,12 +62,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
 @Slf4j
-class ChannelTests extends AmqpProtocolHandlerTestBase {
+class ChannelTest extends AmqpProtocolHandlerTestBase {
 
     @BeforeEach
     @Override
@@ -179,9 +190,10 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
                 assertThatExceptionOfType(IOException.class)
                         .isThrownBy(() -> channel.exchangeDeclare(exchangeName, "topic"))
                         .withCauseInstanceOf(ShutdownSignalException.class)
-                        .withMessageContaining("channel error; protocol method: #method<channel.close>" +
-                                "(reply-code=406, reply-text=PRECONDITION_FAILED - inequivalent arg 'type' " +
-                                "for exchange 'test1' in vhost '/' received 'topic' but current is 'fanout', class-id=40, method-id=10)");
+                        .withMessageContaining("channel error; protocol method: #method<channel.close>"
+                                + "(reply-code=406, reply-text=PRECONDITION_FAILED - inequivalent arg 'type' "
+                                + "for exchange 'test1' in vhost '/' received 'topic' but current is 'fanout', "
+                                + "class-id=40, method-id=10)");
             }
         }
     }
@@ -190,7 +202,8 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
     void exchangeDeclareNoWait_creates_it() throws IOException, TimeoutException {
         try (Connection conn = getConnection()) {
             try (Channel channel = conn.createChannel()) {
-                channel.exchangeDeclareNoWait("test1", BuiltinExchangeType.DIRECT, true, false, false, null);
+                channel.exchangeDeclareNoWait("test1", BuiltinExchangeType.DIRECT, true,
+                        false, false, null);
                 assertThat(channel.exchangeDeclarePassive("test1")).isNotNull();
             }
         }
@@ -202,7 +215,9 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
             try (Channel channel = conn.createChannel()) {
                 assertThatExceptionOfType(IOException.class)
                         .isThrownBy(() -> channel.exchangeDeclarePassive("test1"))
-                        .withMessage("com.rabbitmq.client.ShutdownSignalException: channel error; protocol method: #method<channel.close>(reply-code=404, reply-text=NOT_FOUND - no exchange 'test1' in vhost '/', class-id=40, method-id=10)")
+                        .withMessage("com.rabbitmq.client.ShutdownSignalException: channel error; protocol method: "
+                                + "#method<channel.close>(reply-code=404, reply-text=NOT_FOUND - no exchange 'test1' "
+                                + "in vhost '/', class-id=40, method-id=10)")
                         .withCauseExactlyInstanceOf(ShutdownSignalException.class);
             }
         }
@@ -212,7 +227,8 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
     void exchangeDelete_removes_it() throws IOException, TimeoutException {
         try (Connection conn = getConnection()) {
             try (Channel channel = conn.createChannel()) {
-                channel.exchangeDeclareNoWait("test1", BuiltinExchangeType.DIRECT, true, false, false, null);
+                channel.exchangeDeclareNoWait("test1", BuiltinExchangeType.DIRECT, true,
+                        false, false, null);
                 assertThat(channel.exchangeDelete("test1")).isNotNull();
                 assertThatExceptionOfType(IOException.class)
                         .isThrownBy(() -> channel.exchangeDeclarePassive("test1"));
@@ -224,7 +240,8 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
     void exchangeDeleteNoWait_removes_it() throws IOException, TimeoutException {
         try (Connection conn = getConnection()) {
             try (Channel channel = conn.createChannel()) {
-                channel.exchangeDeclareNoWait("test1", BuiltinExchangeType.DIRECT, true, false, false, null);
+                channel.exchangeDeclareNoWait("test1", BuiltinExchangeType.DIRECT, true,
+                        false, false, null);
                 channel.exchangeDeleteNoWait("test1", false);
                 assertThatExceptionOfType(IOException.class)
                         .isThrownBy(() -> channel.exchangeDeclarePassive("test1"));
@@ -337,7 +354,9 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
             try (Channel channel = conn.createChannel()) {
                 assertThatExceptionOfType(IOException.class)
                         .isThrownBy(() -> channel.queueDeclarePassive("test1"))
-                        .withMessage("com.rabbitmq.client.ShutdownSignalException: channel error; protocol method: #method<channel.close>(reply-code=404, reply-text=NOT_FOUND - no queue 'test1' in vhost '/', class-id=50, method-id=10)")
+                        .withMessage("com.rabbitmq.client.ShutdownSignalException: channel error; protocol method: "
+                                + "#method<channel.close>(reply-code=404, reply-text=NOT_FOUND - no queue 'test1' in "
+                                + "vhost '/', class-id=50, method-id=10)")
                         .withCauseExactlyInstanceOf(ShutdownSignalException.class);
             }
         }
@@ -704,7 +723,8 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
 
                 String queue = channel.queueDeclare().getQueue();
 
-                channel.basicPublish("", queue, new AMQP.BasicProperties.Builder().replyTo("amq.rabbitmq.reply-to").build(), "ping".getBytes());
+                channel.basicPublish("", queue, new AMQP.BasicProperties.Builder()
+                        .replyTo("amq.rabbitmq.reply-to").build(), "ping".getBytes());
                 assertThat(channel.messageCount(queue)).isEqualTo(1);
 
                 final GetResponse basicGet = channel.basicGet(queue, true);
@@ -727,7 +747,8 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
 
                 String queue = channel.queueDeclare().getQueue();
 
-                channel.basicPublish("", queue, new AMQP.BasicProperties.Builder().replyTo("amq.rabbitmq.reply-to").build(), "ping".getBytes());
+                channel.basicPublish("", queue, new AMQP.BasicProperties.Builder()
+                        .replyTo("amq.rabbitmq.reply-to").build(), "ping".getBytes());
                 assertThat(channel.messageCount(queue)).isEqualTo(1);
 
                 final GetResponse basicGet = channel.basicGet(queue, true);
@@ -739,7 +760,8 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
                 CountDownLatch latch = new CountDownLatch(1);
                 AtomicBoolean cancelled = new AtomicBoolean();
                 AtomicReference<String> reply = new AtomicReference<>();
-                String consumerTag = channel.basicConsume("amq.rabbitmq.reply-to", true, new DefaultConsumer(channel) {
+                String consumerTag = channel.basicConsume("amq.rabbitmq.reply-to", true,
+                        new DefaultConsumer(channel) {
                     @Override
                     public void handleDelivery(String consumerTag,
                                                Envelope envelope,
@@ -776,13 +798,16 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
             "existingQueue, -1",
             "unexistingQueue, 312",
     })
-    void mandatory_publish_with_default_exchange(String routingKey, int expectedReplyCode) throws IOException, TimeoutException {
+    void mandatory_publish_with_default_exchange(String routingKey, int expectedReplyCode) throws IOException,
+            TimeoutException {
         try (Connection conn = getConnection()) {
             try (Channel channel = conn.createChannel()) {
 
-                channel.queueDeclare("existingQueue", false, false, false, Collections.emptyMap()).getQueue();
+                channel.queueDeclare("existingQueue", false, false,
+                        false, Collections.emptyMap()).getQueue();
                 AtomicInteger replyCodeHolder = new AtomicInteger(-1);
-                ReturnListener returnListener = (replyCode, replyText, exchange, routingKey1, properties, body) -> replyCodeHolder.set(replyCode);
+                ReturnListener returnListener = (replyCode, replyText, exchange, routingKey1, properties, body)
+                        -> replyCodeHolder.set(replyCode);
                 channel.addReturnListener(returnListener);
                 channel.basicPublish("", routingKey, true, MessageProperties.BASIC, "msg".getBytes());
                 assertThat(replyCodeHolder.get()).isEqualTo(expectedReplyCode);
@@ -796,16 +821,19 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
             "boundRoutingKey, -1",
             "unboundRoutingKey, 312",
     })
-    void mandatory_publish_with_direct_exchange(String routingKey, int expectedReplyCode) throws IOException, TimeoutException {
+    void mandatory_publish_with_direct_exchange(String routingKey, int expectedReplyCode) throws IOException,
+            TimeoutException {
         try (Connection conn = getConnection()) {
             try (Channel channel = conn.createChannel()) {
                 channel.exchangeDeclare("test", "direct");
-                channel.queueDeclare("existingQueue", false, false, false, Collections.emptyMap()).getQueue();
-                channel.queueBind("existingQueue","test", "boundRoutingKey");
+                channel.queueDeclare("existingQueue", false, false, false,
+                        Collections.emptyMap()).getQueue();
+                channel.queueBind("existingQueue", "test", "boundRoutingKey");
                 AtomicInteger replyCodeHolder = new AtomicInteger(-1);
                 ReturnCallback returnListener = r -> replyCodeHolder.set(r.getReplyCode());
                 channel.addReturnListener(returnListener);
-                channel.basicPublish("test", routingKey, true, MessageProperties.BASIC, "msg".getBytes());
+                channel.basicPublish("test", routingKey, true, MessageProperties.BASIC,
+                        "msg".getBytes());
                 assertThat(replyCodeHolder.get()).isEqualTo(expectedReplyCode);
             }
         }
@@ -830,11 +858,14 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
                 TrackingCallback thirdCallback = new TrackingCallback();
                 channel.addReturnListener(firstCallbackThatIsRegistedTwice);
                 channel.addReturnListener(firstCallbackThatIsRegistedTwice);
-                channel.addReturnListener(r -> {throw new RuntimeException("Listener throwing exception");});
+                channel.addReturnListener(r -> {
+                    throw new RuntimeException("Listener throwing exception");
+                });
                 ReturnListener returnListener = channel.addReturnListener(secondCallbackThatWillBeRemoved);
                 channel.addReturnListener(thirdCallback);
                 channel.removeReturnListener(returnListener);
-                channel.basicPublish("", "unexisting", true, MessageProperties.BASIC, "msg".getBytes());
+                channel.basicPublish("", "unexisting", true, MessageProperties.BASIC,
+                        "msg".getBytes());
                 assertThat(firstCallbackThatIsRegistedTwice.invocationCount).isEqualTo(1);
                 assertThat(secondCallbackThatWillBeRemoved.invocationCount).isEqualTo(0);
                 assertThat(thirdCallback.invocationCount).isEqualTo(1);
@@ -850,11 +881,13 @@ class ChannelTests extends AmqpProtocolHandlerTestBase {
                 String queue = channel.queueDeclare().getQueue();
                 channel.basicConsume(queue, new DefaultConsumer(channel) {
                     @Override
-                    public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                    public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                                               byte[] body) throws IOException {
                         channel.basicPublish(
                                 "",
                                 properties.getReplyTo(),
-                                MessageProperties.BASIC.builder().correlationId(properties.getCorrelationId()).build(), "pong".getBytes()
+                                MessageProperties.BASIC.builder().correlationId(properties.getCorrelationId()).build(),
+                                "pong".getBytes()
                         );
                     }
                 });

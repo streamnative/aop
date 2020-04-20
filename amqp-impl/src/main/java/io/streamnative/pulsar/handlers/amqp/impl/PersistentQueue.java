@@ -82,6 +82,16 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
                              Map<String, Object> arguments) {
         super.bindExchange(exchange, router, bindingKey, arguments);
+        updateQueueProperties();
+    }
+
+    @Override
+    public void unbindExchange(AmqpExchange exchange) {
+        super.unbindExchange(exchange);
+        updateQueueProperties();
+    }
+
+    private void updateQueueProperties() {
         Map<String, String> properties = new HashMap<>();
         try {
             properties.put(ROUTERS, jsonMapper.writeValueAsString(getQueueProperties(routers)));
@@ -108,10 +118,10 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {
         return TopicName.get(TopicDomain.persistent.value(),
-            namespaceName, "__index__" + queueName).toString();
+                namespaceName, "__index__" + queueName).toString();
     }
 
-    private List<AmqpQueueProperties> getQueueProperties(Map<String, AmqpMessageRouter> routers){
+    private List<AmqpQueueProperties> getQueueProperties(Map<String, AmqpMessageRouter> routers) {
         List<AmqpQueueProperties> propertiesList = new ArrayList<>();
         for (Map.Entry<String, AmqpMessageRouter> router : routers.entrySet()) {
             AmqpQueueProperties amqpQueueProperties = new AmqpQueueProperties();

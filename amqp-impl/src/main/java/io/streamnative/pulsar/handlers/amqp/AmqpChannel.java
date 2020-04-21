@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -288,6 +289,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
                             + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+        }
+        if ((queue == null) || (queue.length() == 0)) {
+            queue = AMQShortString.createAMQShortString("tmp_" + UUID.randomUUID());
         }
         AmqpQueue amqpQueue;
         if (passive) {

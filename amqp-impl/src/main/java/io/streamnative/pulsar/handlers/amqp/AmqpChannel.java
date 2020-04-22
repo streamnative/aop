@@ -68,11 +68,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 
-
-
-
-
-
 /**
  * Amqp Channel level method processor.
  */
@@ -85,6 +80,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final AtomicBoolean closing = new AtomicBoolean(false);
     private long confirmedMessageCounter;
     private boolean confirmOnPublish;
+    /** A channel has a default queue (the last declared) that is used when no queue name is explicitly set. */
+    private volatile AmqpQueue defaultQueue;
 
     private final UnacknowledgedMessageMap unacknowledgedMessageMap;
 
@@ -299,6 +296,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             if (null == amqpQueue) {
                 closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
             } else {
+                setDefaultQueue(amqpQueue);
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
                 QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
                 connection.writeFrame(responseBody.generateFrame(channelId));
@@ -319,7 +317,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
             connection.putQueue(queue.toString(), amqpQueue);
-
+            setDefaultQueue(amqpQueue);
             // return success.
             // when call QueueBind, then create Pulsar sub.
             MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -339,7 +337,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
-        AmqpQueue amqpQueue = connection.getQueue(queue.toString());
+        AmqpQueue amqpQueue;
+        if (queue == null) {
+            amqpQueue = getDefaultQueue();
+            if (amqpQueue != null) {
+                if (bindingKey == null) {
+                    bindingKey = AMQShortString.valueOf(amqpQueue.getName());
+                }
+            }
+        } else {
+            amqpQueue = connection.getQueue(queue.toString());
+        }
         AmqpExchange amqpExchange = connection.getExchange(exchange.toString());
 
         AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
@@ -894,6 +902,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             consumer.getSubscription().doUnsubscribe(consumer);
         });
         tag2ConsumersMap.clear();
+    }
+
+    private void setDefaultQueue(AmqpQueue queue) {
+        defaultQueue = queue;
+    }
+
+    private AmqpQueue getDefaultQueue() {
+        return defaultQueue;
     }
 
     @VisibleForTesting

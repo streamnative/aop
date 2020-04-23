@@ -146,7 +146,7 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
 
         final String queueName = "testQueue";
         final String message = "Hello AOP!";
-        final int messagesNum = 10;
+        final int messagesNum = 1000;
 
         @Cleanup
         PulsarAdmin pulsarAdmin = PulsarAdmin.builder().serviceHttpUrl("http://127.0.0.1:"

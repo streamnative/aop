@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.buffer.ByteBuf;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.mledger.Position;
@@ -25,11 +26,13 @@ import org.apache.pulsar.broker.service.Replicator;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
 import org.apache.pulsar.broker.stats.ClusterReplicationMetrics;
 import org.apache.pulsar.broker.stats.NamespaceStats;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.policies.data.BacklogQuota;
+import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
 import org.apache.pulsar.common.policies.data.PersistentTopicInternalStats;
 import org.apache.pulsar.common.policies.data.Policies;
 import org.apache.pulsar.common.policies.data.TopicStats;
@@ -119,12 +122,12 @@ public class MockTopic implements Topic {
     }
 
     @Override
-    public CompletableFuture<Void> close() {
+    public CompletableFuture<Void> close(boolean b) {
         return null;
     }
 
     @Override
-    public void checkGC(int i) {
+    public void checkGC(int i, InactiveTopicDeleteMode inactiveTopicDeleteMode) {
 
     }
 
@@ -222,7 +225,7 @@ public class MockTopic implements Topic {
     }
 
     @Override
-    public TopicStats getStats() {
+    public TopicStats getStats(boolean b) {
         return null;
     }
 
@@ -232,7 +235,12 @@ public class MockTopic implements Topic {
     }
 
     @Override
-    public Position getLastMessageId() {
+    public Position getLastPosition() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<MessageId> getLastMessageId() {
         return null;
     }
 
@@ -264,5 +272,10 @@ public class MockTopic implements Topic {
     @Override
     public CompletableFuture<Void> deleteForcefully() {
         return null;
+    }
+
+    @Override
+    public Optional<DispatchRateLimiter> getDispatchRateLimiter() {
+        return Optional.empty();
     }
 }

@@ -32,49 +32,42 @@ import org.apache.pulsar.common.api.proto.PulsarApi;
  */
 public class MockSubscription implements Subscription {
 
-    @Override
-    public Topic getTopic() {
+
+
+    @Override public Topic getTopic() {
         return null;
     }
 
-    @Override
-    public String getName() {
+    @Override public String getName() {
         return null;
     }
 
-    @Override
-    public void addConsumer(Consumer consumer) throws BrokerServiceException {
+    @Override public void addConsumer(Consumer consumer) throws BrokerServiceException {
 
     }
 
-    @Override
-    public void removeConsumer(Consumer consumer, boolean isResetCursor) throws BrokerServiceException {
+    @Override public void removeConsumer(Consumer consumer, boolean isResetCursor) throws BrokerServiceException {
 
     }
 
-    @Override
-    public void consumerFlow(Consumer consumer, int additionalNumberOfMessages) {
+    @Override public void consumerFlow(Consumer consumer, int additionalNumberOfMessages) {
 
     }
 
-    @Override
-    public void acknowledgeMessage(List<Position> positions, PulsarApi.CommandAck.AckType ackType,
+    @Override public void acknowledgeMessage(List<Position> positions, PulsarApi.CommandAck.AckType ackType,
         Map<String, Long> properties) {
 
     }
 
-    @Override
-    public String getTopicName() {
+    @Override public String getTopicName() {
         return null;
     }
 
-    @Override
-    public boolean isReplicated() {
+    @Override public boolean isReplicated() {
         return false;
     }
 
-    @Override
-    public Dispatcher getDispatcher() {
+    @Override public Dispatcher getDispatcher() {
         return null;
     }
 
@@ -83,18 +76,15 @@ public class MockSubscription implements Subscription {
         return 0;
     }
 
-    @Override
-    public List<Consumer> getConsumers() {
+    @Override public List<Consumer> getConsumers() {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> close() {
+    @Override public CompletableFuture<Void> close() {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> delete() {
+    @Override public CompletableFuture<Void> delete() {
         CompletableFuture<Void> completableFuture = new CompletableFuture<>();
         completableFuture.complete(null);
         return completableFuture;
@@ -105,78 +95,63 @@ public class MockSubscription implements Subscription {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> disconnect() {
+    @Override public CompletableFuture<Void> disconnect() {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> doUnsubscribe(Consumer consumer) {
+    @Override public CompletableFuture<Void> doUnsubscribe(Consumer consumer) {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> clearBacklog() {
+    @Override public CompletableFuture<Void> clearBacklog() {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> skipMessages(int numMessagesToSkip) {
+    @Override public CompletableFuture<Void> skipMessages(int numMessagesToSkip) {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> resetCursor(long timestamp) {
+    @Override public CompletableFuture<Void> resetCursor(long timestamp) {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Void> resetCursor(Position position) {
+    @Override public CompletableFuture<Void> resetCursor(Position position) {
         return null;
     }
 
-    @Override
-    public CompletableFuture<Entry> peekNthMessage(int messagePosition) {
+    @Override public CompletableFuture<Entry> peekNthMessage(int messagePosition) {
         return null;
     }
 
-    @Override
-    public void expireMessages(int messageTTLInSeconds) {
+    @Override public void expireMessages(int messageTTLInSeconds) {
 
     }
 
-    @Override
-    public void redeliverUnacknowledgedMessages(Consumer consumer) {
+    @Override public void redeliverUnacknowledgedMessages(Consumer consumer) {
 
     }
 
-    @Override
-    public void redeliverUnacknowledgedMessages(Consumer consumer, List<PositionImpl> positions) {
+    @Override public void redeliverUnacknowledgedMessages(Consumer consumer, List<PositionImpl> positions) {
 
     }
 
-    @Override
-    public void markTopicWithBatchMessagePublished() {
+    @Override public void markTopicWithBatchMessagePublished() {
 
     }
 
-    @Override
-    public double getExpiredMessageRate() {
+    @Override public double getExpiredMessageRate() {
         return 0;
     }
 
-    @Override
-    public PulsarApi.CommandSubscribe.SubType getType() {
+    @Override public PulsarApi.CommandSubscribe.SubType getType() {
         return null;
     }
 
-    @Override
-    public String getTypeString() {
+    @Override public String getTypeString() {
         return null;
     }
 
-    @Override
-    public void addUnAckedMessages(int unAckMessages) {
+    @Override public void addUnAckedMessages(int unAckMessages) {
 
     }
 }

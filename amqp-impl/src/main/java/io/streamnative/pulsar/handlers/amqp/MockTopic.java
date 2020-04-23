@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.buffer.ByteBuf;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.mledger.Position;
@@ -25,6 +26,7 @@ import org.apache.pulsar.broker.service.Replicator;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
 import org.apache.pulsar.broker.stats.ClusterReplicationMetrics;
 import org.apache.pulsar.broker.stats.NamespaceStats;
 import org.apache.pulsar.client.api.MessageId;
@@ -271,5 +273,10 @@ public class MockTopic implements Topic {
     @Override
     public CompletableFuture<Void> deleteForcefully() {
         return null;
+    }
+
+    @Override
+    public Optional<DispatchRateLimiter> getDispatchRateLimiter() {
+        return Optional.empty();
     }
 }

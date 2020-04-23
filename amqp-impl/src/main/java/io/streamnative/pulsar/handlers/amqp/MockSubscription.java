@@ -71,7 +71,8 @@ public class MockSubscription implements Subscription {
         return null;
     }
 
-    @Override public long getNumberOfEntriesInBacklog() {
+    @Override
+    public long getNumberOfEntriesInBacklog(boolean b) {
         return 0;
     }
 
@@ -87,6 +88,11 @@ public class MockSubscription implements Subscription {
         CompletableFuture<Void> completableFuture = new CompletableFuture<>();
         completableFuture.complete(null);
         return completableFuture;
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteForcefully() {
+        return null;
     }
 
     @Override public CompletableFuture<Void> disconnect() {

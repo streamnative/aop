@@ -202,8 +202,10 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         channel.queueDeclare(queueName2, true, false, false, null);
         channel.queueBind(queueName2, exchangeName, "");
 
-        String contentMsg = "Hello AOP!";
-        channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+        for (int i = 0; i < 1000; i++) {
+            String contentMsg = "Hello AOP - " + i;
+            channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+        }
 
         @Cleanup
         PulsarClient pulsarClient = PulsarClient.builder().serviceUrl("pulsar://localhost:" + brokerPort).build();
@@ -234,22 +236,24 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .subscribe();
 
-        Message<byte[]> message = exchangeConsumer.receive();
-        final long ledgerId = ((MessageIdImpl) message.getMessageId()).getLedgerId();
-        final long entryId = ((MessageIdImpl) message.getMessageId()).getEntryId();
-        log.info("[{}] receive messageId: {}, msg: {}",
-            exchangeTopic, message.getMessageId(), new String(message.getData()));
-        Assert.assertEquals(new String(message.getData()), contentMsg);
+        for (int i = 0; i < 1000; i++) {
+            Message<byte[]> message = exchangeConsumer.receive();
+            final long ledgerId = ((MessageIdImpl) message.getMessageId()).getLedgerId();
+            final long entryId = ((MessageIdImpl) message.getMessageId()).getEntryId();
+            log.info("[{}] receive messageId: {}, msg: {}",
+                    exchangeTopic, message.getMessageId(), new String(message.getData()));
+            Assert.assertEquals(new String(message.getData()), "Hello AOP - " + i);
 
-        message = queueIndexConsumer1.receive();
-        ByteBuf byteBuf1 = Unpooled.wrappedBuffer(message.getData());
-        Assert.assertEquals(ledgerId, byteBuf1.readLong());
-        Assert.assertEquals(entryId, byteBuf1.readLong());
+            message = queueIndexConsumer1.receive();
+            ByteBuf byteBuf1 = Unpooled.wrappedBuffer(message.getData());
+            Assert.assertEquals(ledgerId, byteBuf1.readLong());
+            Assert.assertEquals(entryId, byteBuf1.readLong());
 
-        message = queueIndexConsumer2.receive();
-        ByteBuf byteBuf2 = Unpooled.wrappedBuffer(message.getData());
-        Assert.assertEquals(ledgerId, byteBuf2.readLong());
-        Assert.assertEquals(entryId, byteBuf2.readLong());
+            message = queueIndexConsumer2.receive();
+            ByteBuf byteBuf2 = Unpooled.wrappedBuffer(message.getData());
+            Assert.assertEquals(ledgerId, byteBuf2.readLong());
+            Assert.assertEquals(entryId, byteBuf2.readLong());
+        }
     }
 
     @Test

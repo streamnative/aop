@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -67,11 +68,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 
-
-
-
-
-
 /**
  * Amqp Channel level method processor.
  */
@@ -84,6 +80,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final AtomicBoolean closing = new AtomicBoolean(false);
     private long confirmedMessageCounter;
     private boolean confirmOnPublish;
+    /** A channel has a default queue (the last declared) that is used when no queue name is explicitly set. */
+    private volatile AmqpQueue defaultQueue;
 
     private final UnacknowledgedMessageMap unacknowledgedMessageMap;
 
@@ -166,36 +164,53 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             }
         } else {
             String name = exchange.toString();
-
-            // create new exchange, on first step, we just create a Pulsar Topic.
-            if (PulsarService.State.Started == connection.getPulsarService().getState()) {
-
-                if (!durable) {
-                    // in-memory integration
-                    InMemoryExchange inMemoryExchange = new InMemoryExchange(
-                            name, AmqpExchange.Type.value(type.toString()));
-                    connection.putExchange(name, inMemoryExchange);
-                    connection.writeFrame(declareOkBody.generateFrame(channelId));
-                    return;
-                }
-
-                TopicName topicName = TopicName.get(
-                        TopicDomain.persistent.value(), connection.getNamespaceName(), name);
-                try {
-                    PersistentTopic persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
-                    if (persistentTopic == null) {
-                        connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
-                        return;
-                    }
-                    connection.putExchange(name, new PersistentExchange(
-                        name, AmqpExchange.Type.value(type.toString()), persistentTopic, amqpTopicManager));
-                    connection.writeFrame(declareOkBody.generateFrame(channelId));
-                } catch (Exception e) {
-                    log.error(channelId + "Exchange declare failed! exchangeName: " + name, e);
-                    connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
+            if (passive) {
+                AmqpExchange amqpExchange = connection.getExchange(name);
+                if (null == amqpExchange) {
+                    closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + name + "'");
+                } else if (!(type == null || type.length() == 0)
+                        && !amqpExchange.getType().toString().equalsIgnoreCase(type.toString())) {
+                    connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Attempt to redeclare exchange: '"
+                            + name
+                            + "' of type "
+                            + amqpExchange.getType()
+                            + " to "
+                            + type
+                            + ".", getChannelId());
+                } else {
+                    connection.writeFrame(declareOkBody.generateFrame(getChannelId()));
                 }
             } else {
-                connection.sendConnectionClose(INTERNAL_ERROR, "PulsarService not start.", channelId);
+                // create new exchange, on first step, we just create a Pulsar Topic.
+                if (PulsarService.State.Started == connection.getPulsarService().getState()) {
+
+                    if (!durable) {
+                        // in-memory integration
+                        InMemoryExchange inMemoryExchange = new InMemoryExchange(
+                                name, AmqpExchange.Type.value(type.toString()));
+                        connection.putExchange(name, inMemoryExchange);
+                        connection.writeFrame(declareOkBody.generateFrame(channelId));
+                        return;
+                    }
+
+                    TopicName topicName = TopicName.get(
+                            TopicDomain.persistent.value(), connection.getNamespaceName(), name);
+                    try {
+                        PersistentTopic persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
+                        if (persistentTopic == null) {
+                            connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
+                            return;
+                        }
+                        connection.putExchange(name, new PersistentExchange(
+                                name, AmqpExchange.Type.value(type.toString()), persistentTopic, amqpTopicManager));
+                        connection.writeFrame(declareOkBody.generateFrame(channelId));
+                    } catch (Exception e) {
+                        log.error(channelId + "Exchange declare failed! exchangeName: " + name, e);
+                        connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
+                    }
+                } else {
+                    connection.sendConnectionClose(INTERNAL_ERROR, "PulsarService not start.", channelId);
+                }
             }
         }
     }
@@ -265,36 +280,50 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
-        boolean autoDelete, boolean nowait, FieldTable arguments) {
+                                    boolean autoDelete, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug(
                     "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
                             + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }
-
-        AmqpQueue amqpQueue;
-        if (!durable) {
-            // in-memory integration
-            amqpQueue = new InMemoryQueue(queue.toString());
-        } else {
-            try {
-                PersistentTopic indexTopic = amqpTopicManager.getTopic(
-                            PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queue.toString())).get();
-                amqpQueue = new PersistentQueue(queue.toString(), indexTopic);
-            } catch (ExecutionException | InterruptedException e) {
-                log.error(channelId + "Exchange declare failed! queueName: {}", queue.toString());
-                connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
-                return;
-            }
+        if ((queue == null) || (queue.length() == 0)) {
+            queue = AMQShortString.createAMQShortString("tmp_" + UUID.randomUUID());
         }
-        connection.putQueue(queue.toString(), amqpQueue);
-
-        // return success.
-        // when call QueueBind, then create Pulsar sub.
-        MethodRegistry methodRegistry = connection.getMethodRegistry();
-        QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
-        connection.writeFrame(responseBody.generateFrame(channelId));
+        AmqpQueue amqpQueue;
+        if (passive) {
+            amqpQueue = connection.getQueue(queue.toString());
+            if (null == amqpQueue) {
+                closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
+            } else {
+                setDefaultQueue(amqpQueue);
+                MethodRegistry methodRegistry = connection.getMethodRegistry();
+                QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
+                connection.writeFrame(responseBody.generateFrame(channelId));
+            }
+        } else {
+            if (!durable) {
+                // in-memory integration
+                amqpQueue = new InMemoryQueue(queue.toString());
+            } else {
+                try {
+                    PersistentTopic indexTopic = amqpTopicManager.getTopic(
+                            PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queue.toString())).get();
+                    amqpQueue = new PersistentQueue(queue.toString(), indexTopic);
+                } catch (ExecutionException | InterruptedException e) {
+                    log.error(channelId + "Queue declare failed! queueName: {}", queue.toString());
+                    connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Queue failed.", channelId);
+                    return;
+                }
+            }
+            connection.putQueue(queue.toString(), amqpQueue);
+            setDefaultQueue(amqpQueue);
+            // return success.
+            // when call QueueBind, then create Pulsar sub.
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }
     }
 
     @Override
@@ -308,7 +337,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
-        AmqpQueue amqpQueue = connection.getQueue(queue.toString());
+        AmqpQueue amqpQueue;
+        if (queue == null) {
+            amqpQueue = getDefaultQueue();
+            if (amqpQueue != null) {
+                if (bindingKey == null) {
+                    bindingKey = AMQShortString.valueOf(amqpQueue.getName());
+                }
+            }
+        } else {
+            amqpQueue = connection.getQueue(queue.toString());
+        }
         AmqpExchange amqpExchange = connection.getExchange(exchange.toString());
 
         AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
@@ -863,6 +902,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             consumer.getSubscription().doUnsubscribe(consumer);
         });
         tag2ConsumersMap.clear();
+    }
+
+    private void setDefaultQueue(AmqpQueue queue) {
+        defaultQueue = queue;
+    }
+
+    private AmqpQueue getDefaultQueue() {
+        return defaultQueue;
     }
 
     @VisibleForTesting

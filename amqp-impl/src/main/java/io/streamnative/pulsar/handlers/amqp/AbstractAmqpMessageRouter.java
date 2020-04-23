@@ -68,8 +68,18 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     }
 
     @Override
+    public Set<String> getBindingKey() {
+        return bindingKeys;
+    }
+
+    @Override
     public void setArguments(Map<String, Object> arguments) {
         this.arguments = arguments;
+    }
+
+    @Override
+    public Map<String, Object> getArguments() {
+        return arguments;
     }
 
     public static AmqpMessageRouter generateRouter(AmqpExchange.Type type) {

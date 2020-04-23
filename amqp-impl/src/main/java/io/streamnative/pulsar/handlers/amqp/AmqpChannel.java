@@ -431,7 +431,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             connection.sendConnectionClose(INTERNAL_ERROR, "exchange not found.", channelId);
         } else {
             try {
-                topic.getSubscription(queue.toString()).delete().get();
+                amqpQueue.unbindExchange(amqpExchange);
                 final AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));
             } catch (Exception e) {

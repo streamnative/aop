@@ -78,7 +78,7 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     }
 
     @Override
-    public Map<String, Object> getArgument() {
+    public Map<String, Object> getArguments() {
         return arguments;
     }
 

@@ -95,7 +95,7 @@ public interface AmqpMessageRouter {
      *
      * @return map of properties
      */
-    Map<String, Object> getArgument();
+    Map<String, Object> getArguments();
 
     /**
      * Routes the message ID to the queue.

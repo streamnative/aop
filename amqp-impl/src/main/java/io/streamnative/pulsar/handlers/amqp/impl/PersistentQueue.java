@@ -128,7 +128,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
             amqpQueueProperties.setExchangeName(router.getKey());
             amqpQueueProperties.setType(router.getValue().getType());
-            amqpQueueProperties.setArguments(router.getValue().getArgument());
+            amqpQueueProperties.setArguments(router.getValue().getArguments());
             amqpQueueProperties.setBindingKeys(router.getValue().getBindingKey());
 
             propertiesList.add(amqpQueueProperties);

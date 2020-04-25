@@ -13,7 +13,11 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.io.IOException;
+import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
+import org.apache.qpid.server.protocol.v0_8.AMQFrameDecodingException;
 import org.apache.qpid.server.protocol.v0_8.ServerDecoder;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQProtocolVersionException;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 
@@ -22,6 +26,9 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
  */
 public class AmqpBrokerDecoder extends ServerDecoder {
 
+    private static final int NETWORK_BUFFER_SIZE = 100 * 1024 * 1024;
+    private volatile QpidByteBuffer netInputBuffer;
+
     /**
      * Creates a new AMQP decoder.
      *
@@ -29,10 +36,44 @@ public class AmqpBrokerDecoder extends ServerDecoder {
      */
     public AmqpBrokerDecoder(ServerMethodProcessor<? extends ServerChannelMethodProcessor> methodProcessor) {
         super(methodProcessor);
+        netInputBuffer = QpidByteBuffer.allocateDirect(NETWORK_BUFFER_SIZE);
     }
 
     @Override
     public ServerMethodProcessor<? extends ServerChannelMethodProcessor> getMethodProcessor() {
         return super.getMethodProcessor();
+    }
+
+    @Override
+    public void decodeBuffer(QpidByteBuffer buf) throws AMQFrameDecodingException, AMQProtocolVersionException,
+            IOException {
+        netInputBuffer.put(buf);
+        netInputBuffer.flip();
+        super.decodeBuffer(netInputBuffer);
+        restoreApplicationBufferForWrite();
+    }
+
+    protected void restoreApplicationBufferForWrite() {
+        try (QpidByteBuffer oldNetInputBuffer = netInputBuffer) {
+            int unprocessedDataLength = netInputBuffer.remaining();
+            netInputBuffer.limit(netInputBuffer.capacity());
+            netInputBuffer = oldNetInputBuffer.slice();
+            netInputBuffer.limit(unprocessedDataLength);
+        }
+        if (netInputBuffer.limit() != netInputBuffer.capacity()) {
+            netInputBuffer.position(netInputBuffer.limit());
+            netInputBuffer.limit(netInputBuffer.capacity());
+        } else {
+            try (QpidByteBuffer currentBuffer = netInputBuffer) {
+                int newBufSize;
+                if (currentBuffer.capacity() < NETWORK_BUFFER_SIZE) {
+                    newBufSize = NETWORK_BUFFER_SIZE;
+                } else {
+                    newBufSize = currentBuffer.capacity() + NETWORK_BUFFER_SIZE;
+                }
+                netInputBuffer = QpidByteBuffer.allocateDirect(newBufSize);
+                netInputBuffer.put(currentBuffer);
+            }
+        }
     }
 }

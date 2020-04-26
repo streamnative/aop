@@ -180,7 +180,7 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
     }
 
     @Test
-    private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException {
+    private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException, InterruptedException {
         final String vhost = "vhost1";
         final String exchangeName = "ex";
         final String queueName1 = "ex-q1";
@@ -190,6 +190,7 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         connectionFactory.setHost("localhost");
         connectionFactory.setPort(5672);
         connectionFactory.setVirtualHost(vhost);
+        connectionFactory.setConnectionTimeout(1000 * 60 * 60);
 
         @Cleanup
         Connection connection = connectionFactory.newConnection();
@@ -202,7 +203,8 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
         channel.queueDeclare(queueName2, true, false, false, null);
         channel.queueBind(queueName2, exchangeName, "");
 
-        for (int i = 0; i < 1000; i++) {
+        int numMessage = 10;
+        for (int i = 0; i < numMessage; i++) {
             String contentMsg = "Hello AOP - " + i;
             channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
         }
@@ -236,7 +238,7 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .subscribe();
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < numMessage; i++) {
             Message<byte[]> message = exchangeConsumer.receive();
             final long ledgerId = ((MessageIdImpl) message.getMessageId()).getLedgerId();
             final long entryId = ((MessageIdImpl) message.getMessageId()).getEntryId();
@@ -254,6 +256,18 @@ public class RabbitmqTest extends AmqpProtocolHandlerTestBase {
             Assert.assertEquals(ledgerId, byteBuf2.readLong());
             Assert.assertEquals(entryId, byteBuf2.readLong());
         }
+
+        CountDownLatch countDownLatch = new CountDownLatch(numMessage);
+        Consumer consumer = new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                log.info("[receive] consumerTag: {}, msg: {}", consumerTag, new String(body));
+                countDownLatch.countDown();
+            }
+        };
+
+        channel.basicConsume(queueName1, consumer);
+        countDownLatch.await();
     }
 
     @Test

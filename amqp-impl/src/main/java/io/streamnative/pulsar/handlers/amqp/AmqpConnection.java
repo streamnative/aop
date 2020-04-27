@@ -160,7 +160,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.AWAIT_SECURE_OK;
-        bufferSender.flush();
     }
 
     @Override
@@ -362,7 +361,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
             state = ConnectionState.AWAIT_START_OK;
-            bufferSender.flush();
         } catch (QpidException e) {
             log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
         }
@@ -429,9 +427,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         if (log.isDebugEnabled()) {
             log.debug("send: " + frame);
         }
-
-        frame.writePayload(bufferSender);
-        bufferSender.flush();
+        getCtx().writeAndFlush(frame);
+//        frame.writePayload(bufferSender);
+//        bufferSender.flush();
     }
 
     public MethodRegistry getMethodRegistry() {
@@ -674,5 +672,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             new InMemoryExchange("", AmqpExchange.Type.Direct));
 
     }
-
+    @VisibleForTesting
+    public ByteBufferSender getBufferSender() {
+        return bufferSender;
+    }
 }

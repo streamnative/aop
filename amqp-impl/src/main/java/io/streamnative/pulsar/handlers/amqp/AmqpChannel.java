@@ -81,7 +81,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final AmqpConnection connection;
     private final AtomicBoolean blocking = new AtomicBoolean(false);
     private final AtomicBoolean closing = new AtomicBoolean(false);
-    private volatile long confirmedMessageCounter;
+    private long confirmedMessageCounter;
     private boolean confirmOnPublish;
     /** A channel has a default queue (the last declared) that is used when no queue name is explicitly set. */
     private volatile AmqpQueue defaultQueue;
@@ -739,7 +739,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             amqpExchange = connection.getExchange(exchangeName);
             CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
             position.whenComplete((position1, throwable) -> {
-                if (throwable != null) {
+                if (throwable == null) {
                     if (log.isDebugEnabled()) {
                         log.debug("publish message success position {}", position1.toString());
                     }

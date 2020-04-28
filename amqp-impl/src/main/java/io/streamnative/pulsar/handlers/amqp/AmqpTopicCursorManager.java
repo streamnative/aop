@@ -44,11 +44,17 @@ public class AmqpTopicCursorManager implements Closeable {
         cursors = new ConcurrentHashMap<>();
         for (ManagedCursor cursor : topic.getManagedLedger().getCursors()) {
             cursors.put(cursor.getName(), cursor);
+            log.info("recover cursor {}", cursor.toString());
         }
     }
 
     public ManagedCursor getCursor(String name) {
-        return cursors.get(name);
+        rwLock.readLock().lock();
+        try {
+            return cursors.get(name);
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     public ManagedCursor getOrCreateCursor(String name) {
@@ -82,7 +88,7 @@ public class AmqpTopicCursorManager implements Closeable {
     }
 
     public ManagedCursor deleteCursor(String cursorName) {
-        rwLock.readLock().lock();
+        rwLock.writeLock().lock();
         try {
             if (closed) {
                 return null;
@@ -91,7 +97,7 @@ public class AmqpTopicCursorManager implements Closeable {
             deleteCursorAsync(cursor);
             return cursor;
         } finally {
-            rwLock.readLock().unlock();
+            rwLock.writeLock().unlock();
         }
     }
 

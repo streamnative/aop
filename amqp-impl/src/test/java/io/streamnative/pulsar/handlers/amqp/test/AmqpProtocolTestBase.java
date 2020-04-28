@@ -45,6 +45,7 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQDataBlock;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionStartBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
@@ -81,7 +82,6 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(channel.remoteAddress()).thenReturn(socketAddress);
         Mockito.when(ctx.pipeline()).thenReturn(Mockito.mock(ChannelPipeline.class));
         connection.channelActive(ctx);
-
         // 2.Init ByteBuffer sender for the test to send requests to AMQP server.
         toServerSender = new ToServerByteBufferSender(connection);
 
@@ -146,6 +146,13 @@ public abstract class AmqpProtocolTestBase {
             return channelMethodProcessor;
         }
 
+        @Override public synchronized void writeFrame(AMQDataBlock frame) {
+            if (log.isDebugEnabled()) {
+                log.debug("send: " + frame);
+            }
+            frame.writePayload(getBufferSender());
+            getBufferSender().flush();
+        }
     }
 
     /**

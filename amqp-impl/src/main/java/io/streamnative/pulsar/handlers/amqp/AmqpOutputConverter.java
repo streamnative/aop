@@ -66,7 +66,7 @@ public class AmqpOutputConverter {
     private long writeMessageDelivery(AmqpMessageData message, ContentHeaderBody contentHeaderBody, int channelId,
         AMQBody deliverBody) {
 
-        int bodySize = (int) message.getContentHeaderBody().getSize();
+        int bodySize = (int) message.getContentHeaderBody().getBodySize();
         boolean msgCompressed = isCompressed(contentHeaderBody);
         AmqpOutputConverter.DisposableMessageContentSource modifiedContent = null;
 
@@ -145,21 +145,20 @@ public class AmqpOutputConverter {
             int maxFrameBodySize = (int) connection.getMaxFrameSize() - AMQFrame.getFrameOverhead();
             try (QpidByteBuffer contentByteBuffer = content.getContent()) {
                 int contentChunkSize = bodySize > maxFrameBodySize ? maxFrameBodySize : bodySize;
-                try (QpidByteBuffer chunk = contentByteBuffer.view(0, contentChunkSize)) {
-                    writeFrame(new AmqpOutputConverter.CompositeAMQBodyBlock(channelId,
-                        deliverBody,
-                        contentHeaderBody,
-                        new AmqpOutputConverter.MessageContentSourceBody(chunk)));
-                }
+                QpidByteBuffer chunk = contentByteBuffer.view(0, contentChunkSize);
+                writeFrame(new AmqpOutputConverter.CompositeAMQBodyBlock(channelId,
+                    deliverBody,
+                    contentHeaderBody,
+                    new AmqpOutputConverter.MessageContentSourceBody(chunk)));
 
                 int writtenSize = contentChunkSize;
                 while (writtenSize < bodySize) {
                     contentChunkSize =
                         (bodySize - writtenSize) > maxFrameBodySize ? maxFrameBodySize : bodySize - writtenSize;
-                    try (QpidByteBuffer chunk = contentByteBuffer.view(writtenSize, contentChunkSize)) {
-                        writtenSize += contentChunkSize;
-                        writeFrame(new AMQFrame(channelId, new AmqpOutputConverter.MessageContentSourceBody(chunk)));
-                    }
+                    QpidByteBuffer chunkElement = contentByteBuffer.view(writtenSize, contentChunkSize);
+                    writtenSize += contentChunkSize;
+                    writeFrame(new AMQFrame(channelId, new AmqpOutputConverter.MessageContentSourceBody(chunkElement)));
+
                 }
             }
         }
@@ -191,7 +190,11 @@ public class AmqpOutputConverter {
 
         @Override
         public long writePayload(final ByteBufferSender sender) {
-            sender.send(content);
+            try {
+                sender.send(content);
+            } finally {
+                content.close();
+            }
             return length;
         }
 

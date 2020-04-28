@@ -28,7 +28,7 @@ public class SimpleEncodeBufferSender implements ByteBufferSender {
 
     public SimpleEncodeBufferSender(int capacity, boolean isDirect) {
         this.isDirect = isDirect;
-        byteBuffer = isDirect ? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
+        this.byteBuffer = isDirect ? ByteBuffer.allocateDirect(capacity) : ByteBuffer.allocate(capacity);
     }
 
     @Override public boolean isDirectBufferPreferred() {

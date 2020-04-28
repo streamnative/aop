@@ -35,7 +35,8 @@
     <dependency>
       <groupId>com.rabbitmq</groupId>
       <artifactId>amqp-client</artifactId>
-      <version>5.8.0</version>
+      <version>${rabbitmq.version}</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

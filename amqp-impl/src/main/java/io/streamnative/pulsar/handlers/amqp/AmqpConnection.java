@@ -428,8 +428,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             log.debug("send: " + frame);
         }
         getCtx().writeAndFlush(frame);
-//        frame.writePayload(bufferSender);
-//        bufferSender.flush();
     }
 
     public MethodRegistry getMethodRegistry() {

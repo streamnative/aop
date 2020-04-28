@@ -155,9 +155,9 @@ public class AmqpOutputConverter {
                 while (writtenSize < bodySize) {
                     contentChunkSize =
                         (bodySize - writtenSize) > maxFrameBodySize ? maxFrameBodySize : bodySize - writtenSize;
-                    QpidByteBuffer chunk1 = contentByteBuffer.view(writtenSize, contentChunkSize);
+                    QpidByteBuffer chunkElement = contentByteBuffer.view(writtenSize, contentChunkSize);
                     writtenSize += contentChunkSize;
-                    writeFrame(new AMQFrame(channelId, new AmqpOutputConverter.MessageContentSourceBody(chunk1)));
+                    writeFrame(new AMQFrame(channelId, new AmqpOutputConverter.MessageContentSourceBody(chunkElement)));
 
                 }
             }

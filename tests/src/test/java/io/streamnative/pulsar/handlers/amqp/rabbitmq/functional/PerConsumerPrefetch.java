@@ -15,7 +15,7 @@
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
-import static io.streamnative.pulsar.handlers.amqp.functional.QosTests.drain;
+import static io.streamnative.pulsar.handlers.amqp.rabbitmq.functional.QosTests.drain;
 import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.QueueingConsumer;

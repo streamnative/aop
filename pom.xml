@@ -62,6 +62,7 @@
     <spotbugs-maven-plugin.version>3.1.8</spotbugs-maven-plugin.version>
     <qpid-protocol-plugin.version>7.1.8</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
+    <assertj.version>3.15.0</assertj.version>
   </properties>
 
   <licenses>

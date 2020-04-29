@@ -22,15 +22,14 @@ import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -100,20 +99,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
             log.error("[{}] covert map of routers to String error: {}", queueName, e.getMessage());
             return;
         }
-        indexTopic.getManagedLedger().asyncSetProperties(properties, new AsyncCallbacks.SetPropertiesCallback() {
-            @Override
-            public void setPropertiesComplete(Map<String, String> map, Object o) {
-                if (log.isDebugEnabled()) {
-                    log.debug("[{}] set properties succeed, properties:{}", queueName, properties);
-                }
-            }
-
-            @Override
-            public void setPropertiesFailed(ManagedLedgerException e, Object o) {
-                log.error("[{}] set properties failed message: {}, properties:{}",
-                        queueName, e.getMessage(), properties);
-            }
-        }, null);
+        PulsarTopicMetadataUtils.updateMetaData(this.indexTopic, properties, queueName);
     }
 
     public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {

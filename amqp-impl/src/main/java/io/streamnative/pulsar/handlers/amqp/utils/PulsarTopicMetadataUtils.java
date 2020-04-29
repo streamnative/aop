@@ -32,6 +32,10 @@ public class PulsarTopicMetadataUtils {
      * @param name       exchange or queue name
      */
     public static void updateMetaData(PersistentTopic topic, Map<String, String> properties, String name) {
+        if (null == topic) {
+            log.error("name:{}, topic is null.", name);
+            return;
+        }
         topic.getManagedLedger().asyncSetProperties(properties, new AsyncCallbacks.SetPropertiesCallback() {
             @Override
             public void setPropertiesComplete(Map<String, String> map, Object o) {

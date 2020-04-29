@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test.mock;
 
 import io.netty.buffer.ByteBuf;
 import java.util.Map;

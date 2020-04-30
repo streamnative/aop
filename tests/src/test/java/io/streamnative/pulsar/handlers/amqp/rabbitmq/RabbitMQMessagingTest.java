@@ -137,48 +137,48 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertEquals(atomicInteger.get(), 0);
     }
 
-    @Test
-    void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException,
-        InterruptedException {
-        String exchangeName = "test-exchange";
-        String routingKey = "test.key";
-        String queueName = "test-queue1";
-        @Cleanup
-        Connection conn = getConnection();
-        CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
-        @Cleanup
-        Channel channel = conn.createChannel();
-        channel.exchangeDeclare(exchangeName, "direct", true);
-        channel.queueDeclare(queueName, true, false, false, null);
-        channel.queueBind(queueName, exchangeName, routingKey);
-        AtomicReference<Envelope> redeliveredMessageEnvelope = new AtomicReference();
-
-        channel.basicConsume(queueName, new DefaultConsumer(channel) {
-            @Override
-            public void handleDelivery(String consumerTag,
-                Envelope envelope,
-                AMQP.BasicProperties properties,
-                byte[] body) throws IOException {
-                if (messagesToBeProcessed.getCount() == 1) {
-                    redeliveredMessageEnvelope.set(envelope);
-                    messagesToBeProcessed.countDown();
-
-                } else {
-                    channel.basicNack(envelope.getDeliveryTag(), false, true);
-                    messagesToBeProcessed.countDown();
-                }
-
-            }
-        });
-
-        channel.basicPublish(exchangeName, routingKey, null, "banana".getBytes());
-
-        final boolean finishedProperly = messagesToBeProcessed.await(1000, TimeUnit.SECONDS);
-        Assert.assertTrue(finishedProperly);
-        Assert.assertNotNull(redeliveredMessageEnvelope.get());
-        Assert.assertTrue(redeliveredMessageEnvelope.get().isRedeliver());
-
-    }
+//    @Test
+//    void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException,
+//        InterruptedException {
+//        String exchangeName = "test-exchange";
+//        String routingKey = "test.key";
+//        String queueName = "test-queue1";
+//        @Cleanup
+//        Connection conn = getConnection();
+//        CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
+//        @Cleanup
+//        Channel channel = conn.createChannel();
+//        channel.exchangeDeclare(exchangeName, "direct", true);
+//        channel.queueDeclare(queueName, true, false, false, null);
+//        channel.queueBind(queueName, exchangeName, routingKey);
+//        AtomicReference<Envelope> redeliveredMessageEnvelope = new AtomicReference();
+//
+//        channel.basicConsume(queueName, new DefaultConsumer(channel) {
+//            @Override
+//            public void handleDelivery(String consumerTag,
+//                Envelope envelope,
+//                AMQP.BasicProperties properties,
+//                byte[] body) throws IOException {
+//                if (messagesToBeProcessed.getCount() == 1) {
+//                    redeliveredMessageEnvelope.set(envelope);
+//                    messagesToBeProcessed.countDown();
+//
+//                } else {
+//                    channel.basicNack(envelope.getDeliveryTag(), false, true);
+//                    messagesToBeProcessed.countDown();
+//                }
+//
+//            }
+//        });
+//
+//        channel.basicPublish(exchangeName, routingKey, null, "banana".getBytes());
+//
+//        final boolean finishedProperly = messagesToBeProcessed.await(1000, TimeUnit.SECONDS);
+//        Assert.assertTrue(finishedProperly);
+//        Assert.assertNotNull(redeliveredMessageEnvelope.get());
+//        Assert.assertTrue(redeliveredMessageEnvelope.get().isRedeliver());
+//
+//    }
 
     @Test(timeOut = 5000)
     private void inMemoryE2ETest() throws IOException, TimeoutException, InterruptedException {

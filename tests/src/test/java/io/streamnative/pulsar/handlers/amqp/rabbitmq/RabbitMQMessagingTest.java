@@ -141,7 +141,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
     @Test
     void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException,
         InterruptedException {
-        String exchangeName = "test-exchange1";
+        String exchangeName = "test-exchange";
         String routingKey = "test.key";
         String queueName = "test-queue1";
         try (Connection conn = getConnection()) {

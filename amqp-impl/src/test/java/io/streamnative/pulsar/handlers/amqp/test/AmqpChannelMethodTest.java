@@ -275,12 +275,21 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        exchangeDeclare(exchange, true);
+        queueDeclare(queue, true);
 
         QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString(queue),
             AMQShortString.createAMQShortString(exchange), AMQShortString.createAMQShortString("key"), null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+
         AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueUnbindOkBody);
     }
 

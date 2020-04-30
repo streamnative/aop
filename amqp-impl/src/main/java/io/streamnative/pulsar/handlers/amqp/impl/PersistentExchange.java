@@ -13,13 +13,17 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicCursorManager;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,22 +40,28 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.pulsar.common.util.ObjectMapperFactory;
 
 /**
  * Persistent Exchange.
  */
 @Slf4j
 public class PersistentExchange extends AbstractAmqpExchange {
+    public static final String EXCHANGE = "EXCHANGE";
+    public static final String QUEUES = "QUEUES";
+    public static final String TYPE = "TYPE";
 
     private PersistentTopic persistentTopic;
     private final AmqpTopicManager amqpTopicManager;
     private AmqpTopicCursorManager cursorManager;
+    private ObjectMapper jsonMapper = ObjectMapperFactory.create();
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
         AmqpTopicManager amqpTopicManager) {
         super(exchangeName, type, new HashSet<>(), true);
         this.persistentTopic = persistentTopic;
         this.amqpTopicManager = amqpTopicManager;
+        updateExchangeProperties();
     }
 
     @Override
@@ -164,5 +174,38 @@ public class PersistentExchange extends AbstractAmqpExchange {
             }
         }
         return cursorManager;
+    }
+
+    @Override
+    public void addQueue(AmqpQueue queue) {
+        queues.add(queue);
+        updateExchangeProperties();
+    }
+
+    @Override
+    public void removeQueue(AmqpQueue queue) {
+        queues.remove(queue);
+        updateExchangeProperties();
+    }
+
+    private void updateExchangeProperties() {
+        Map<String, String> properties = new HashMap<>();
+        try {
+            properties.put(EXCHANGE, exchangeName);
+            properties.put(TYPE, exchangeType.toString());
+            properties.put(QUEUES, jsonMapper.writeValueAsString(getQueueNames()));
+        } catch (JsonProcessingException e) {
+            log.error("[{}] covert map of routers to String error: {}", exchangeName, e.getMessage());
+            return;
+        }
+        PulsarTopicMetadataUtils.updateMetaData(this.persistentTopic, properties, exchangeName);
+    }
+
+    private List<String> getQueueNames() {
+        List<String> queueNames = new ArrayList<>();
+        for (AmqpQueue queue : queues) {
+            queueNames.add(queue.getName());
+        }
+        return queueNames;
     }
 }

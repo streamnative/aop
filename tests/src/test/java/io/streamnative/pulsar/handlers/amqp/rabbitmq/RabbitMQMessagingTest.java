@@ -57,35 +57,35 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String exchangeName = "test-exchange";
         String routingKey = "test.key";
         String queueName = "test-queue";
-        try (Connection conn = getConnection()) {
-            try (Channel channel = conn.createChannel()) {
+        @Cleanup
+        Connection conn = getConnection();
+        @Cleanup
+        Channel channel = conn.createChannel();
 
-                channel.exchangeDeclare(exchangeName, "direct", true);
-                channel.queueDeclare(queueName, true, false, false, null);
-                channel.queueBind(queueName, exchangeName, routingKey);
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
 
-                List<String> messages = new ArrayList<>();
-                channel.basicConsume(queueName, false, "myConsumerTag",
-                    new DefaultConsumer(channel) {
-                        @Override
-                        public void handleDelivery(String consumerTag,
-                            Envelope envelope,
-                            AMQP.BasicProperties properties,
-                            byte[] body) throws IOException {
-                            long deliveryTag = envelope.getDeliveryTag();
-                            messages.add(new String(body));
-                            // (process the message components here ...)
-                            channel.basicAck(deliveryTag, false);
-                        }
-                    });
+        List<String> messages = new ArrayList<>();
+        channel.basicConsume(queueName, false, "myConsumerTag",
+            new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String consumerTag,
+                    Envelope envelope,
+                    AMQP.BasicProperties properties,
+                    byte[] body) throws IOException {
+                    long deliveryTag = envelope.getDeliveryTag();
+                    messages.add(new String(body));
+                    // (process the message components here ...)
+                    channel.basicAck(deliveryTag, false);
+                }
+            });
 
-                byte[] messageBodyBytes = "Hello, world!".getBytes();
-                channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
+        byte[] messageBodyBytes = "Hello, world!".getBytes();
+        channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
 
-                TimeUnit.MILLISECONDS.sleep(200L);
-                Assert.assertEquals(messages.get(0), "Hello, world!");
-            }
-        }
+        TimeUnit.MILLISECONDS.sleep(200L);
+        Assert.assertEquals(messages.get(0), "Hello, world!");
     }
 
     @Test
@@ -96,38 +96,37 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         AtomicInteger atomicInteger = new AtomicInteger();
         final Semaphore waitForAtLeastOneDelivery = new Semaphore(0);
         final Semaphore waitForCancellation = new Semaphore(0);
+        @Cleanup
+        Connection conn = getConnection();
+        @Cleanup
+        Channel channel = conn.createChannel();
 
-        try (Connection conn = getConnection()) {
-            try (Channel channel = conn.createChannel()) {
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
 
-                channel.exchangeDeclare(exchangeName, "direct", true);
-                channel.queueDeclare(queueName, true, false, false, null);
-                channel.queueBind(queueName, exchangeName, routingKey);
+        channel.basicConsume(queueName, false, "myConsumerTag",
+            new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String consumerTag,
+                    Envelope envelope,
+                    AMQP.BasicProperties properties,
+                    byte[] body) throws IOException {
+                    waitForAtLeastOneDelivery.release();
+                    long deliveryTag = envelope.getDeliveryTag();
+                    atomicInteger.incrementAndGet();
+                    channel.basicNack(deliveryTag, false, true);
+                }
 
-                channel.basicConsume(queueName, false, "myConsumerTag",
-                    new DefaultConsumer(channel) {
-                        @Override
-                        public void handleDelivery(String consumerTag,
-                            Envelope envelope,
-                            AMQP.BasicProperties properties,
-                            byte[] body) throws IOException {
-                            waitForAtLeastOneDelivery.release();
-                            long deliveryTag = envelope.getDeliveryTag();
-                            atomicInteger.incrementAndGet();
-                            channel.basicNack(deliveryTag, false, true);
-                        }
-
-                        @Override
-                        public void handleCancel(String consumerTag) {
+                @Override
+                public void handleCancel(String consumerTag) {
 //                                waitForCancellation.release();
-                        }
-                    });
+                }
+            });
 
-                byte[] messageBodyBytes = "Hello, world!".getBytes();
-                channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
-                waitForAtLeastOneDelivery.acquire();
-            }
-        }
+        byte[] messageBodyBytes = "Hello, world!".getBytes();
+        channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
+        waitForAtLeastOneDelivery.acquire();
 
         // WHEN after closing the connection and resetting the counter
         atomicInteger.set(0);
@@ -144,40 +143,41 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String exchangeName = "test-exchange";
         String routingKey = "test.key";
         String queueName = "test-queue1";
-        try (Connection conn = getConnection()) {
-            CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
-            try (Channel channel = conn.createChannel()) {
-                channel.exchangeDeclare(exchangeName, "direct", true);
-                channel.queueDeclare(queueName, true, false, false, null);
-                channel.queueBind(queueName, exchangeName, routingKey);
-                AtomicReference<Envelope> redeliveredMessageEnvelope = new AtomicReference();
+        @Cleanup
+        Connection conn = getConnection();
+        CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
+        @Cleanup
+        Channel channel = conn.createChannel();
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
+        AtomicReference<Envelope> redeliveredMessageEnvelope = new AtomicReference();
 
-                channel.basicConsume(queueName, new DefaultConsumer(channel) {
-                    @Override
-                    public void handleDelivery(String consumerTag,
-                        Envelope envelope,
-                        AMQP.BasicProperties properties,
-                        byte[] body) throws IOException {
-                        if (messagesToBeProcessed.getCount() == 1) {
-                            redeliveredMessageEnvelope.set(envelope);
-                            messagesToBeProcessed.countDown();
+        channel.basicConsume(queueName, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag,
+                Envelope envelope,
+                AMQP.BasicProperties properties,
+                byte[] body) throws IOException {
+                if (messagesToBeProcessed.getCount() == 1) {
+                    redeliveredMessageEnvelope.set(envelope);
+                    messagesToBeProcessed.countDown();
 
-                        } else {
-                            channel.basicNack(envelope.getDeliveryTag(), false, true);
-                            messagesToBeProcessed.countDown();
-                        }
+                } else {
+                    channel.basicNack(envelope.getDeliveryTag(), false, true);
+                    messagesToBeProcessed.countDown();
+                }
 
-                    }
-                });
-
-                channel.basicPublish(exchangeName, routingKey, null, "banana".getBytes());
-
-                final boolean finishedProperly = messagesToBeProcessed.await(1000, TimeUnit.SECONDS);
-                Assert.assertTrue(finishedProperly);
-                Assert.assertNotNull(redeliveredMessageEnvelope.get());
-                Assert.assertTrue(redeliveredMessageEnvelope.get().isRedeliver());
             }
-        }
+        });
+
+        channel.basicPublish(exchangeName, routingKey, null, "banana".getBytes());
+
+        final boolean finishedProperly = messagesToBeProcessed.await(1000, TimeUnit.SECONDS);
+        Assert.assertTrue(finishedProperly);
+        Assert.assertNotNull(redeliveredMessageEnvelope.get());
+        Assert.assertTrue(redeliveredMessageEnvelope.get().isRedeliver());
+
     }
 
     @Test(timeOut = 5000)

@@ -653,7 +653,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             publishContentBody(new ContentBody(data));
         } else {
             connection.sendConnectionClose(ErrorCodes.COMMAND_INVALID,
-                    "Attempt to send a content header without first sending a publish frame", channelId);
+                "Attempt to send a content header without first sending a publish frame", channelId);
         }
     }
 
@@ -780,7 +780,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 AmqpConsumer consumer = association.getConsumer();
                 List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
                     list -> new ArrayList<>());
-                positions.add((PositionImpl) association.getPosition());
+                positions.add((PositionImpl) association.getIndexPosition());
             });
             positionMap.entrySet().stream().forEach(entry -> {
                 entry.getKey().redeliverAmqpMessages(entry.getValue());
@@ -801,8 +801,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
             ackedMessages.stream().forEach(entry -> {
-                entry.getConsumer().messagesAck(entry.getPosition(), entry.getExchangeName(),
-                    PulsarApi.CommandAck.AckType.Individual, null);
+                entry.getConsumer().messagesAck(entry.getIndexPosition(), entry.getMsgPosition(),
+                    entry.getExchangeName(), PulsarApi.CommandAck.AckType.Individual, null);
             });
         }
 

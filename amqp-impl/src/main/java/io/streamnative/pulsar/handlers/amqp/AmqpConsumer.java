@@ -87,29 +87,30 @@ public class AmqpConsumer extends Consumer {
                 }
                 CompletableFuture<Entry> entryCompletableFuture = getQueue().readEntryAsync(
                     indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId());
-                entryCompletableFuture.whenComplete((entry, ex) -> {
+                entryCompletableFuture.whenComplete((msg, ex) -> {
                     if (ex == null) {
                         long deliveryTag = channel.getNextDeliveryTag();
                         try {
-                            connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entryToAmqpBody(entry),
-                                channel.getChannelId(), false, deliveryTag,
-                                AMQShortString.createAMQShortString(consumerTag));
+
+                            connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entryToAmqpBody(msg),
+                                channel.getChannelId(), getRedeliveryTracker().contains(index.getPosition()),
+                                deliveryTag, AMQShortString.createAMQShortString(consumerTag));
                         } catch (UnsupportedEncodingException e) {
                             log.error("sendMessages UnsupportedEncodingException", e.getMessage());
                         }
                         if (autoAck) {
 
-                            messagesAck(entry.getPosition(), indexMessage.getExchangeName(),
+                            messagesAck(index.getPosition(), msg.getPosition(), indexMessage.getExchangeName(),
                                 PulsarApi.CommandAck.AckType.Individual, null);
                         } else {
-                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
-                                entry.getPosition(), indexMessage.getExchangeName(), this);
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag, index.getPosition(),
+                                msg.getPosition(), indexMessage.getExchangeName(), this);
                         }
                     }
-                    entry.release();
+                    msg.release();
+                    index.release();
+                    indexMessage.recycle();
                 });
-                index.release();
-                indexMessage.recycle();
             }
             batchSizes.recyle();
         });
@@ -117,19 +118,24 @@ public class AmqpConsumer extends Consumer {
         return null;
     }
 
-    public void messagesAck(Position position, String exchangeName, PulsarApi.CommandAck.AckType ackType,
+    public void messagesAck(Position indexPosition, Position messagePosition, String exchangeName,
+        PulsarApi.CommandAck.AckType ackType,
         Map<String, Long> properties) {
-        getSubscription().acknowledgeMessage(Collections.singletonList(position), ackType, properties);
-        getQueue().acknowledgeAsync(exchangeName, ((PositionImpl) position).getLedgerId(),
-            ((PositionImpl) position).getEntryId());
+        getSubscription().acknowledgeMessage(Collections.singletonList(indexPosition), ackType, properties);
+        getQueue().acknowledgeAsync(exchangeName, ((PositionImpl) messagePosition).getLedgerId(),
+            ((PositionImpl) messagePosition).getEntryId());
     }
 
     public void redeliverAmqpMessages(List<PositionImpl> positions) {
-        getSubscription().redeliverUnacknowledgedMessages(this, positions);
+        getSubscription().getDispatcher().redeliverUnacknowledgedMessages(this, positions);
     }
 
     public AmqpQueue getQueue() {
         return channel.getConnection().getQueue(queueName);
+    }
+
+    public RedeliveryTracker getRedeliveryTracker() {
+        return getSubscription().getDispatcher().getRedeliveryTracker();
     }
 
     @Override

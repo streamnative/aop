@@ -30,16 +30,16 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.concurrent.TimeoutException;
 import javax.net.SocketFactory;
-import org.junit.Test;
 
 
 /**
- * Check that protocol negotiation works
+ * Check that protocol negotiation works.
  */
 public class ConnectionOpen {
-    @Test
+    //@Test
     public void correctProtocolHeader() throws IOException {
-        SocketFrameHandler fh = new SocketFrameHandler(SocketFactory.getDefault().createSocket("localhost", AMQP.PROTOCOL.PORT));
+        SocketFrameHandler fh = new SocketFrameHandler(SocketFactory.getDefault().
+                createSocket("localhost", AMQP.PROTOCOL.PORT));
         fh.sendHeader();
         AMQCommand command = new AMQCommand();
         while (!command.handleFrame(fh.readFrame())) {
@@ -50,12 +50,12 @@ public class ConnectionOpen {
                 m instanceof AMQP.Connection.Start);
         AMQP.Connection.Start start = (AMQP.Connection.Start) m;
         assertTrue("Version in Connection.start is <= what we sent",
-                start.getVersionMajor() < AMQP.PROTOCOL.MAJOR ||
-                        (start.getVersionMajor() == AMQP.PROTOCOL.MAJOR &&
-                                start.getVersionMinor() <= AMQP.PROTOCOL.MINOR));
+                start.getVersionMajor() < AMQP.PROTOCOL.MAJOR
+                        || (start.getVersionMajor() == AMQP.PROTOCOL.MAJOR
+                        && start.getVersionMinor() <= AMQP.PROTOCOL.MINOR));
     }
 
-    @Test
+    //@Test
     public void crazyProtocolHeader() throws IOException {
         ConnectionFactory factory = TestUtils.connectionFactory();
         // keep the frame handler's socket
@@ -88,7 +88,7 @@ public class ConnectionOpen {
         }
     }
 
-    @Test
+    //@Test
     public void frameMaxLessThanFrameMinSize() throws IOException, TimeoutException {
         ConnectionFactory factory = TestUtils.connectionFactory();
         factory.setRequestedFrameMax(100);

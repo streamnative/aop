@@ -21,13 +21,16 @@ import static org.junit.Assert.assertNull;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.QueueingConsumer;
 import java.io.IOException;
-import org.junit.Test;
 
+/**
+ * Reject.
+ */
 public class Reject extends AbstractRejectTest {
-    @Test
+    ////@Test
     public void reject()
             throws IOException, InterruptedException {
-        String q = channel.queueDeclare("", false, true, false, null).getQueue();
+        String q = channel.queueDeclare("", false, true,
+                false, null).getQueue();
 
         byte[] m1 = "1".getBytes();
         byte[] m2 = "2".getBytes();

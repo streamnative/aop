@@ -22,10 +22,11 @@ import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.UUID;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class ExceptionMessages extends BrokerTestCase {
-    @Test
+    //@Test
     public void alreadyClosedExceptionMessageWithChannelError() throws IOException {
         String uuid = UUID.randomUUID().toString();
         try {
@@ -43,7 +44,7 @@ public class ExceptionMessages extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void alreadyClosedExceptionMessageWithCleanClose() throws IOException {
         String uuid = UUID.randomUUID().toString();
 

@@ -19,7 +19,9 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-
+/**
+ * Testcase.
+ */
 public class ExchangeDeletePredeclared extends BrokerTestCase {
     public void testDeletingPredeclaredAmqExchange() throws IOException {
         try {

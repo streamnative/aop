@@ -24,14 +24,13 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.TestUtils;
 import java.util.HashMap;
-import org.junit.Test;
 
 /**
- *
+ *TopologyRecoveryRetry.
  */
 public class TopologyRecoveryRetry extends BrokerTestCase {
 
-    @Test
+    ////@Test
     public void topologyRecoveryRetry() throws Exception {
         int nbQueues = 200;
         String prefix = "topology-recovery-retry-" + System.currentTimeMillis();

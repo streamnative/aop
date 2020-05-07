@@ -22,8 +22,10 @@ import com.rabbitmq.client.MessageProperties;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
-import org.junit.Test;
 
+/**
+ * PerQueueTTL.
+ */
 public class PerQueueTTL extends TTLHandling {
 
     protected static final String TTL_ARG = "x-message-ttl";
@@ -34,7 +36,7 @@ public class PerQueueTTL extends TTLHandling {
         return this.channel.queueDeclare(name, false, true, false, argMap);
     }
 
-    @Test
+    //@Test
     public void queueReDeclareEquivalence() throws Exception {
         declareQueue(10);
         try {
@@ -45,7 +47,7 @@ public class PerQueueTTL extends TTLHandling {
         }
     }
 
-    @Test
+    //@Test
     public void queueReDeclareSemanticEquivalence() throws Exception {
         declareQueue((byte) 10);
         declareQueue(10);
@@ -53,7 +55,7 @@ public class PerQueueTTL extends TTLHandling {
         declareQueue(10L);
     }
 
-    @Test
+    //@Test
     public void queueReDeclareSemanticNonEquivalence() throws Exception {
         declareQueue(10);
         try {

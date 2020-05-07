@@ -19,13 +19,11 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-import org.junit.Test;
 
 /**
- * See bug 21846:
+ * See bug 21846.
  * Basic.Ack is now required to signal a channel error immediately upon
  * detecting an invalid deliveryTag, even if the channel is (Tx-)transacted.
- * <p>
  * Specifically, a client MUST not acknowledge the same message more than once.
  */
 public abstract class InvalidAcksBase extends BrokerTestCase {
@@ -33,7 +31,7 @@ public abstract class InvalidAcksBase extends BrokerTestCase {
 
     protected abstract void commit() throws IOException;
 
-    @Test
+    //@Test
     public void doubleAck()
             throws IOException {
         select();
@@ -48,7 +46,7 @@ public abstract class InvalidAcksBase extends BrokerTestCase {
         expectError(AMQP.PRECONDITION_FAILED);
     }
 
-    @Test
+    //@Test
     public void crazyAck()
             throws IOException {
         select();

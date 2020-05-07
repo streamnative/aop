@@ -1,5 +1,3 @@
-
-
 /**
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +27,10 @@ import java.util.concurrent.TimeoutException;
  * Base class for tests which would like a second, clustered node.
  */
 public class ClusteredTestBase extends BrokerTestCase {
+    private static boolean nonClusteredWarningPrinted;
     // If these are non-null then the secondary node is up and clustered
     public Channel clusteredChannel;
     public Connection clusteredConnection;
-
     // These will always be non-null - if there is clustering they will point
     // to the secondary node, otherwise the primary
     public Channel alternateChannel;
@@ -49,8 +47,6 @@ public class ClusteredTestBase extends BrokerTestCase {
         alternateChannel = clusteredChannel == null ? channel : clusteredChannel;
     }
 
-    private static boolean nonClusteredWarningPrinted;
-
     @Override
     public void openConnection() throws IOException, TimeoutException {
         super.openConnection();
@@ -65,7 +61,8 @@ public class ClusteredTestBase extends BrokerTestCase {
             }
         }
 
-        if (clusteredConnection != null &&
+        if (clusteredConnection != null
+                &&
                 !clustered(connection, clusteredConnection)) {
             clusteredConnection.close();
             clusteredConnection = null;
@@ -123,14 +120,18 @@ public class ClusteredTestBase extends BrokerTestCase {
     }
 
     protected void stopSecondary() throws IOException {
-        Host.executeCommand(Host.rabbitmqctlCommand() +
-                " -n '" + Host.nodenameB() + "'" +
+        Host.executeCommand(Host.rabbitmqctlCommand()
+                +
+                " -n '" + Host.nodenameB() + "'"
+                +
                 " stop_app");
     }
 
     protected void startSecondary() throws IOException {
-        Host.executeCommand(Host.rabbitmqctlCommand() +
-                " -n '" + Host.nodenameB() + "'" +
+        Host.executeCommand(Host.rabbitmqctlCommand()
+                +
+                " -n '" + Host.nodenameB() + "'"
+                +
                 " start_app");
         Host.tryConnectFor(10_000, Host.node_portB() == null ? 5673 : Integer.valueOf(Host.node_portB()));
     }

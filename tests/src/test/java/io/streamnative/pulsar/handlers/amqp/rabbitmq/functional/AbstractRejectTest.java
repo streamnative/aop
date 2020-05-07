@@ -23,7 +23,9 @@ import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.QueueingConsumer;
 import java.util.Arrays;
-
+/**
+ * Testcase.
+ */
 abstract class AbstractRejectTest extends BrokerTestCase {
 
     protected Channel secondaryChannel;

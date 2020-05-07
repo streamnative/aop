@@ -21,8 +21,9 @@ import static org.junit.Assert.assertTrue;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.impl.recovery.AutorecoveringConnection;
 import com.rabbitmq.client.test.BrokerTestCase;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class Heartbeat extends BrokerTestCase {
 
     @Override
@@ -32,7 +33,7 @@ public class Heartbeat extends BrokerTestCase {
         return cf;
     }
 
-    @Test
+    //@Test
     public void heartbeat() throws InterruptedException {
         assertEquals(1, connection.getHeartbeat());
         Thread.sleep(3100);

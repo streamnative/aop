@@ -31,10 +31,12 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
-import org.junit.Test;
 
+/**
+ * Testcase.
+ */
 public class Confirm extends BrokerTestCase {
-    private final static int NUM_MESSAGES = 1000;
+    private static final int NUM_MESSAGES = 1000;
 
     private static final String TTL_ARG = "x-message-ttl";
 
@@ -68,7 +70,7 @@ public class Confirm extends BrokerTestCase {
         channel.queueDelete("confirm-durable-nonexclusive");
     }
 
-    @Test
+    //@Test
     public void persistentMandatoryCombinations()
             throws IOException, InterruptedException, TimeoutException {
         boolean[] b = {false, true};
@@ -79,20 +81,20 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void nonDurable()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("", "confirm-test-nondurable", true, false);
     }
 
-    @Test
+    //@Test
     public void mandatoryNoRoute()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("", "confirm-test-doesnotexist", false, true);
         confirmTest("", "confirm-test-doesnotexist", true, true);
     }
 
-    @Test
+    //@Test
     public void multipleQueues()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("amq.direct", "confirm-multiple-queues", true, false);
@@ -103,7 +105,7 @@ public class Confirm extends BrokerTestCase {
      * (thus causing a confirm).  I'd manually comment out the line in
      * internal_sync that notifies the clients. */
 
-    @Test
+    //@Test
     public void queueDelete()
             throws IOException, InterruptedException, TimeoutException {
         publishN("", "confirm-test-noconsumer", true, false);
@@ -113,7 +115,7 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(60000);
     }
 
-    @Test
+    //@Test
     public void queuePurge()
             throws IOException, InterruptedException, TimeoutException {
         publishN("", "confirm-test-noconsumer", true, false);
@@ -124,7 +126,7 @@ public class Confirm extends BrokerTestCase {
     }
 
     /* Tests rabbitmq-server #854 */
-    @Test
+    //@Test
     public void confirmQueuePurge()
             throws IOException, InterruptedException, TimeoutException {
         channel.basicQos(1);
@@ -137,7 +139,7 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(90000);
     }
 
-    @Test
+    //@Test
     public void basicReject()
             throws IOException, InterruptedException, TimeoutException {
         basicRejectCommon(false);
@@ -145,7 +147,7 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(60000);
     }
 
-    @Test
+    //@Test
     public void queueTTL()
             throws IOException, InterruptedException, TimeoutException {
         for (int ttl : new int[]{1, 0}) {
@@ -160,7 +162,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void basicRejectRequeue()
             throws IOException, InterruptedException, TimeoutException {
         basicRejectCommon(true);
@@ -174,7 +176,7 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(60000);
     }
 
-    @Test
+    //@Test
     public void basicRecover()
             throws IOException, InterruptedException, TimeoutException {
         publishN("", "confirm-test-noconsumer", true, false);
@@ -196,7 +198,7 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(60000);
     }
 
-    @Test
+    //@Test
     public void select()
             throws IOException {
         channel.confirmSelect();
@@ -218,7 +220,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void waitForConfirms()
             throws IOException, InterruptedException, TimeoutException {
         final SortedSet<Long> unconfirmedSet =
@@ -251,7 +253,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void waitForConfirmsWithoutConfirmSelected()
             throws IOException, InterruptedException {
         channel = connection.createChannel();
@@ -266,7 +268,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void waitForConfirmsException()
             throws IOException, InterruptedException, TimeoutException {
         publishN("", "confirm-test", true, false);

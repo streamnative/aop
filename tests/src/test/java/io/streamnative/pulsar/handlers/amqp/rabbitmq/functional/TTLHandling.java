@@ -1,5 +1,3 @@
-
-
 /**
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +23,10 @@ import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.QueueingConsumer;
 import java.io.IOException;
-import org.junit.Test;
 
+/**
+ * TTLHandling.
+ */
 public abstract class TTLHandling extends BrokerTestCase {
 
     protected static final String TTL_EXCHANGE = "ttl.exchange";
@@ -45,7 +45,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         this.channel.exchangeDelete(TTL_EXCHANGE);
     }
 
-    @Test
+    ////@Test
     public void multipleTTLTypes() throws IOException {
         final Object[] args = {(((byte) 200) & (0xff)), (short) 200, 200, 200L};
         for (Object ttl : args) {
@@ -53,13 +53,13 @@ public abstract class TTLHandling extends BrokerTestCase {
                 declareAndBindQueue(ttl);
                 publishAndSync(MSG[0]);
             } catch (IOException ex) {
-                fail("Should be able to use " + ttl.getClass().getName() +
-                        " when setting TTL");
+                fail("Should be able to use " + ttl.getClass().getName()
+                        + " when setting TTL");
             }
         }
     }
 
-    @Test
+    ////@Test
     public void invalidTypeUsedInTTL() throws Exception {
         try {
             declareAndBindQueue("foobar");
@@ -70,7 +70,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         }
     }
 
-    @Test
+    ////@Test
     public void trailingCharsUsedInTTL() throws Exception {
         try {
             declareAndBindQueue("10000foobar");
@@ -81,7 +81,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         }
     }
 
-    @Test
+    ////@Test
     public void tTLMustBePositive() throws Exception {
         try {
             declareAndBindQueue(-10);
@@ -92,7 +92,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         }
     }
 
-    @Test
+    ////@Test
     public void tTLAllowZero() throws Exception {
         try {
             declareQueue(0);
@@ -102,7 +102,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         }
     }
 
-    @Test
+    ////@Test
     public void messagesExpireWhenUsingBasicGet() throws Exception {
         declareAndBindQueue(200);
         publish(MSG[0]);
@@ -112,7 +112,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         assertNull("expected message " + what + " to have been removed", what);
     }
 
-    @Test
+    ////@Test
     public void publishAndGetWithExpiry() throws Exception {
         declareAndBindQueue(200);
 
@@ -129,7 +129,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         assertNull(get());
     }
 
-    @Test
+    ////@Test
     public void transactionalPublishWithGet() throws Exception {
         declareAndBindQueue(100);
 
@@ -148,7 +148,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         assertNull(get());
     }
 
-    @Test
+    ////@Test
     public void expiryWithRequeue() throws Exception {
         declareAndBindQueue(400);
 
@@ -171,7 +171,7 @@ public abstract class TTLHandling extends BrokerTestCase {
     /*
      * Test expiry of re-queued messages after being consumed instantly
      */
-    @Test
+    ////@Test
     public void expiryWithReQueueAfterConsume() throws Exception {
         declareAndBindQueue(100);
         QueueingConsumer c = new QueueingConsumer(channel);
@@ -187,7 +187,7 @@ public abstract class TTLHandling extends BrokerTestCase {
         assertNull("Re-queued message not expired", get());
     }
 
-    @Test
+    ////@Test
     public void zeroTTLDelivery() throws Exception {
         declareAndBindQueue(0);
 

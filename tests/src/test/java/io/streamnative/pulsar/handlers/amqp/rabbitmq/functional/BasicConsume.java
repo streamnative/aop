@@ -24,14 +24,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.junit.Test;
 
 /**
- *
+ * Testcase.
  */
 public class BasicConsume extends BrokerTestCase {
 
-    @Test
+    //@Test
     public void basicConsumeOk() throws IOException, InterruptedException {
         String q = channel.queueDeclare().getQueue();
         basicPublishPersistent("msg".getBytes(StandardCharsets.UTF_8), q);
@@ -54,7 +53,9 @@ public class BasicConsume extends BrokerTestCase {
         }
 
         @Override
-        public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+        public void handleDelivery(String consumerTag, Envelope envelope,
+                                   AMQP.BasicProperties properties,
+                                   byte[] body) throws IOException {
             latch.countDown();
         }
     }

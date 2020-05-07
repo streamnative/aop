@@ -21,13 +21,16 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
-import org.junit.Test;
 
-/* Declare an exchange, bind a queue to it, then try to delete it,
- * setting if-unused to true.  This should throw an exception. */
+/**
+ * Testcase.
+ * Declare an exchange, bind a queue to it, then try to delete it,
+ *  setting if-unused to true.  This should throw an exception.
+ */
+
 public class ExchangeDeleteIfUnused extends BrokerTestCase {
-    private final static String EXCHANGE_NAME = "xchg1";
-    private final static String ROUTING_KEY = "something";
+    private static final String EXCHANGE_NAME = "xchg1";
+    private static final String ROUTING_KEY = "something";
 
     protected void createResources()
             throws IOException, TimeoutException {
@@ -45,7 +48,7 @@ public class ExchangeDeleteIfUnused extends BrokerTestCase {
 
     /* Attempt to Exchange.Delete(ifUnused = true) a used exchange.
      * Should throw an exception. */
-    @Test
+    //@Test
     public void exchangeDelete() {
         try {
             channel.exchangeDelete(EXCHANGE_NAME, true);

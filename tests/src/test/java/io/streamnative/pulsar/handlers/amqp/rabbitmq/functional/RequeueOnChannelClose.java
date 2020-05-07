@@ -19,6 +19,9 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import java.io.IOException;
 
+/**
+ * RequeueOnChannelClose.
+ */
 public class RequeueOnChannelClose extends RequeueOnClose {
 
     protected void open() throws IOException {

@@ -18,6 +18,9 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 
+/**
+ * Nowait.
+ */
 public class Nowait extends BrokerTestCase {
     public void testQueueDeclareWithNowait() throws IOException {
         String q = generateQueueName();

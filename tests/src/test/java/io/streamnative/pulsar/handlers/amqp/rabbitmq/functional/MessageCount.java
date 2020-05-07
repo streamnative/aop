@@ -17,10 +17,11 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import static org.junit.Assert.assertEquals;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class MessageCount extends BrokerTestCase {
-    @Test
+    //@Test
     public void messageCount() throws IOException {
         String q = generateQueueName();
         channel.queueDeclare(q, false, true, false, null);

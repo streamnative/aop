@@ -1,6 +1,3 @@
-
-
-
 /**
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,11 +29,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.Test;
 
+/**
+ * Tables.
+ */
 public class Tables extends BrokerTestCase {
 
-    @Test
+    ////@Test
     public void types() throws IOException {
 
         Map<String, Object> table = new HashMap<String, Object>();

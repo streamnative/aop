@@ -16,7 +16,6 @@
 
 package com.rabbitmq.client.test;
 
-import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.ConnectionFactory;
@@ -35,21 +34,14 @@ import java.util.concurrent.TimeUnit;
  * Convenience class: an implementation of {@link Consumer} with
  * straightforward blocking semantics. It is meant to be using in
  * tests.
- *
  * Deprecated in favor of {@link DefaultConsumer} (see below for background).
  * Will be removed in next major release.
- *
  * The general pattern for using QueueingConsumer is as follows:
- *
  * <pre>
  * // Create connection and channel.
  * {@link ConnectionFactory} factory = new ConnectionFactory();
  * Connection conn = factory.newConnection();
  * {@link Channel} ch1 = conn.createChannel();
- *
- * // Declare a queue and bind it to an exchange.
- * String queueName = ch1.queueDeclare().{@link AMQP.Queue.DeclareOk#getQueue getQueue}();
- * ch1.{@link Channel#queueBind queueBind}(queueName, exchangeName, queueName);
  *
  * // Create the QueueingConsumer and have it consume from the queue
  * QueueingConsumer consumer = new {@link QueueingConsumer#QueueingConsumer(Channel) QueueingConsumer}(ch1);
@@ -59,7 +51,8 @@ import java.util.concurrent.TimeUnit;
  * while (/* some condition * /) {
  *     {@link Delivery} delivery = consumer.{@link QueueingConsumer#nextDelivery nextDelivery}();
  *     // process delivery
- *     ch1.{@link Channel#basicAck basicAck}(delivery.{@link Delivery#getEnvelope getEnvelope}().{@link Envelope#getDeliveryTag getDeliveryTag}(), false);
+ *     ch1.{@link Channel#basicAck basicAck}(delivery.
+ *     {@link Delivery#getEnvelope getEnvelope}().{@link Envelope#getDeliveryTag getDeliveryTag}(), false);
  * }
  * </pre>
  *
@@ -68,8 +61,7 @@ import java.util.concurrent.TimeUnit;
  * directory of the source distribution.</p>
  *
  * <h3>Historical Perspective</h3>
- *
- * <p><code>QueueingConsumer</code> was introduced to allow
+ *<code>QueueingConsumer</code> was introduced to allow
  * applications to overcome a limitation in the way <code>Connection</code>
  * managed threads and consumer dispatching. When <code>QueueingConsumer</code>
  * was introduced, callbacks to <code>Consumers</code> were made on the
@@ -78,13 +70,9 @@ import java.util.concurrent.TimeUnit;
  * <code>Channels</code> on the <code>Connection</code>. Secondly, if a
  * <code>Consumer</code> made a recursive synchronous call into its
  * <code>Channel</code> the client would deadlock.
- * </p>
- * <p>
  * <code>QueueingConsumer</code> provided client code with an easy way to
  * obviate this problem by queueing incoming messages and processing them on
  * a separate, application-managed thread.
- * </p>
- * <p>
  * The threading behaviour of <code>Connection</code> and <code>Channel</code>
  * has been changed so that each <code>Channel</code> uses a distinct thread
  * for dispatching to <code>Consumers</code>. This prevents
@@ -93,16 +81,16 @@ import java.util.concurrent.TimeUnit;
  * deadlocking the client.
  * As such, it is now safe to implement <code>Consumer</code> directly or
  * to extend <code>DefaultConsumer</code> and <code>QueueingConsumer</code>
- * is a lot less relevant.</p>
+ * is a lot less relevant.
  *
  */
 public class QueueingConsumer extends DefaultConsumer {
-    private final BlockingQueue<Delivery> _queue;
+    private final BlockingQueue<Delivery> queue;
 
     // When this is non-null the queue is in shutdown mode and nextDelivery should
     // throw a shutdown signal exception.
-    private volatile ShutdownSignalException _shutdown;
-    private volatile ConsumerCancelledException _cancelled;
+    private volatile ShutdownSignalException shutdown;
+    private volatile ConsumerCancelledException cancelled;
 
     // Marker object used to signal the queue is in shutdown mode.
     // It is only there to wake up consumers. The canonical representation
@@ -116,42 +104,44 @@ public class QueueingConsumer extends DefaultConsumer {
 
     public QueueingConsumer(Channel ch, BlockingQueue<Delivery> q) {
         super(ch);
-        this._queue = q;
+        this.queue = q;
     }
 
-    @Override public void handleShutdownSignal(String consumerTag,
-                                               ShutdownSignalException sig) {
-        _shutdown = sig;
-        _queue.add(POISON);
+    @Override
+    public void handleShutdownSignal(String consumerTag,
+                                     ShutdownSignalException sig) {
+        shutdown = sig;
+        queue.add(POISON);
     }
 
-    @Override public void handleCancel(String consumerTag) throws IOException {
-        _cancelled = new ConsumerCancelledException();
-        _queue.add(POISON);
+    @Override
+    public void handleCancel(String consumerTag) throws IOException {
+        cancelled = new ConsumerCancelledException();
+        queue.add(POISON);
     }
 
-    @Override public void handleDelivery(String consumerTag,
+    @Override
+    public void handleDelivery(String consumerTag,
                                Envelope envelope,
                                BasicProperties properties,
                                byte[] body)
-        throws IOException
-    {
+            throws IOException {
         checkShutdown();
-        this._queue.add(new Delivery(envelope, properties, body));
+        this.queue.add(new Delivery(envelope, properties, body));
     }
 
     /**
      * Encapsulates an arbitrary message - simple "bean" holder structure.
      */
     public static class Delivery {
-        private final Envelope _envelope;
-        private final BasicProperties _properties;
-        private final byte[] _body;
+        private final Envelope envelope;
+        private final BasicProperties properties;
+        private final byte[] body;
 
         public Delivery(Envelope envelope, BasicProperties properties, byte[] body) {
-            _envelope = envelope;
-            _properties = properties;
-            _body = body;
+            this.envelope = envelope;
+            this.properties = properties;
+            this.body = body;
         }
 
         /**
@@ -159,7 +149,7 @@ public class QueueingConsumer extends DefaultConsumer {
          * @return the message envelope
          */
         public Envelope getEnvelope() {
-            return _envelope;
+            return envelope;
         }
 
         /**
@@ -167,7 +157,7 @@ public class QueueingConsumer extends DefaultConsumer {
          * @return the message properties
          */
         public BasicProperties getProperties() {
-            return _properties;
+            return properties;
         }
 
         /**
@@ -175,7 +165,7 @@ public class QueueingConsumer extends DefaultConsumer {
          * @return the message body
          */
         public byte[] getBody() {
-            return _body;
+            return body;
         }
     }
 
@@ -183,8 +173,9 @@ public class QueueingConsumer extends DefaultConsumer {
      * Check if we are in shutdown mode and if so throw an exception.
      */
     private void checkShutdown() {
-        if (_shutdown != null)
-            throw Utility.fixStackTrace(_shutdown);
+        if (shutdown != null) {
+            throw Utility.fixStackTrace(shutdown);
+        }
     }
 
     /**
@@ -199,20 +190,24 @@ public class QueueingConsumer extends DefaultConsumer {
      * throw a corresponding exception.
      */
     private Delivery handle(Delivery delivery) {
-        if (delivery == POISON ||
-            delivery == null && (_shutdown != null || _cancelled != null)) {
+        if (delivery == POISON
+                ||
+                delivery == null && (shutdown != null || cancelled != null)) {
             if (delivery == POISON) {
-                _queue.add(POISON);
-                if (_shutdown == null && _cancelled == null) {
+                queue.add(POISON);
+                if (shutdown == null && cancelled == null) {
                     throw new IllegalStateException(
-                        "POISON in queue, but null _shutdown and null _cancelled. " +
-                        "This should never happen, please report as a BUG");
+                            "POISON in queue, but null _shutdown and null _cancelled. "
+                                    +
+                                    "This should never happen, please report as a BUG");
                 }
             }
-            if (null != _shutdown)
-                throw Utility.fixStackTrace(_shutdown);
-            if (null != _cancelled)
-                throw Utility.fixStackTrace(_cancelled);
+            if (null != shutdown) {
+                throw Utility.fixStackTrace(shutdown);
+            }
+            if (null != cancelled) {
+                throw Utility.fixStackTrace(cancelled);
+            }
         }
         return delivery;
     }
@@ -225,9 +220,8 @@ public class QueueingConsumer extends DefaultConsumer {
      * @throws ConsumerCancelledException if this consumer is cancelled while waiting
      */
     public Delivery nextDelivery()
-        throws InterruptedException, ShutdownSignalException, ConsumerCancelledException
-    {
-        return handle(_queue.take());
+            throws InterruptedException, ShutdownSignalException, ConsumerCancelledException {
+        return handle(queue.take());
     }
 
     /**
@@ -239,8 +233,7 @@ public class QueueingConsumer extends DefaultConsumer {
      * @throws ConsumerCancelledException if this consumer is cancelled while waiting
      */
     public Delivery nextDelivery(long timeout)
-        throws InterruptedException, ShutdownSignalException, ConsumerCancelledException
-    {
-        return handle(_queue.poll(timeout, TimeUnit.MILLISECONDS));
+            throws InterruptedException, ShutdownSignalException, ConsumerCancelledException {
+        return handle(queue.poll(timeout, TimeUnit.MILLISECONDS));
     }
 }

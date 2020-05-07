@@ -27,13 +27,14 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class ConsumerCancelNotification extends BrokerTestCase {
 
     private final String queue = "cancel_notification_queue";
 
-    @Test
+    //@Test
     public void consumerCancellationNotification() throws IOException,
             InterruptedException {
         final BlockingQueue<Boolean> result = new ArrayBlockingQueue<Boolean>(1);
@@ -81,7 +82,7 @@ public class ConsumerCancelNotification extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void consumerCancellationHandlerUsesBlockingOperations()
             throws IOException, InterruptedException {
         final String altQueue = "basic.cancel.fallback";

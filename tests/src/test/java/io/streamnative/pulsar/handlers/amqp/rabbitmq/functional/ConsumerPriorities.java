@@ -33,11 +33,14 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.junit.Test;
+
+/**
+ * Testcase.
+ */
 
 public class ConsumerPriorities extends BrokerTestCase {
 
-    @Test
+    //@Test
     public void validation() throws IOException {
         assertFailValidation(args("banana"));
         assertFailValidation(args(new HashMap<Object, Object>()));
@@ -60,7 +63,7 @@ public class ConsumerPriorities extends BrokerTestCase {
     private static final long DELIVERY_TIMEOUT_MS = 100;
     private static final long CANCEL_OK_TIMEOUT_MS = 10 * 1000;
 
-    @Test
+    //@Test
     public void consumerPriorities() throws Exception {
         String queue = channel.queueDeclare().getQueue();
         QueueMessageConsumer highConsumer = new QueueMessageConsumer(channel);
@@ -119,7 +122,8 @@ public class ConsumerPriorities extends BrokerTestCase {
         }
 
         @Override
-        public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+        public void handleDelivery(String consumerTag, Envelope envelope,
+                                   AMQP.BasicProperties properties, byte[] body) throws IOException {
             messages.add(body);
         }
 

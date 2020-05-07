@@ -48,6 +48,9 @@ import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 import org.slf4j.LoggerFactory;
 
+/**
+ * TestUtils.
+ */
 public class TestUtils {
 
     public static final boolean USE_NIO = System.getProperty("use.nio") != null;
@@ -169,7 +172,8 @@ public class TestUtils {
             ch.basicConsume(queue, true, new DefaultConsumer(ch) {
 
                 @Override
-                public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                public void handleDelivery(String consumerTag, Envelope envelope,
+                                           AMQP.BasicProperties properties, byte[] body) throws IOException {
                     latch.countDown();
                 }
             });
@@ -225,19 +229,22 @@ public class TestUtils {
         });
     }
 
-    public static void closeAndWaitForRecovery(RecoverableConnection connection) throws IOException, InterruptedException {
+    public static void closeAndWaitForRecovery(RecoverableConnection connection)
+            throws IOException, InterruptedException {
         CountDownLatch latch = prepareForRecovery(connection);
         Host.closeConnection((NetworkConnection) connection);
         wait(latch);
     }
 
-    public static void closeAllConnectionsAndWaitForRecovery(Collection<Connection> connections) throws IOException, InterruptedException {
+    public static void closeAllConnectionsAndWaitForRecovery(Collection<Connection> connections)
+            throws IOException, InterruptedException {
         CountDownLatch latch = prepareForRecovery(connections);
         Host.closeAllConnections();
         wait(latch);
     }
 
-    public static void closeAllConnectionsAndWaitForRecovery(Connection connection) throws IOException, InterruptedException {
+    public static void closeAllConnectionsAndWaitForRecovery(Connection connection)
+            throws IOException, InterruptedException {
         closeAllConnectionsAndWaitForRecovery(Collections.singletonList(connection));
     }
 
@@ -269,7 +276,7 @@ public class TestUtils {
     }
 
     /**
-     * https://stackoverflow.com/questions/6701948/efficient-way-to-compare-version-strings-in-java
+     * https://stackoverflow.com/questions/6701948/efficient-way-to-compare-version-strings-in-java.
      */
     static int versionCompare(String str1, String str2) {
         String[] vals1 = str1.split("\\.");

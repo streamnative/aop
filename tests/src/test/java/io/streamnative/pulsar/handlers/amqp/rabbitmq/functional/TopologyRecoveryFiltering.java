@@ -43,7 +43,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.Test;
 
 /**
  *
@@ -82,7 +81,7 @@ public class TopologyRecoveryFiltering extends BrokerTestCase {
         deleteQueues(queuesToDelete);
     }
 
-    @Test
+    ////@Test
     public void topologyRecoveryFilteringExchangesAndQueues() throws Exception {
         Channel ch = c.createChannel();
         ch.exchangeDeclare("recovered.exchange", "direct");
@@ -103,7 +102,7 @@ public class TopologyRecoveryFiltering extends BrokerTestCase {
         assertFalse(queueExists("filtered.queue", c));
     }
 
-    @Test
+    ////@Test
     public void topologyRecoveryFilteringBindings() throws Exception {
         Channel ch = c.createChannel();
 
@@ -127,7 +126,7 @@ public class TopologyRecoveryFiltering extends BrokerTestCase {
         ));
     }
 
-    @Test
+    ////@Test
     public void topologyRecoveryFilteringConsumers() throws Exception {
         Channel ch = c.createChannel();
 
@@ -141,7 +140,8 @@ public class TopologyRecoveryFiltering extends BrokerTestCase {
         ch.basicConsume("topology.recovery.queue.1", true, "recovered.consumer", new DefaultConsumer(ch) {
 
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            public void handleDelivery(String consumerTag, Envelope envelope,
+                                       AMQP.BasicProperties properties, byte[] body) throws IOException {
                 recoveredConsumerMessageCount.incrementAndGet();
             }
         });
@@ -153,7 +153,8 @@ public class TopologyRecoveryFiltering extends BrokerTestCase {
         ch.basicConsume("topology.recovery.queue.2", true, "filtered.consumer", new DefaultConsumer(ch) {
 
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            public void handleDelivery(String consumerTag, Envelope envelope,
+                                       AMQP.BasicProperties properties, byte[] body) throws IOException {
                 filteredConsumerMessageCount.incrementAndGet();
                 filteredConsumerLatch.countDown();
             }

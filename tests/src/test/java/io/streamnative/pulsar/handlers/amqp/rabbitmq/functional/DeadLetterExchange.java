@@ -43,8 +43,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class DeadLetterExchange extends BrokerTestCase {
     public static final String DLX = "dead.letter.exchange";
     private static final String DLX_ARG = "x-dead-letter-exchange";
@@ -69,33 +70,33 @@ public class DeadLetterExchange extends BrokerTestCase {
         channel.queueDelete(TEST_QUEUE_NAME);
     }
 
-    @Test
+    //@Test
     public void declareQueueWithExistingDeadLetterExchange()
             throws IOException {
         declareQueue(DLX);
     }
 
-    @Test
+    //@Test
     public void declareQueueWithNonExistingDeadLetterExchange()
             throws IOException {
         declareQueue("some.random.exchange.name");
     }
 
-    @Test
+    //@Test
     public void declareQueueWithEquivalentDeadLetterExchange()
             throws IOException {
         declareQueue(DLX);
         declareQueue(DLX);
     }
 
-    @Test
+    //@Test
     public void declareQueueWithEquivalentDeadLetterRoutingKey()
             throws IOException {
         declareQueue(TEST_QUEUE_NAME, DLX, "routing_key", null);
         declareQueue(TEST_QUEUE_NAME, DLX, "routing_key", null);
     }
 
-    @Test
+    //@Test
     public void declareQueueWithInvalidDeadLetterExchangeArg() {
         try {
             declareQueue(133);
@@ -105,20 +106,20 @@ public class DeadLetterExchange extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void redeclareQueueWithInvalidDeadLetterExchangeArg()
             throws IOException {
         declareQueue("inequivalent_dlx_name", "dlx_foo", null, null);
         try {
             declareQueue("inequivalent_dlx_name", "dlx_bar", null, null);
-            fail("x-dead-letter-exchange must be a valid exchange name " +
-                    "and must not change in subsequent declarations");
+            fail("x-dead-letter-exchange must be a valid exchange name "
+                    + "and must not change in subsequent declarations");
         } catch (IOException ex) {
             checkShutdownSignal(AMQP.PRECONDITION_FAILED, ex);
         }
     }
 
-    @Test
+    //@Test
     public void declareQueueWithInvalidDeadLetterRoutingKeyArg() {
         try {
             declareQueue("foo", "amq.direct", 144, null);
@@ -128,20 +129,20 @@ public class DeadLetterExchange extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void redeclareQueueWithInvalidDeadLetterRoutingKeyArg()
             throws IOException {
         declareQueue("inequivalent_dlx_rk", "amq.direct", "dlx_rk", null);
         try {
             declareQueue("inequivalent_dlx_rk", "amq.direct", "dlx_rk2", null);
-            fail("x-dead-letter-routing-key must be a string and must not " +
-                    "change in subsequent declarations");
+            fail("x-dead-letter-routing-key must be a string and must not "
+                    + "change in subsequent declarations");
         } catch (IOException ex) {
             checkShutdownSignal(AMQP.PRECONDITION_FAILED, ex);
         }
     }
 
-    @Test
+    //@Test
     public void declareQueueWithRoutingKeyButNoDeadLetterExchange() {
         try {
             Map<String, Object> args = new HashMap<>();
@@ -154,7 +155,7 @@ public class DeadLetterExchange extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void redeclareQueueWithRoutingKeyButNoDeadLetterExchange() {
         try {
             String queueName = randomQueueName();
@@ -164,24 +165,24 @@ public class DeadLetterExchange extends BrokerTestCase {
             args.put(DLX_RK_ARG, "foo");
 
             channel.queueDeclare(queueName, false, true, false, args);
-            fail("x-dead-letter-exchange must be specified if " +
-                    "x-dead-letter-routing-key is set");
+            fail("x-dead-letter-exchange must be specified if "
+                    + "x-dead-letter-routing-key is set");
         } catch (IOException ex) {
             checkShutdownSignal(AMQP.PRECONDITION_FAILED, ex);
         }
     }
 
-    @Test
+    //@Test
     public void deadLetterQueueTTLExpiredMessages() throws Exception {
         ttlTest(TTL);
     }
 
-    @Test
+    //@Test
     public void deadLetterQueueZeroTTLExpiredMessages() throws Exception {
         ttlTest(0);
     }
 
-    @Test
+    //@Test
     public void deadLetterQueueTTLPromptExpiry() throws Exception {
         Map<String, Object> args = new HashMap<>();
         args.put("x-message-ttl", TTL);
@@ -235,7 +236,7 @@ public class DeadLetterExchange extends BrokerTestCase {
         checkPromptArrival(c, 2, latency);
     }
 
-    @Test
+    //@Test
     public void deadLetterDeletedDLX() throws Exception {
         declareQueue(TEST_QUEUE_NAME, DLX, null, null, 1);
         channel.queueBind(TEST_QUEUE_NAME, "amq.direct", "test");
@@ -257,7 +258,7 @@ public class DeadLetterExchange extends BrokerTestCase {
     }
 
     @SuppressWarnings("unchecked")
-    @Test
+    //@Test
     public void deadLetterPerMessageTTLRemoved() throws Exception {
         declareQueue(TEST_QUEUE_NAME, DLX, null, null, 1);
         channel.queueBind(TEST_QUEUE_NAME, "amq.direct", "test");
@@ -283,17 +284,17 @@ public class DeadLetterExchange extends BrokerTestCase {
         });
     }
 
-    @Test
+    //@Test
     public void deadLetterOnReject() throws Exception {
         rejectionTest(false);
     }
 
-    @Test
+    //@Test
     public void deadLetterOnNack() throws Exception {
         rejectionTest(true);
     }
 
-    @Test
+    //@Test
     public void deadLetterNoDeadLetterQueue() throws IOException {
         channel.queueDelete(DLQ);
 
@@ -303,7 +304,7 @@ public class DeadLetterExchange extends BrokerTestCase {
         publishN(MSG_COUNT);
     }
 
-    @Test
+    //@Test
     public void deadLetterMultipleDeadLetterQueues()
             throws IOException {
         declareQueue(TEST_QUEUE_NAME, DLX, null, null, 1);
@@ -318,7 +319,7 @@ public class DeadLetterExchange extends BrokerTestCase {
     }
 
     @SuppressWarnings("unchecked")
-    @Test
+    //@Test
     public void deadLetterTwice() throws Exception {
         declareQueue(TEST_QUEUE_NAME, DLX, null, null, 1);
 
@@ -353,7 +354,7 @@ public class DeadLetterExchange extends BrokerTestCase {
         });
     }
 
-    @Test
+    //@Test
     public void deadLetterSelf() throws Exception {
         declareQueue(TEST_QUEUE_NAME, "amq.direct", "test", null, 1);
         channel.queueBind(TEST_QUEUE_NAME, "amq.direct", "test");
@@ -368,7 +369,7 @@ public class DeadLetterExchange extends BrokerTestCase {
         consumeN(TEST_QUEUE_NAME, 0, WithResponse.NULL);
     }
 
-    @Test
+    //@Test
     public void deadLetterCycle() throws Exception {
         // testDeadLetterTwice and testDeadLetterSelf both test that we drop
         // messages in pure-expiry cycles. So we just need to test that
@@ -392,7 +393,7 @@ public class DeadLetterExchange extends BrokerTestCase {
     }
 
     @SuppressWarnings("unchecked")
-    @Test
+    //@Test
     public void deadLetterNewRK() throws Exception {
         declareQueue(TEST_QUEUE_NAME, DLX, "test-other", null, 1);
 
@@ -429,7 +430,7 @@ public class DeadLetterExchange extends BrokerTestCase {
     }
 
     @SuppressWarnings("unchecked")
-    @Test
+    //@Test
     public void republish() throws Exception {
         Map<String, Object> args = new HashMap<>();
         args.put("x-message-ttl", 100);
@@ -592,10 +593,10 @@ public class DeadLetterExchange extends BrokerTestCase {
             long now = System.currentTimeMillis();
             long publishTime = Long.valueOf(new String(body));
             long targetTime = publishTime + TTL + latency;
-            assertTrue("expiry outside bounds (+/- " + epsilon + "): " +
-                            (now - targetTime),
-                    (now >= targetTime - epsilon) &&
-                            (now <= targetTime + epsilon));
+            assertTrue("expiry outside bounds (+/- " + epsilon + "): "
+                            + (now - targetTime),
+                    (now >= targetTime - epsilon)
+                            && (now <= targetTime + epsilon));
         }
     }
 
@@ -721,7 +722,8 @@ public class DeadLetterExchange extends BrokerTestCase {
         }
 
         @Override
-        public void handleDelivery(String consumerTag, Envelope envelope, BasicProperties properties, byte[] body) throws IOException {
+        public void handleDelivery(String consumerTag, Envelope envelope,
+                                   BasicProperties properties, byte[] body) throws IOException {
             messages.add(body);
         }
 

@@ -1,4 +1,3 @@
-
 /**
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +18,13 @@ import static org.junit.Assert.fail;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-import org.junit.Test;
 
 /**
- * Test that unbinding from an auto-delete exchange causes the exchange to go
- * away
+ * Test that unbinding from an auto-delete exchange causes the exchange to go away.
+ *
  */
 public class UnbindAutoDeleteExchange extends BrokerTestCase {
-    @Test
+    ////@Test
     public void unbind() throws IOException, InterruptedException {
         String exchange = "myexchange";
         channel.exchangeDeclare(exchange, "fanout", false, true, null);

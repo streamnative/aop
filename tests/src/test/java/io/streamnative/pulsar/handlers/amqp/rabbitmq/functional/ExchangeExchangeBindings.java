@@ -24,8 +24,9 @@ import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.QueueingConsumer;
 import com.rabbitmq.client.test.QueueingConsumer.Delivery;
 import java.io.IOException;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class ExchangeExchangeBindings extends BrokerTestCase {
 
     private static final int TIMEOUT = 5000;
@@ -80,7 +81,7 @@ public class ExchangeExchangeBindings extends BrokerTestCase {
         assertEquals(new String(MARKER), new String(markerDelivery.getBody()));
     }
 
-    @Test
+    //@Test
     public void bindingCreationDeletion() throws IOException {
         channel.exchangeUnbind("e2", "e1", "");
         channel.exchangeBind("e2", "e1", "");
@@ -96,7 +97,7 @@ public class ExchangeExchangeBindings extends BrokerTestCase {
      * add binding (e2 --> e1)
      * test (e2 --> {q2, q1, q0})
      */
-    @Test
+    //@Test
     public void simpleChains() throws IOException, ShutdownSignalException,
             InterruptedException {
         publishWithMarker("e0", "");
@@ -124,7 +125,7 @@ public class ExchangeExchangeBindings extends BrokerTestCase {
      * resulting in: (e1 --> {q1, e0 --> {q0, q1}})
      * test (e1 --> {q0, q1})
      */
-    @Test
+    //@Test
     public void duplicateQueueDestinations() throws IOException,
             ShutdownSignalException, InterruptedException {
         channel.queueBind("q1", "e0", "");
@@ -147,7 +148,7 @@ public class ExchangeExchangeBindings extends BrokerTestCase {
      * add binding (e0 --> e2)
      * test (eN --> {q0, q1, q2}) for N in [0..2]
      */
-    @Test
+    //@Test
     public void exchangeRoutingLoop() throws IOException,
             ShutdownSignalException, InterruptedException {
         channel.exchangeBind("e0", "e1", "");
@@ -177,7 +178,7 @@ public class ExchangeExchangeBindings extends BrokerTestCase {
      * Then remove the first set of bindings from e --> eN for N in [0..2]
      * test publish with rk to e
      */
-    @Test
+    //@Test
     public void topicExchange() throws IOException, ShutdownSignalException,
             InterruptedException {
 

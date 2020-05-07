@@ -17,13 +17,14 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class DoubleDeletion extends BrokerTestCase {
     protected static final String Q = "DoubleDeletionQueue";
     protected static final String X = "DoubleDeletionExchange";
 
-    @Test
+    //@Test
     public void doubleDeletionQueue()
             throws IOException {
         channel.queueDelete(Q);
@@ -32,7 +33,7 @@ public class DoubleDeletion extends BrokerTestCase {
         channel.queueDelete(Q);
     }
 
-    @Test
+    //@Test
     public void doubleDeletionExchange()
             throws IOException {
         channel.exchangeDelete(X);

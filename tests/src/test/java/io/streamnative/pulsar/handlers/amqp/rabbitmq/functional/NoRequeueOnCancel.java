@@ -28,41 +28,45 @@ import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import org.junit.Test;
 
+/**
+ * NoRequeueOnCancel.
+ */
 public class NoRequeueOnCancel extends BrokerTestCase {
-    protected final String Q = "NoRequeueOnCancel";
+    protected final String queue = "NoRequeueOnCancel";
 
     protected void createResources() throws IOException {
-        channel.queueDeclare(Q, false, false, false, null);
+        channel.queueDeclare(queue, false, false, false, null);
     }
 
     protected void releaseResources() throws IOException {
-        channel.queueDelete(Q);
+        channel.queueDelete(queue);
     }
 
-    @Test
+    //@Test
     public void noRequeueOnCancel()
             throws IOException, InterruptedException {
-        channel.basicPublish("", Q, null, "1".getBytes());
+        channel.basicPublish("", queue, null, "1".getBytes());
 
         final CountDownLatch latch = new CountDownLatch(1);
         Consumer c = new DefaultConsumer(channel) {
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            public void handleDelivery(String consumerTag, Envelope envelope,
+                                       AMQP.BasicProperties properties, byte[] body)
+                    throws IOException {
                 latch.countDown();
             }
         };
-        String consumerTag = channel.basicConsume(Q, false, c);
+        String consumerTag = channel.basicConsume(queue, false, c);
         assertTrue(latch.await(5, TimeUnit.SECONDS));
 
         channel.basicCancel(consumerTag);
 
-        assertNull(channel.basicGet(Q, true));
+        assertNull(channel.basicGet(queue, true));
 
         closeChannel();
         openChannel();
 
-        assertNotNull(channel.basicGet(Q, true));
+        assertNotNull(channel.basicGet(queue, true));
     }
 }

@@ -20,7 +20,9 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.Map;
-
+/**
+ * Testcase.
+ */
 public abstract class ExchangeEquivalenceBase extends BrokerTestCase {
     public void verifyEquivalent(String name,
                                  String type, boolean durable, boolean autoDelete,

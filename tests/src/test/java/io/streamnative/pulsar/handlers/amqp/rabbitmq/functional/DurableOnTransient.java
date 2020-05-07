@@ -19,8 +19,9 @@ import static org.junit.Assert.assertNotNull;
 import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.MessageProperties;
 import java.io.IOException;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class DurableOnTransient extends ClusteredTestBase {
     protected static final String Q = "SemiDurableBindings.DurableQueue";
     protected static final String X = "SemiDurableBindings.TransientExchange";
@@ -52,7 +53,7 @@ public class DurableOnTransient extends ClusteredTestBase {
         channel.exchangeDelete(X);
     }
 
-    @Test
+    //@Test
     public void bindDurableToTransient()
             throws IOException {
         channel.queueBind(Q, X, "");
@@ -60,7 +61,7 @@ public class DurableOnTransient extends ClusteredTestBase {
         assertNotNull(basicGet());
     }
 
-    @Test
+    //@Test
     public void semiDurableBindingRemoval() throws IOException {
         if (clusteredConnection != null) {
             deleteExchange("x");

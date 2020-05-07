@@ -51,6 +51,9 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * BrokerTestCase.
+ */
 @Slf4j
 public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 
@@ -67,7 +70,8 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 
         @Override
         protected void finished(Description description) {
-            LOGGER.info("Test finished: {}.{}", description.getTestClass().getSimpleName(), description.getMethodName());
+            LOGGER.info("Test finished: {}.{}", description.getTestClass().getSimpleName(),
+                    description.getMethodName());
         }
     };
 

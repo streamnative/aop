@@ -27,7 +27,6 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * This tests whether bindings are created and nuked properly.
- * <p>
  * The tests attempt to declare durable queues on a secondary node, if
  * present, and that node is restarted as part of the tests while the
  * primary node is still running. That way we exercise any node-down
@@ -38,7 +37,7 @@ public class BindingLifecycleBase extends ClusteredTestBase {
     protected static final int N = 1;
     protected static final String Q = "Q-" + System.currentTimeMillis();
     protected static final String X = "X-" + System.currentTimeMillis();
-    protected static final byte[] payload = ("" + System.currentTimeMillis()).getBytes();
+    protected static final byte[] PAYLOAD = ("" + System.currentTimeMillis()).getBytes();
 
     protected static String randomString() {
         return "-" + System.nanoTime();
@@ -114,13 +113,13 @@ public class BindingLifecycleBase extends ClusteredTestBase {
     }
 
     protected void sendRoutable(Binding binding) throws IOException {
-        channel.basicPublish(binding.x, binding.k, null, payload);
+        channel.basicPublish(binding.x, binding.k, null, PAYLOAD);
         GetResponse response = channel.basicGet(binding.q, true);
         assertNotNull("The response should not be null", response);
     }
 
     protected void sendUnroutable(Binding binding) throws IOException {
-        channel.basicPublish(binding.x, binding.k, null, payload);
+        channel.basicPublish(binding.x, binding.k, null, PAYLOAD);
         GetResponse response = channel.basicGet(binding.q, true);
         assertNull("The response SHOULD BE null", response);
     }
@@ -143,6 +142,9 @@ public class BindingLifecycleBase extends ClusteredTestBase {
         channel.basicCancel(tag);
     }
 
+    /**
+     * Binding.
+     */
     protected static class Binding {
 
         final String q;
@@ -165,9 +167,7 @@ public class BindingLifecycleBase extends ClusteredTestBase {
     // whether the broker is restarted)
 
     /**
-     * The same thing as testExchangeAutoDelete, but with durable
-     * queues.
-     * <p>
+     * The same thing as testExchangeAutoDelete, but with durable queues.
      * Main difference is restarting the broker to make sure that the
      * durable queues are blasted away.
      */

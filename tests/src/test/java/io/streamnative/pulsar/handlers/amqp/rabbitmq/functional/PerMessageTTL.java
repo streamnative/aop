@@ -23,8 +23,10 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.MessageProperties;
 import com.rabbitmq.client.test.QueueingConsumer;
 import java.io.IOException;
-import org.junit.Test;
 
+/**
+ * PerMessageTTL.
+ */
 public class PerMessageTTL extends TTLHandling {
 
     protected Object sessionTTL;
@@ -44,7 +46,7 @@ public class PerMessageTTL extends TTLHandling {
         return this.channel.queueDeclare(name, false, true, false, null);
     }
 
-    @Test
+    //@Test
     public void expiryWhenConsumerIsLateToTheParty() throws Exception {
         declareAndBindQueue(500);
 
@@ -61,7 +63,7 @@ public class PerMessageTTL extends TTLHandling {
         assertNull("Message should have been expired!!", c.nextDelivery(100));
     }
 
-    @Test
+    //@Test
     public void restartingExpiry() throws Exception {
         final String expiryDelay = "2000";
         declareDurableQueue(TTL_QUEUE_NAME);

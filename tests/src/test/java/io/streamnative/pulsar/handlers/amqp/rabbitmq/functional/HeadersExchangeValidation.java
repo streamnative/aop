@@ -21,11 +21,12 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.HashMap;
-import org.junit.Test;
-
+/**
+ * Testcase.
+ */
 public class HeadersExchangeValidation extends BrokerTestCase {
 
-    @Test
+    //@Test
     public void headersValidation() throws IOException {
         AMQP.Queue.DeclareOk ok = channel.queueDeclare();
         String queue = ok.getQueue();

@@ -20,6 +20,9 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * RequeueOnConnectionClose.
+ */
 public class RequeueOnConnectionClose extends RequeueOnClose {
 
     protected void open() throws IOException, TimeoutException {

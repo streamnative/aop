@@ -17,7 +17,9 @@
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import java.io.IOException;
-
+/**
+ * Testcase.
+ */
 public class InvalidAcks extends InvalidAcksBase {
     protected void select() throws IOException {
     }

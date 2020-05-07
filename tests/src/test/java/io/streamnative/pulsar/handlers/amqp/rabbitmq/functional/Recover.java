@@ -33,8 +33,10 @@ import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.Test;
 
+/**
+ * Recover.
+ */
 public class Recover extends BrokerTestCase {
 
     String queue;
@@ -75,7 +77,8 @@ public class Recover extends BrokerTestCase {
         final AtomicReference<byte[]> bodyReference = new AtomicReference<byte[]>();
         Consumer consumer = new DefaultConsumer(channel) {
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            public void handleDelivery(String consumerTag, Envelope envelope,
+                                       AMQP.BasicProperties properties, byte[] body) throws IOException {
                 bodyReference.set(body);
                 latch.countDown();
             }
@@ -101,24 +104,24 @@ public class Recover extends BrokerTestCase {
         }
     };
 
-    @Test
+    ////@Test
     public void redeliveryOnRecover() throws IOException, InterruptedException {
         verifyRedeliverOnRecover(recoverSync);
     }
 
-    @Test
+    ////@Test
     public void redeliverOnRecoverConvenience()
             throws IOException, InterruptedException {
         verifyRedeliverOnRecover(recoverSyncConvenience);
     }
 
-    @Test
+    ////@Test
     public void noRedeliveryWithAutoAck()
             throws IOException, InterruptedException {
         verifyNoRedeliveryWithAutoAck(recoverSync);
     }
 
-    @Test
+    ////@Test
     public void requeueFalseNotSupported() throws Exception {
         try {
             channel.basicRecover(false);

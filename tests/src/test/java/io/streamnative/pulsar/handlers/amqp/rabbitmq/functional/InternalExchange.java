@@ -23,7 +23,6 @@ import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.Arrays;
-import org.junit.Test;
 
 
 //
@@ -43,6 +42,9 @@ import org.junit.Test;
 // turn is bound to a queue.  A client should be able to publish to e0, but
 // not to e1, and publications to e0 should be delivered into q1.
 //
+/**
+ * Testcase.
+ */
 public class InternalExchange extends BrokerTestCase {
     private final String[] queues = new String[]{"q1"};
     private final String[] exchanges = new String[]{"e0", "e1"};
@@ -67,7 +69,7 @@ public class InternalExchange extends BrokerTestCase {
     }
 
 
-    @Test
+    //@Test
     public void tryPublishingToInternalExchange()
             throws IOException {
         byte[] testDataBody = "test-data".getBytes();

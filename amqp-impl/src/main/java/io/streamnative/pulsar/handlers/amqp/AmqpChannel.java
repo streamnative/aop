@@ -510,7 +510,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveBasicConsume(AMQShortString queue, AMQShortString consumerTag,
-                                    boolean noLocal, boolean noAck, boolean exclusive, boolean nowait, FieldTable arguments) {
+                                    boolean noLocal, boolean noAck, boolean exclusive,
+                                    boolean nowait, FieldTable arguments) {
 
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] BasicConsume[queue:{} consumerTag:{} noLocal:{} noAck:{} exclusive:{} nowait:{}"

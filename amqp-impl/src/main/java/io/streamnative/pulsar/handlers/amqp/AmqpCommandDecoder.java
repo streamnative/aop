@@ -13,15 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.List;
@@ -29,7 +24,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
@@ -38,7 +32,6 @@ import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
 import org.apache.pulsar.zookeeper.ZooKeeperCache;
-import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 
 
 /**
@@ -66,24 +59,6 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
         }
     }
 
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        // Get a buffer that contains the full frame
-        ByteBuf buffer = (ByteBuf) msg;
-
-        Channel nettyChannel = ctx.channel();
-        checkState(nettyChannel.equals(this.ctx.channel()));
-
-        try {
-            brokerDecoder.decodeBuffer(QpidByteBuffer.wrap(buffer.nioBuffer()));
-        } catch (Throwable e) {
-            log.error("error while handle command:", e);
-            close();
-        } finally {
-            // the amqpRequest has already held the reference.
-            buffer.release();
-        }
-    }
 
     public AmqpBrokerDecoder getBrokerDecoder() {
         return brokerDecoder;

@@ -13,8 +13,11 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import com.google.common.annotations.VisibleForTesting;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
@@ -38,6 +41,7 @@ import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.QpidException;
+import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -92,7 +96,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AmqpTopicManager amqpTopicManager;
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
-    private Map<String, AmqpExchange> exchangeMap = new ConcurrentHashMap<>();
+    private static Map<String, AmqpExchange> exchangeMap = new ConcurrentHashMap<>();
     private Map<String, AmqpQueue> queueMap = new ConcurrentHashMap<>();
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
@@ -132,6 +136,26 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         isActive.set(true);
         this.brokerDecoder = new AmqpBrokerDecoder(this);
         this.pulsarServerCnx = new AmqpPulsarServerCnx(getPulsarService(), ctx);
+    }
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        // Get a buffer that contains the full frame
+        ByteBuf buffer = (ByteBuf) msg;
+
+        Channel nettyChannel = ctx.channel();
+        checkState(nettyChannel.equals(this.ctx.channel()));
+
+        try {
+            brokerDecoder.decodeBuffer(QpidByteBuffer.wrap(buffer.nioBuffer()));
+            receivedCompleteAllChannels();
+        } catch (Throwable e) {
+            log.error("error while handle command:", e);
+            close();
+        } finally {
+            // the amqpRequest has already held the reference.
+            buffer.release();
+        }
     }
 
     @Override
@@ -643,6 +667,13 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         return exchangeMap.getOrDefault(exchangeName, null);
     }
 
+    public void deleteExchange(String exchangeName) {
+        if (StringUtils.isEmpty(exchangeName)) {
+            return;
+        }
+        exchangeMap.remove(exchangeName);
+    }
+
     public void putQueue(String queueName, AmqpQueue amqpQueue) {
         queueMap.computeIfAbsent(queueName, name -> amqpQueue);
     }
@@ -664,10 +695,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             log.error("Create default exchange topic failed!");
         }
         exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
-            AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager));
+            AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
 
         exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE,
-            new InMemoryExchange("", AmqpExchange.Type.Direct));
+            new InMemoryExchange("", AmqpExchange.Type.Direct, false));
 
     }
     @VisibleForTesting

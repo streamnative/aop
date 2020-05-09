@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.api.Message;
 
 /**
@@ -63,6 +64,10 @@ public interface AmqpExchange {
     String getName();
 
     boolean getDurable();
+
+    boolean getAutoDelete();
+
+    Topic getTopic();
 
     /**
      * Get the type {@link Type} of the exchange.
@@ -132,5 +137,7 @@ public interface AmqpExchange {
      * @param queue AMQP queue.
      */
     void removeQueue(AmqpQueue queue);
+
+    int getQueueSize();
 
 }

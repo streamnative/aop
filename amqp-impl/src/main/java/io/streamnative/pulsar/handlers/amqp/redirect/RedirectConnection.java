@@ -100,12 +100,9 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
                 } catch (Throwable e) {
                     log.error("error while handle command:", e);
                     close();
-                } finally {
-//                    buffer.release();
                 }
                 brokerDecoder.getMethodProcessor();
 
-//                ((ByteBuf) msg).retain();
                 connectMsgList.add(msg);
                 break;
             case RedirectToBroker:
@@ -183,20 +180,29 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
             virtualHostStr = virtualHostStr.substring(1);
         }
 
-        NamespaceName namespaceName = NamespaceName.get(redirectConfig.getAmqpTenant(), virtualHostStr);
-        this.namespaceName = namespaceName;
+        if (redirectService.getVhostBrokerMap().containsKey(virtualHostStr)) {
+            amqpBrokerHost = redirectService.getVhostBrokerMap().get(virtualHostStr);
+        } else {
+            NamespaceName namespaceName = NamespaceName.get(redirectConfig.getAmqpTenant(), virtualHostStr);
+            this.namespaceName = namespaceName;
+
+            try {
+                Pair<InetSocketAddress, InetSocketAddress> pair =
+                        this.redirectService.getBrokerDiscoveryProvider().lookupBroker(namespaceName);
+                log.info("logical address: {}, physical address: {}", pair.getLeft(), pair.getRight());
+                InetSocketAddress logicalAddress = pair.getLeft();
+                InetSocketAddress physicalAddress = pair.getRight();
+                amqpBrokerHost = logicalAddress.getHostString();
+            } catch (Exception e) {
+                log.error("Failed to lookup broker.", e);
+            }
+        }
 
         try {
-            Pair<InetSocketAddress, InetSocketAddress> pair =
-                    this.redirectService.getBrokerDiscoveryProvider().lookupBroker(namespaceName);
-            log.info("logical address: {}, physical address: {}", pair.getLeft(), pair.getRight());
-            InetSocketAddress logicalAddress = pair.getLeft();
-            InetSocketAddress physicalAddress = pair.getRight();
-            amqpBrokerHost = logicalAddress.getHostString();
             redirectHandler = new RedirectHandler(redirectService,
                     this, amqpBrokerHost, amqpBrokerPort, connectMsgList);
+            redirectService.getVhostBrokerMap().put(virtualHostStr, amqpBrokerHost);
             state = State.RedirectToBroker;
-
 
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
             writeFrame(responseBody.generateFrame(0));

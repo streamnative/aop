@@ -38,7 +38,6 @@ public class RedirectService implements Closeable {
 
     @Getter
     private BrokerDiscoveryProvider brokerDiscoveryProvider;
-    private LookupHandler lookupHandler;
     private ZooKeeperClientFactory zkClientFactory = null;
 
     @Getter
@@ -72,10 +71,6 @@ public class RedirectService implements Closeable {
         }
         // Return default factory
         return zkClientFactory;
-    }
-
-    public void putVHostBroker(String vhost, String broker) {
-        vhostBrokerMap.computeIfAbsent(vhost, v -> broker);
     }
 
     @Override

@@ -8,19 +8,11 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
-import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
-import io.streamnative.pulsar.handlers.amqp.AmqpCommandDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import java.util.List;
-
-import static com.google.common.base.Preconditions.checkState;
 
 @Slf4j
 public class RedirectHandler {
@@ -74,9 +66,11 @@ public class RedirectHandler {
             log.info("RedirectBackendHandler [channelRead]");
             switch (state) {
                 case Init:
+                case Failed:
                     break;
                 case Connected:
                     clientChannel.writeAndFlush(msg);
+                    break;
             }
         }
 
@@ -84,16 +78,14 @@ public class RedirectHandler {
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             cause.printStackTrace();
             log.error("RedirectBackendHandler [exceptionCaught] - msg: " + cause.getMessage(), cause);
+            state = State.Failed;
         }
-    }
-
-    public void connected() {
-        this.state = State.Connected;
     }
 
     enum State {
         Init,
-        Connected
+        Connected,
+        Failed
     }
 
 }

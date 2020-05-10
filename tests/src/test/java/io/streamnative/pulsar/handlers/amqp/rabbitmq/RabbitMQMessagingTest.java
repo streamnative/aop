@@ -72,7 +72,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
                 count.incrementAndGet();
             }
         };
-        channel1.basicConsume(queueName1, true, consumer1);
+        channel1.basicConsume(queueName1, false, consumer1);
 
         @Cleanup
         Channel channel2 = connection.createChannel();
@@ -85,9 +85,9 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
                 count.incrementAndGet();
             }
         };
-        channel2.basicConsume(queueName2, true, consumer2);
-        Thread.sleep(1000 * 10);
-        Assert.assertTrue(count.get() == 2);
+        channel2.basicConsume(queueName2, false, consumer2);
+        Thread.sleep(1000 * 5);
+        Assert.assertTrue(count.get() == 200);
 
     }
 }

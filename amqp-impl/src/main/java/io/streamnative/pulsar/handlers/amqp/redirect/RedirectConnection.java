@@ -114,6 +114,29 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
         }
     }
 
+    // step 1
+    @Override
+    public void receiveProtocolHeader(ProtocolInitiation protocolInitiation) {
+        if (log.isDebugEnabled()) {
+            log.debug("RedirectConnection - [receiveProtocolHeader] Protocol Header [{}]", protocolInitiation);
+        }
+        brokerDecoder.setExpectProtocolInitiation(false);
+        try {
+            ProtocolVersion pv = protocolInitiation.checkVersion(); // Fails if not correct
+            // TODO serverProperties mechanis
+            AMQMethodBody responseBody = this.methodRegistry.createConnectionStartBody(
+                    (short) protocolVersion.getMajorVersion(),
+                    (short) pv.getActualMinorVersion(),
+                    null,
+                    // TODO temporary modification
+                    "PLAIN".getBytes(US_ASCII),
+                    "en_US".getBytes(US_ASCII));
+            writeFrame(responseBody.generateFrame(0));
+        } catch (QpidException e) {
+            log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
+        }
+    }
+
     // step 2
     @Override
     public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response,
@@ -214,28 +237,6 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
         log.info("RedirectConnection - [receiveHeartbeat]");
     }
 
-    // step 1
-    @Override
-    public void receiveProtocolHeader(ProtocolInitiation protocolInitiation) {
-        if (log.isDebugEnabled()) {
-            log.debug("RedirectConnection - [receiveProtocolHeader] Protocol Header [{}]", protocolInitiation);
-        }
-        brokerDecoder.setExpectProtocolInitiation(false);
-        try {
-            ProtocolVersion pv = protocolInitiation.checkVersion(); // Fails if not correct
-            // TODO serverProperties mechanis
-            AMQMethodBody responseBody = this.methodRegistry.createConnectionStartBody(
-                    (short) protocolVersion.getMajorVersion(),
-                    (short) pv.getActualMinorVersion(),
-                    null,
-                    // TODO temporary modification
-                    "PLAIN".getBytes(US_ASCII),
-                    "en_US".getBytes(US_ASCII));
-            writeFrame(responseBody.generateFrame(0));
-        } catch (QpidException e) {
-            log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
-        }
-    }
 
     @Override
     public void setCurrentMethod(int classId, int methodId) {

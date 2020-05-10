@@ -74,8 +74,8 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
     protected Connection getConnection() throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        connectionFactory.setPort(5672);
-//        connectionFactory.setPort(6660);
+//        connectionFactory.setPort(5672);
+        connectionFactory.setPort(6660);
         connectionFactory.setVirtualHost("vhost1");
         return connectionFactory.newConnection();
     }

@@ -73,9 +73,11 @@ public abstract class AmqpProtocolHandlerTestBase {
     protected int brokerWebservicePort = PortManager.nextFreePort();
     protected int brokerWebservicePortTls = PortManager.nextFreePort();
     @Getter
-    protected int brokerPort = PortManager.nextFreePort();
+    protected int brokerPort = 6650;
+//    protected int brokerPort = PortManager.nextFreePort();
     @Getter
-    protected int amqpBrokerPort = PortManager.nextFreePort();
+    protected int amqpBrokerPort = 6670;
+//    protected int amqpBrokerPort = PortManager.nextFreePort();
     @Getter
     protected int amqpBrokerPortTls = PortManager.nextFreePort();
 

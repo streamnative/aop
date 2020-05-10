@@ -54,7 +54,10 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         channel.queueBind(queueName2, exchangeName, "");
 
         String contentMsg = "Hello AOP!";
-        channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+        int msgCnt = 100;
+        for (int i = 0; i < msgCnt; i++) {
+            channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+        }
 
         final AtomicInteger count = new AtomicInteger(0);
 
@@ -83,7 +86,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
             }
         };
         channel2.basicConsume(queueName2, true, consumer2);
-        Thread.sleep(1000);
+        Thread.sleep(1000 * 10);
         Assert.assertTrue(count.get() == 2);
 
     }

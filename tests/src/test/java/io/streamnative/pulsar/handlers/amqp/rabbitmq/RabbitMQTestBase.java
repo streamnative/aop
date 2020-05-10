@@ -61,6 +61,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
             admin.namespaces().setRetention("public/vhost1",
                     new RetentionPolicies(60, 1000));
         }
+        admin.topics().createNonPartitionedTopic("public/vhost1/__for_lookup__");
         Mockito.when(pulsar.getState()).thenReturn(PulsarService.State.Started);
     }
 
@@ -74,6 +75,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
         connectionFactory.setPort(5672);
+//        connectionFactory.setPort(6660);
         connectionFactory.setVirtualHost("vhost1");
         return connectionFactory.newConnection();
     }

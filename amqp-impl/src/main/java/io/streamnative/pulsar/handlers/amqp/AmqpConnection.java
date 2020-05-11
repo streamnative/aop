@@ -25,14 +25,11 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -96,8 +93,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AmqpTopicManager amqpTopicManager;
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
-    private static Map<String, AmqpExchange> exchangeMap = new ConcurrentHashMap<>();
-    private Map<String, AmqpQueue> queueMap = new ConcurrentHashMap<>();
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
@@ -656,35 +651,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.pulsarServerCnx = pulsarServerCnx;
     }
 
-    public void putExchange(String exchangeName, AmqpExchange amqpExchange) {
-        exchangeMap.computeIfAbsent(exchangeName, name -> amqpExchange);
-    }
-
-    public AmqpExchange getExchange(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
-            return null;
-        }
-        return exchangeMap.getOrDefault(exchangeName, null);
-    }
-
-    public void deleteExchange(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
-            return;
-        }
-        exchangeMap.remove(exchangeName);
-    }
-
-    public void putQueue(String queueName, AmqpQueue amqpQueue) {
-        queueMap.computeIfAbsent(queueName, name -> amqpQueue);
-    }
-
-    public AmqpQueue getQueue(String queueName) {
-        if (StringUtils.isEmpty(queueName)) {
-            return null;
-        }
-        return queueMap.getOrDefault(queueName, null);
-    }
-
     public void defaultExchangeInit() {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
             getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
@@ -694,10 +660,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         } catch (InterruptedException | ExecutionException e) {
             log.error("Create default exchange topic failed!");
         }
-        exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
+        ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
             AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
 
-        exchangeMap.put(AbstractAmqpExchange.DEFAULT_EXCHANGE,
+        ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE,
             new InMemoryExchange("", AmqpExchange.Type.Direct, false));
 
     }

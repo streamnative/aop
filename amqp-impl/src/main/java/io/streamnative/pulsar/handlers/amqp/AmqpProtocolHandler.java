@@ -18,6 +18,8 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
+import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
+import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
@@ -83,6 +85,14 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public void start(BrokerService service) {
         brokerService = service;
+
+        ProxyConfiguration proxyConfig = new ProxyConfiguration();
+        ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
+        try {
+            proxyService.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         log.info("Starting AmqpProtocolHandler, aop version is: '{}'", AopVersion.getVersion());
         log.info("Git Revision {}", AopVersion.getGitSha());

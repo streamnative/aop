@@ -1,4 +1,17 @@
-package io.streamnative.pulsar.handlers.amqp.redirect;
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
@@ -7,17 +20,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
-import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
-import io.swagger.models.auth.In;
+import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.utils.Lists;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.impl.PulsarClientImpl;
-import org.apache.pulsar.client.impl.conf.ClientConfigurationData;
-import org.apache.pulsar.common.api.AuthData;
+import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -32,32 +41,30 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 
-import java.net.InetSocketAddress;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-
 /**
- * Redirect connection.
+ * Proxy connection.
  */
 @Slf4j
-public class RedirectConnection extends ChannelInboundHandlerAdapter implements
+public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         ServerMethodProcessor<ServerChannelMethodProcessor> {
 
-    private RedirectService redirectService;
-    private RedirectConfiguration redirectConfig;
+    private PulsarService pulsarService;
+    private ProxyService proxyService;
+    private ProxyConfiguration proxyConfig;
     @Getter
     private ChannelHandlerContext cnx;
     private State state;
     private NamespaceName namespaceName;
     private int amqpBrokerPort = 5672;
     private String amqpBrokerHost;
-    private RedirectHandler redirectHandler;
+    private ProxyHandler proxyHandler;
 
     protected AmqpBrokerDecoder brokerDecoder;
     private MethodRegistry methodRegistry;
     private ProtocolVersion protocolVersion;
     private int currentClassId;
     private int currentMethodId;
+    private LookupHandler lookupHandler;
 
     private List<Object> connectMsgList = Lists.newArrayList();
 
@@ -68,12 +75,16 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
         Close
     }
 
-    public RedirectConnection(RedirectService redirectService) {
-        this.redirectService = redirectService;
-        this.redirectConfig = redirectService.getRedirectConfig();
+    public ProxyConnection(ProxyService proxyService, PulsarService pulsarService) {
+        this.pulsarService = pulsarService;
+        this.proxyService = proxyService;
+        this.proxyConfig = proxyService.getProxyConfig();
         brokerDecoder = new AmqpBrokerDecoder(this);
         protocolVersion = ProtocolVersion.v0_91;
         methodRegistry = new MethodRegistry(protocolVersion);
+        if (pulsarService != null) {
+            lookupHandler = new PulsarServiceLookupHandler(pulsarService);
+        }
         state = State.Init;
     }
 
@@ -107,7 +118,7 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
                 break;
             case RedirectToBroker:
                 log.info("RedirectConnection [channelRead] - RedirectToBroker");
-                redirectHandler.getBrokerChannel().writeAndFlush(msg);
+                proxyHandler.getBrokerChannel().writeAndFlush(msg);
         }
     }
 
@@ -154,8 +165,8 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
         }
         // TODO AUTH
         ConnectionTuneBody tuneBody =
-                methodRegistry.createConnectionTuneBody(redirectConfig.getMaxNoOfChannels(),
-                        redirectConfig.getMaxFrameSize(), redirectConfig.getHeartBeat());
+                methodRegistry.createConnectionTuneBody(proxyConfig.getMaxNoOfChannels(),
+                        proxyConfig.getMaxFrameSize(), proxyConfig.getHeartBeat());
         writeFrame(tuneBody.generateFrame(0));
     }
 
@@ -180,30 +191,32 @@ public class RedirectConnection extends ChannelInboundHandlerAdapter implements
             virtualHostStr = virtualHostStr.substring(1);
         }
 
-        if (redirectService.getVhostBrokerMap().containsKey(virtualHostStr)) {
-            amqpBrokerHost = redirectService.getVhostBrokerMap().get(virtualHostStr);
+        String amqpBrokerHost = "";
+        int amqpBrokerPort = 0;
+        if (proxyService.getVhostBrokerMap().containsKey(virtualHostStr)) {
+            amqpBrokerHost = proxyService.getVhostBrokerMap().get(virtualHostStr).getLeft();
+            amqpBrokerPort = proxyService.getVhostBrokerMap().get(virtualHostStr).getRight();
         } else {
-            NamespaceName namespaceName = NamespaceName.get(redirectConfig.getAmqpTenant(), virtualHostStr);
-            this.namespaceName = namespaceName;
-
             try {
-                Pair<InetSocketAddress, InetSocketAddress> pair =
-                        this.redirectService.getBrokerDiscoveryProvider().lookupBroker(namespaceName);
-                log.info("logical address: {}, physical address: {}", pair.getLeft(), pair.getRight());
-                InetSocketAddress logicalAddress = pair.getLeft();
-                InetSocketAddress physicalAddress = pair.getRight();
-                amqpBrokerHost = logicalAddress.getHostString();
+                NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), virtualHostStr);
+                Pair<String, Integer> lookupData = lookupHandler.findBroker(namespaceName);
+                amqpBrokerHost = lookupData.getLeft();
+                amqpBrokerPort = lookupData.getRight();
+                proxyService.getVhostBrokerMap().put(virtualHostStr, lookupData);
             } catch (Exception e) {
-                log.error("Failed to lookup broker.", e);
+                log.error("Lookup broker failed.");
+                return;
             }
         }
 
         try {
-            redirectHandler = new RedirectHandler(redirectService,
+            if (StringUtils.isEmpty(amqpBrokerHost) || amqpBrokerPort == 0) {
+                log.error("Lookup broker failed.");
+                return;
+            }
+            proxyHandler = new ProxyHandler(proxyService,
                     this, amqpBrokerHost, amqpBrokerPort, connectMsgList);
-            redirectService.getVhostBrokerMap().put(virtualHostStr, amqpBrokerHost);
             state = State.RedirectToBroker;
-
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
             writeFrame(responseBody.generateFrame(0));
         } catch (Exception e) {

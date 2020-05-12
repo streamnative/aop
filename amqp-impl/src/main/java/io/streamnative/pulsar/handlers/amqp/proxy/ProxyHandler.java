@@ -1,7 +1,19 @@
-package io.streamnative.pulsar.handlers.amqp.redirect;
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -9,29 +21,30 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
+import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
-
+/**
+ * Proxy handler is the bridge between client and broker.
+ */
 @Slf4j
-public class RedirectHandler {
+public class ProxyHandler {
 
-    private RedirectService redirectService;
-    private RedirectConnection redirectConnection;
+    private ProxyService proxyService;
+    private ProxyConnection proxyConnection;
     private Channel clientChannel;
     @Getter
     private Channel brokerChannel;
     private State state;
     private List<Object> connectMsgList;
 
-    RedirectHandler(RedirectService redirectService, RedirectConnection redirectConnection,
-                    String amqpBrokerHost, int amqpBrokerPort, List<Object> connectMsgList) throws InterruptedException {
-        this.redirectService = redirectService;
-        this.redirectConnection = redirectConnection;
-        clientChannel = this.redirectConnection.getCnx().channel();
+    ProxyHandler(ProxyService proxyService, ProxyConnection proxyConnection,
+                 String amqpBrokerHost, int amqpBrokerPort, List<Object> connectMsgList) throws InterruptedException {
+        this.proxyService = proxyService;
+        this.proxyConnection = proxyConnection;
+        clientChannel = this.proxyConnection.getCnx().channel();
         this.connectMsgList = connectMsgList;
-        RedirectConfiguration redirectConfig = this.redirectService.getRedirectConfig();
 
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(clientChannel.eventLoop())

@@ -1,32 +1,32 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.redirect;
+package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import com.google.common.collect.Lists;
 import io.prometheus.client.jetty.JettyStatisticsCollector;
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.TimeZone;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
-//import org.apache.pulsar.broker.web.AuthenticationFilter;
 import org.apache.pulsar.broker.web.JsonMapperProvider;
 import org.apache.pulsar.broker.web.WebExecutorThreadPool;
-//import org.apache.pulsar.common.util.SecurityUtility;
-//import org.apache.pulsar.common.util.keystoretls.KeyStoreSSLContext;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
@@ -39,25 +39,12 @@ import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
 import org.eclipse.jetty.server.handler.StatisticsHandler;
-import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.servlet.DispatcherType;
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.TimeZone;
 
 /**
  * Manages web-service startup/stop on jetty server.
@@ -71,14 +58,14 @@ public class WebServer {
     private final AuthenticationService authenticationService;
     private final List<String> servletPaths = Lists.newArrayList();
     private final List<Handler> handlers = Lists.newArrayList();
-    private final RedirectConfiguration config;
+    private final ProxyConfiguration config;
     protected int externalServicePort;
     private URI serviceURI = null;
 
     private ServerConnector connector;
     private ServerConnector connectorTls;
 
-    public WebServer(RedirectConfiguration config, AuthenticationService authenticationService) {
+    public WebServer(ProxyConfiguration config, AuthenticationService authenticationService) {
         this.webServiceExecutor = new WebExecutorThreadPool(config.getHttpNumThreads(), "pulsar-external-web");
         this.server = new Server(webServiceExecutor);
         this.authenticationService = authenticationService;
@@ -95,40 +82,6 @@ public class WebServer {
             connector.setPort(externalServicePort);
             connectors.add(connector);
         }
-//        if (config.getWebServicePortTls().isPresent()) {
-//            try {
-//                SslContextFactory sslCtxFactory;
-//                if (config.isTlsEnabledWithKeyStore()) {
-//                    sslCtxFactory = KeyStoreSSLContext.createSslContextFactory(
-//                            config.getTlsProvider(),
-//                            config.getTlsKeyStoreType(),
-//                            config.getTlsKeyStore(),
-//                            config.getTlsKeyStorePassword(),
-//                            config.isTlsAllowInsecureConnection(),
-//                            config.getTlsTrustStoreType(),
-//                            config.getTlsTrustStore(),
-//                            config.getTlsTrustStorePassword(),
-//                            config.isTlsRequireTrustedClientCertOnConnect(),
-//                            config.getTlsCertRefreshCheckDurationSec()
-//                    );
-//                } else {
-//                    sslCtxFactory = SecurityUtility.createSslContextFactory(
-//                            config.isTlsAllowInsecureConnection(),
-//                            config.getTlsTrustCertsFilePath(),
-//                            config.getTlsCertificateFilePath(),
-//                            config.getTlsKeyFilePath(),
-//                            config.isTlsRequireTrustedClientCertOnConnect(),
-//                            true,
-//                            config.getTlsCertRefreshCheckDurationSec());
-//                }
-//                connectorTls = new ServerConnector(server, 1, 1, sslCtxFactory);
-//                connectorTls.setPort(config.getWebServicePortTls().get());
-//                connectors.add(connectorTls);
-//            } catch (Exception e) {
-//                throw new RuntimeException(e);
-//            }
-//        }
-
         // Limit number of concurrent HTTP connections to avoid getting out of file descriptors
         connectors.stream().forEach(c -> c.setAcceptQueueSize(1024 / connectors.size()));
         server.setConnectors(connectors.toArray(new ServerConnector[connectors.size()]));
@@ -160,11 +113,6 @@ public class WebServer {
         for (Pair<String, Object> attribute : attributes) {
             context.setAttribute(attribute.getLeft(), attribute.getRight());
         }
-//        if (config.isAuthenticationEnabled() && requireAuthentication) {
-//            FilterHolder filter = new FilterHolder(new AuthenticationFilter(authenticationService));
-//            context.addFilter(filter, MATCH_ALL, EnumSet.allOf(DispatcherType.class));
-//        }
-
         handlers.add(context);
     }
 

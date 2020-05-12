@@ -21,6 +21,7 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import org.junit.Test;
 
 /**
  * Testcase.
@@ -48,7 +49,7 @@ public class ExchangeDeleteIfUnused extends BrokerTestCase {
 
     /* Attempt to Exchange.Delete(ifUnused = true) a used exchange.
      * Should throw an exception. */
-    //@Test
+    @Test
     public void exchangeDelete() {
         try {
             channel.exchangeDelete(EXCHANGE_NAME, true);

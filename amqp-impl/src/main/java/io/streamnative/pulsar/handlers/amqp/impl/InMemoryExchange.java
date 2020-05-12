@@ -30,6 +30,7 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.util.FutureUtil;
 
@@ -43,8 +44,8 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     private final long currentLedgerId;
     private long currentEntryId;
 
-    public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType) {
-        super(exchangeName, exchangeType, new HashSet<>(), false);
+    public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType, boolean autoDelete) {
+        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete);
         this.currentLedgerId = 1L;
     }
 
@@ -142,5 +143,9 @@ public class InMemoryExchange extends AbstractAmqpExchange {
         return FutureUtil.waitForAll(routeFutures).thenApply(v -> position);
     }
 
+    @Override
+    public Topic getTopic() {
+        return null;
+    }
 
 }

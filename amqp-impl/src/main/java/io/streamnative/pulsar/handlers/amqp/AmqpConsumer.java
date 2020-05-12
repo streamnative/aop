@@ -129,7 +129,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     public AmqpQueue getQueue() {
-        return channel.getConnection().getQueue(queueName);
+        return QueueContainer.getQueue(queueName);
     }
 
     @Override

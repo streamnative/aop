@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import org.junit.Test;
+
 /**
  * Testcase.
  */
@@ -39,31 +41,31 @@ public class ExchangeDeclare extends ExchangeEquivalenceBase {
         channel.exchangeDelete(NAME);
     }
 
-    //@Test
+    @Test
     public void exchangeNoArgsEquivalence() throws IOException {
         channel.exchangeDeclare(NAME, TYPE, false, false, null);
         verifyEquivalent(NAME, TYPE, false, false, null);
     }
 
-    //@Test
+    @Test
     public void singleLineFeedStrippedFromExchangeName() throws IOException {
         channel.exchangeDeclare("exchange_test\n", TYPE, false, false, null);
         verifyEquivalent(NAME, TYPE, false, false, null);
     }
 
-    //@Test
+    @Test
     public void multipleLineFeedsStrippedFromExchangeName() throws IOException {
         channel.exchangeDeclare("exchange\n_test\n", TYPE, false, false, null);
         verifyEquivalent(NAME, TYPE, false, false, null);
     }
 
-    //@Test
+    @Test
     public void multipleLineFeedAndCarriageReturnsStrippedFromExchangeName() throws IOException {
         channel.exchangeDeclare("e\nxc\rhange\n\r_test\n\r", TYPE, false, false, null);
         verifyEquivalent(NAME, TYPE, false, false, null);
     }
 
-    //@Test
+    @Test
     public void exchangeNonsenseArgsEquivalent() throws IOException {
         channel.exchangeDeclare(NAME, TYPE, false, false, null);
         Map<String, Object> args = new HashMap<String, Object>();
@@ -71,31 +73,31 @@ public class ExchangeDeclare extends ExchangeEquivalenceBase {
         verifyEquivalent(NAME, TYPE, false, false, args);
     }
 
-    //@Test
+    @Test
     public void exchangeDurableNotEquivalent() throws IOException {
         channel.exchangeDeclare(NAME, TYPE, false, false, null);
         verifyNotEquivalent(NAME, TYPE, true, false, null);
     }
 
-    //@Test
+    @Test
     public void exchangeTypeNotEquivalent() throws IOException {
         channel.exchangeDeclare(NAME, "direct", false, false, null);
         verifyNotEquivalent(NAME, "fanout", false, false, null);
     }
 
-    //@Test
+    @Test
     public void exchangeAutoDeleteNotEquivalent() throws IOException {
         channel.exchangeDeclare(NAME, "direct", false, false, null);
         verifyNotEquivalent(NAME, "direct", false, true, null);
     }
 
-    //@Test
+    @Test
     public void exchangeDeclaredWithEnumerationEquivalentOnNonRecoverableConnection()
             throws IOException, InterruptedException {
         doTestExchangeDeclaredWithEnumerationEquivalent(channel);
     }
 
-    //@Test
+    @Test
     public void exchangeDeclaredWithEnumerationEquivalentOnRecoverableConnection()
             throws IOException, TimeoutException, InterruptedException {
         ConnectionFactory connectionFactory = TestUtils.connectionFactory();

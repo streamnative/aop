@@ -94,7 +94,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testExchangeDeclareFail() {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
-            .createExchangeDeclareBody(0, "test", "fanout", false, true, false, false, false, null);
+            .createExchangeDeclareBody(0, "test", "fanout", false, false, false, false, true, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -172,15 +172,25 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testExchangeDelete() {
         String tenant = "public";
         String namespace = "ns";
-        String exchange = "test";
+        String exchange = "test1";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
-        ExchangeDeleteBody cmd = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
+        ExchangeDeclareBody cmd = methodRegistry
+                .createExchangeDeclareBody(0, exchange, "fanout", false, false, false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+
+        ExchangeDeleteBody cmd1 = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
+        cmd1.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+
         AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ExchangeDeleteOkBody);
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        AMQBody response1 = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response1 instanceof ExchangeDeleteOkBody);
     }
 
     @Test

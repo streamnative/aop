@@ -28,6 +28,8 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
 
     @Category
     private static final String CATEGORY_AMQP = "AMQP on Pulsar";
+    @Category
+    private static final String CATEGORY_AMQP_PROXY = "AMQP Proxy";
 
     //
     // --- AMQP on Pulsar Broker configuration ---
@@ -81,4 +83,18 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
         doc = "The default heartbeat timeout on broker"
     )
     private int heartBeat = 60 * 1000;
+
+    @FieldContext(
+        category = CATEGORY_AMQP_PROXY,
+        required = false,
+        doc = "The amqp proxy port"
+    )
+    private int amqpProxyPort;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_PROXY,
+            required = false,
+            doc = "Whether start amqp protocol handler with proxy"
+    )
+    private boolean useProxy;
 }

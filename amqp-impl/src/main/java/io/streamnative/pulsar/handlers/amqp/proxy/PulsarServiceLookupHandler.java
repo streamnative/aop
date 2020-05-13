@@ -13,7 +13,6 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.net.URL;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -33,12 +32,12 @@ public class PulsarServiceLookupHandler implements LookupHandler {
 
     private PulsarService pulsarService;
 
-    PulsarServiceLookupHandler(PulsarService pulsarService) {
+    public PulsarServiceLookupHandler(PulsarService pulsarService) {
         this.pulsarService = pulsarService;
     }
 
     @Override
-    public Pair<String, Integer> findBroker(NamespaceName namespaceName) throws ProxyException {
+    public Pair<String, Integer> findBroker(NamespaceName namespaceName, String protocolName) throws ProxyException {
         String hostname = null;
         Integer port = null;
 
@@ -48,9 +47,6 @@ public class PulsarServiceLookupHandler implements LookupHandler {
                     .getNamespaceBundleFactory().getBundles(namespaceName);
             NamespaceBundle bundle = bundles.getFullBundle();
 
-            // The findBrokerServiceUrl method is private
-//            pulsarService.getNamespaceService().findBrokerServiceUrl(bundle, false, false).get();
-
             Optional<URL> url =  pulsarService.getNamespaceService()
                     .getWebServiceUrl(bundle, false, false, false);
             if (url.isPresent()) {
@@ -58,11 +54,12 @@ public class PulsarServiceLookupHandler implements LookupHandler {
                 httpPort = url.get().getPort();
             }
 
+            String zkPath = LoadManager.LOADBALANCE_BROKERS_ROOT + "/" + hostname + ":" + httpPort;
+            log.info("findBroker zkPath: {}", zkPath);
             Optional<? extends ServiceLookupData> serviceLookupData = pulsarService.getLocalZkCache().getData(
-                    LoadManager.LOADBALANCE_BROKERS_ROOT + "/" + hostname + ":" + httpPort,
-                    pulsarService.getLoadManager().get().getLoadReportDeserializer());
+                    zkPath, pulsarService.getLoadManager().get().getLoadReportDeserializer());
             if (serviceLookupData.isPresent()) {
-                Optional<String> protocolAdvertise = serviceLookupData.get().getProtocol(AmqpProtocolHandler.PROTOCOL_NAME);
+                Optional<String> protocolAdvertise = serviceLookupData.get().getProtocol(protocolName);
                 if (protocolAdvertise.isPresent()) {
                     String advertise = protocolAdvertise.get();
                     String[] splits = advertise.split(":");
@@ -71,6 +68,7 @@ public class PulsarServiceLookupHandler implements LookupHandler {
             } else {
                 throw new ProxyException("Failed to find broker for namespaceName: " + namespaceName.toString());
             }
+            log.info("Find broker namespaceName: {}, bundle: {}, hostname: {}, port: {}", namespaceName, bundle, hostname, port);
             return Pair.of(hostname, port);
         } catch (Exception e) {
             String errorMsg = String.format("Failed to find broker for namespaceName: %S. msg: %S",

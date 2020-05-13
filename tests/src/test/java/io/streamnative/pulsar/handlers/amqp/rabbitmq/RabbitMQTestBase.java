@@ -16,11 +16,19 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 import com.google.common.collect.Sets;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeoutException;
+
+import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
@@ -43,10 +51,10 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         if (!admin.clusters().getClusters().contains(configClusterName)) {
             // so that clients can test short names
             admin.clusters().createCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + brokerWebservicePort));
+                    new ClusterData("http://127.0.0.1:" + getBrokerWebservicePortList().get(0)));
         } else {
             admin.clusters().updateCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + brokerWebservicePort));
+                    new ClusterData("http://127.0.0.1:" + getBrokerWebServicePortTlsList().get(0)));
         }
         if (!admin.tenants().getTenants().contains("public")) {
             admin.tenants().createTenant("public",
@@ -56,13 +64,22 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                     new TenantInfo(Sets.newHashSet("appid1", "appid2"), Sets.newHashSet("test")));
         }
 
-        if (!admin.namespaces().getNamespaces("public").contains("public/vhost1")) {
-            admin.namespaces().createNamespace("public/vhost1");
-            admin.namespaces().setRetention("public/vhost1",
-                    new RetentionPolicies(60, 1000));
+        List<String> vhostList = Arrays.asList("vhost1", "vhost2", "vhost3");
+        for (String vhost : vhostList) {
+            String ns = "public/" + vhost;
+            if (!admin.namespaces().getNamespaces("public").contains(ns)) {
+                admin.namespaces().createNamespace(ns);
+                admin.namespaces().setRetention(ns,
+                        new RetentionPolicies(60, 1000));
+
+                PulsarServiceLookupHandler lookupHandler = new PulsarServiceLookupHandler(getPulsarServiceList().get(0));
+                Pair<String, Integer> lookupData = lookupHandler.findBroker(NamespaceName.get(ns), AmqpProtocolHandler.PROTOCOL_NAME);
+                log.info("admin create namespaceName: {}, hostname: {}, port: {}",
+                        ns, lookupData.getLeft(), lookupData.getRight());
+
+            }
         }
-//        admin.topics().createNonPartitionedTopic("public/vhost1/__for_lookup__");
-        Mockito.when(pulsar.getState()).thenReturn(PulsarService.State.Started);
+        checkPulsarServiceState();
     }
 
     @AfterClass
@@ -71,12 +88,20 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
 //        super.internalCleanup();
     }
 
-    protected Connection getConnection() throws IOException, TimeoutException {
+    protected Connection getConnection(String vhost, boolean useProxy) throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-//        connectionFactory.setPort(5672);
-        connectionFactory.setPort(6660); // use proxy
-        connectionFactory.setVirtualHost("vhost1");
+        if (useProxy) {
+//            int proxyPort = getProxyPort();
+            int proxyPort = getProxyPortList().get(0);
+            connectionFactory.setPort(proxyPort);
+            log.info("use proxyPort: {}", proxyPort);
+        } else {
+            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
+            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
+        }
+        connectionFactory.setVirtualHost(vhost);
         return connectionFactory.newConnection();
     }
+
 }

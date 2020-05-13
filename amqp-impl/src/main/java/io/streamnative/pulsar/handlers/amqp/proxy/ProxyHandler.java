@@ -31,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ProxyHandler {
 
+    private String vhost;
     private ProxyService proxyService;
     private ProxyConnection proxyConnection;
     private Channel clientChannel;
@@ -39,12 +40,13 @@ public class ProxyHandler {
     private State state;
     private List<Object> connectMsgList;
 
-    ProxyHandler(ProxyService proxyService, ProxyConnection proxyConnection,
+    ProxyHandler(String vhost, ProxyService proxyService, ProxyConnection proxyConnection,
                  String amqpBrokerHost, int amqpBrokerPort, List<Object> connectMsgList) throws InterruptedException {
         this.proxyService = proxyService;
         this.proxyConnection = proxyConnection;
         clientChannel = this.proxyConnection.getCnx().channel();
         this.connectMsgList = connectMsgList;
+        this.vhost = vhost;
 
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(clientChannel.eventLoop())
@@ -59,14 +61,15 @@ public class ProxyHandler {
         ChannelFuture channelFuture = bootstrap.connect(amqpBrokerHost, amqpBrokerPort);
         brokerChannel = channelFuture.channel();
         state = State.Init;
-        log.info("broker channel connect isOpen: {}", brokerChannel.isOpen());
+        log.info("broker channel connect. vhost: {}, broker: {}:{}, isOpen: {}",
+                vhost, amqpBrokerHost, amqpBrokerPort, brokerChannel.isOpen());
     }
 
     private class RedirectBackendHandler extends ChannelInboundHandlerAdapter {
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
-            log.info("RedirectBackendHandler [channelActive]");
+            log.info("[{}] RedirectBackendHandler [channelActive]", vhost);
             super.channelActive(ctx);
             for (Object msg : connectMsgList) {
                 brokerChannel.writeAndFlush(msg);
@@ -76,7 +79,7 @@ public class ProxyHandler {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            log.info("RedirectBackendHandler [channelRead]");
+            log.info("[{}] RedirectBackendHandler [channelRead]", vhost);
             switch (state) {
                 case Init:
                 case Failed:
@@ -90,7 +93,7 @@ public class ProxyHandler {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             cause.printStackTrace();
-            log.error("RedirectBackendHandler [exceptionCaught] - msg: " + cause.getMessage(), cause);
+            log.error("[" + vhost + "] RedirectBackendHandler [exceptionCaught] - msg: " + cause.getMessage(), cause);
             state = State.Failed;
         }
     }

@@ -23,8 +23,14 @@ import com.rabbitmq.client.Envelope;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
+import io.streamnative.pulsar.handlers.amqp.proxy.ProxyException;
+import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -35,7 +41,7 @@ import org.testng.annotations.Test;
 public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
     @Test
-    private void fanoutConsumeTest() throws IOException, TimeoutException, InterruptedException {
+    private void fanoutConsumeTest() throws IOException, TimeoutException, InterruptedException, ProxyException {
 
         final String vhost = "vhost1";
         final String exchangeName = "ex1";
@@ -43,7 +49,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         final String queueName2 = "ex1-q2";
 
         @Cleanup
-        Connection connection = getConnection();
+        Connection connection = getConnection(vhost, true);
         @Cleanup
         Channel channel = connection.createChannel();
 

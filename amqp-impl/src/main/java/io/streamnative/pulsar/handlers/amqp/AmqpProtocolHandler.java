@@ -23,6 +23,8 @@ import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Optional;
+
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -86,12 +88,16 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public void start(BrokerService service) {
         brokerService = service;
 
-        ProxyConfiguration proxyConfig = new ProxyConfiguration();
-        ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
-        try {
-            proxyService.start();
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (amqpConfig.isUseProxy()) {
+            ProxyConfiguration proxyConfig = new ProxyConfiguration();
+            proxyConfig.setServicePort(Optional.of(amqpConfig.getAmqpProxyPort()));
+            ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
+            try {
+                proxyService.start();
+                log.info("Start amqp proxy service at port: {}", proxyConfig.getServicePort().get());
+            } catch (Exception e) {
+                log.error("Failed to start amqp proxy service.");
+            }
         }
 
         log.info("Starting AmqpProtocolHandler, aop version is: '{}'", AopVersion.getVersion());

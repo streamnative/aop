@@ -51,8 +51,6 @@ public class ProxyService implements Closeable {
     private DefaultThreadFactory workerThreadFactory = new DefaultThreadFactory("amqp-redirect-io");
     private static final int numThreads = Runtime.getRuntime().availableProcessors();
 
-    @Getter
-    private BrokerDiscoveryProvider brokerDiscoveryProvider;
     private ZooKeeperClientFactory zkClientFactory = null;
 
     @Getter
@@ -67,8 +65,6 @@ public class ProxyService implements Closeable {
     }
 
     public void start() throws Exception {
-        brokerDiscoveryProvider = new BrokerDiscoveryProvider(proxyConfig, getZooKeeperClientFactory());
-
         ServerBootstrap serverBootstrap = new ServerBootstrap();
         serverBootstrap.group(acceptorGroup, workerGroup);
         serverBootstrap.channel(EventLoopUtil.getServerSocketChannelClass(workerGroup));

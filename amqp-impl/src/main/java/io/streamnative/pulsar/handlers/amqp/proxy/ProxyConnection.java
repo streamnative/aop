@@ -20,7 +20,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
+
+import java.util.ArrayList;
 import java.util.List;
+
+import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.utils.Lists;
@@ -65,8 +69,9 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     private int currentClassId;
     private int currentMethodId;
     private LookupHandler lookupHandler;
+    private String vhost;
 
-    private List<Object> connectMsgList = Lists.newArrayList();
+    private List<Object> connectMsgList = new ArrayList<>();
 
     private enum State {
         Init,
@@ -76,6 +81,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     }
 
     public ProxyConnection(ProxyService proxyService, PulsarService pulsarService) {
+        log.info("ProxyConnection init ...");
         this.pulsarService = pulsarService;
         this.proxyService = proxyService;
         this.proxyConfig = proxyService.getProxyConfig();
@@ -96,10 +102,13 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        log.info("RedirectConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
         switch (state) {
             case Init:
             case RedirectLookup:
                 log.info("RedirectConnection [channelRead] - RedirectLookup");
+                connectMsgList.add(msg);
+
                 // Get a buffer that contains the full frame
                 ByteBuf buffer = (ByteBuf) msg;
 
@@ -114,11 +123,17 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 }
                 brokerDecoder.getMethodProcessor();
 
-                connectMsgList.add(msg);
                 break;
             case RedirectToBroker:
                 log.info("RedirectConnection [channelRead] - RedirectToBroker");
                 proxyHandler.getBrokerChannel().writeAndFlush(msg);
+                break;
+            case Close:
+                log.info("RedirectConnection [channelRead] - closed");
+                break;
+            default:
+                log.info("RedirectConnection [channelRead] - invalid state");
+                break;
         }
     }
 
@@ -179,7 +194,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     // step 5
     @Override
     public void receiveConnectionOpen(AMQShortString virtualHost, AMQShortString capabilities, boolean insist) {
-        log.info("RedirectConnection - [receiveConnectionOpen]");
+        log.info("RedirectConnection - [receiveConnectionOpen] virtualHost: {}", virtualHost);
         if (log.isDebugEnabled()) {
             log.debug("RedirectConnection - [receiveConnectionOpen] virtualHost: {} capabilities: {} insist: {}",
                     virtualHost, capabilities, insist);
@@ -190,6 +205,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
             virtualHostStr = virtualHostStr.substring(1);
         }
+        vhost = virtualHostStr;
 
         String amqpBrokerHost = "";
         int amqpBrokerPort = 0;
@@ -199,7 +215,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         } else {
             try {
                 NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), virtualHostStr);
-                Pair<String, Integer> lookupData = lookupHandler.findBroker(namespaceName);
+                Pair<String, Integer> lookupData = lookupHandler.findBroker(namespaceName, AmqpProtocolHandler.PROTOCOL_NAME);
                 amqpBrokerHost = lookupData.getLeft();
                 amqpBrokerPort = lookupData.getRight();
                 proxyService.getVhostBrokerMap().put(virtualHostStr, lookupData);
@@ -214,7 +230,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 log.error("Lookup broker failed.");
                 return;
             }
-            proxyHandler = new ProxyHandler(proxyService,
+            proxyHandler = new ProxyHandler(vhost, proxyService,
                     this, amqpBrokerHost, amqpBrokerPort, connectMsgList);
             state = State.RedirectToBroker;
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);

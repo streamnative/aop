@@ -21,6 +21,14 @@ import org.apache.pulsar.common.naming.NamespaceName;
  */
 public interface LookupHandler {
 
-    Pair<String, Integer> findBroker(NamespaceName namespaceName) throws ProxyException;
+    /**
+     * Find broker for protocolHandler
+     *
+     * @param namespaceName namespaceName
+     * @param protocolHandlerName protocolHandler name
+     * @return Pair consist of brokerHost and brokerPort
+     * @throws ProxyException
+     */
+    Pair<String, Integer> findBroker(NamespaceName namespaceName, String protocolHandlerName) throws ProxyException;
 
 }

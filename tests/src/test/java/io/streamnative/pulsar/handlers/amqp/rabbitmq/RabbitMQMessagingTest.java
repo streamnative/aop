@@ -20,17 +20,12 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
+import io.streamnative.pulsar.handlers.amqp.proxy.ProxyException;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
-import io.streamnative.pulsar.handlers.amqp.proxy.ProxyException;
-import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pulsar.common.naming.NamespaceName;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

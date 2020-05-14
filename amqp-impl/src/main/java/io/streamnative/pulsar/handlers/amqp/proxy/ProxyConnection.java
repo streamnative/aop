@@ -20,18 +20,19 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
-
+import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.util.ArrayList;
 import java.util.List;
-
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -58,9 +59,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     @Getter
     private ChannelHandlerContext cnx;
     private State state;
-    private NamespaceName namespaceName;
-    private int amqpBrokerPort = 5672;
-    private String amqpBrokerHost;
     private ProxyHandler proxyHandler;
 
     protected AmqpBrokerDecoder brokerDecoder;
@@ -80,7 +78,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         Close
     }
 
-    public ProxyConnection(ProxyService proxyService, PulsarService pulsarService) {
+    public ProxyConnection(ProxyService proxyService, PulsarService pulsarService) throws PulsarClientException {
         log.info("ProxyConnection init ...");
         this.pulsarService = pulsarService;
         this.proxyService = proxyService;
@@ -88,9 +86,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         brokerDecoder = new AmqpBrokerDecoder(this);
         protocolVersion = ProtocolVersion.v0_91;
         methodRegistry = new MethodRegistry(protocolVersion);
-        if (pulsarService != null) {
-            lookupHandler = new PulsarServiceLookupHandler(pulsarService);
-        }
+        lookupHandler = new PulsarServiceLookupHandler(pulsarService, proxyService.getPulsarClient());
         state = State.Init;
     }
 
@@ -215,19 +211,25 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         } else {
             try {
                 NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), virtualHostStr);
-                Pair<String, Integer> lookupData = lookupHandler.findBroker(namespaceName, AmqpProtocolHandler.PROTOCOL_NAME);
+
+                String topic = TopicName.get(TopicDomain.persistent.value(),
+                        namespaceName, "__lookup__").toString();
+                Pair<String, Integer> lookupData = lookupHandler.findBroker(
+                        TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
+
                 amqpBrokerHost = lookupData.getLeft();
                 amqpBrokerPort = lookupData.getRight();
                 proxyService.getVhostBrokerMap().put(virtualHostStr, lookupData);
             } catch (Exception e) {
-                log.error("Lookup broker failed.");
+                log.error("Lookup broker failed.", e);
                 return;
             }
         }
 
         try {
             if (StringUtils.isEmpty(amqpBrokerHost) || amqpBrokerPort == 0) {
-                log.error("Lookup broker failed.");
+                log.error("Lookup broker failed. amqpBrokerHost: {}, amqpBrokerPort: {}",
+                        amqpBrokerHost, amqpBrokerPort);
                 return;
             }
             proxyHandler = new ProxyHandler(vhost, proxyService,
@@ -293,10 +295,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             log.debug("send: " + frame);
         }
         cnx.writeAndFlush(frame);
-    }
-
-    public String getAmqpBrokerUrl() {
-        return amqpBrokerHost + ":" + amqpBrokerPort;
     }
 
     public void close() {

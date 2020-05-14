@@ -27,6 +27,10 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.impl.PulsarClientImpl;
+import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
 import org.apache.pulsar.zookeeper.ZookeeperClientFactoryImpl;
@@ -40,7 +44,10 @@ public class ProxyService implements Closeable {
     @Getter
     private ProxyConfiguration proxyConfig;
     private String serviceUrl;
+    @Getter
     private PulsarService pulsarService;
+    @Getter
+    private PulsarClientImpl pulsarClient;
 
     private Channel listenChannel;
     private EventLoopGroup acceptorGroup;
@@ -75,6 +82,32 @@ public class ProxyService implements Closeable {
         } catch (InterruptedException e) {
             throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getServicePort().get(), e);
         }
+
+        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(proxyConfig.getBrokerServiceURL()).build();
+
+        pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
+            @Override
+            public void onLoad(NamespaceBundle namespaceBundle) {
+                log.info("onLoad namespaceBundle: {}", namespaceBundle);
+                if (vhostBrokerMap.containsKey(namespaceBundle.getNamespaceObject().getLocalName())) {
+                    log.info("onLoad vhostBrokerMap contain the namespaceBundle: {}", namespaceBundle);
+                }
+            }
+
+            @Override
+            public void unLoad(NamespaceBundle namespaceBundle) {
+                log.info("unLoad namespaceBundle: {}", namespaceBundle);
+                if (vhostBrokerMap.containsKey(namespaceBundle.getNamespaceObject().getLocalName())) {
+                    log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", namespaceBundle);
+                }
+            }
+
+            @Override
+            public boolean test(NamespaceBundle namespaceBundle) {
+                log.info("test namespaceBundle: {}", namespaceBundle);
+                return true;
+            }
+        });
     }
 
     public ZooKeeperClientFactory getZooKeeperClientFactory() {

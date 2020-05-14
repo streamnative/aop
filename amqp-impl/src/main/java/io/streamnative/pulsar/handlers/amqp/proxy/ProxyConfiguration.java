@@ -17,6 +17,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import java.util.Optional;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.configuration.Category;
 import org.apache.pulsar.common.configuration.FieldContext;
 
@@ -33,6 +34,12 @@ public class ProxyConfiguration extends AmqpServiceConfiguration {
     private static final String CATEGORY_BROKER_DISCOVERY = "Broker Discovery";
     @Category
     private static final String CATEGORY_HTTP = "HTTP";
+    @Category
+    private static final String CATEGORY_RATE_LIMITING = "RateLimiting";
+    @Category(
+            description = "the settings are for configuring how proxies authenticates with Pulsar brokers"
+    )
+    private static final String CATEGORY_CLIENT_AUTHENTICATION = "Broker Client Authorization";
 
     /** --------- Server --------- **/
     @FieldContext(
@@ -66,6 +73,12 @@ public class ProxyConfiguration extends AmqpServiceConfiguration {
     )
     private String brokerServiceURL = "pulsar://localhost:6650";
 
+    @FieldContext(
+            category = CATEGORY_BROKER_DISCOVERY,
+            doc = "The tls service url points to the broker cluster"
+    )
+    private String brokerServiceURLTLS;
+
     /** --------- HTTP --------- **/
     @FieldContext(
             minValue = 1,
@@ -86,5 +99,18 @@ public class ProxyConfiguration extends AmqpServiceConfiguration {
             doc = "Number of threads to use for HTTP requests processing"
     )
     private int httpNumThreads = Math.max(8, 2 * Runtime.getRuntime().availableProcessors());
+
+    @FieldContext(
+            category = CATEGORY_RATE_LIMITING,
+            doc = "Max concurrent lookup requests. The proxy will reject requests beyond that"
+    )
+    private int maxConcurrentLookupRequests = 50000;
+
+    @FieldContext(
+            category = CATEGORY_CLIENT_AUTHENTICATION,
+            doc = "Whether TLS is enabled when communicating with Pulsar brokers"
+    )
+    private boolean tlsEnabledWithBroker = false;
+
 
 }

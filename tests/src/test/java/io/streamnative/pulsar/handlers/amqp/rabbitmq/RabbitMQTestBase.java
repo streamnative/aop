@@ -16,23 +16,15 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 import com.google.common.collect.Sets;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-
-import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
-import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -71,12 +63,6 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                 admin.namespaces().createNamespace(ns);
                 admin.namespaces().setRetention(ns,
                         new RetentionPolicies(60, 1000));
-
-                PulsarServiceLookupHandler lookupHandler = new PulsarServiceLookupHandler(getPulsarServiceList().get(0));
-                Pair<String, Integer> lookupData = lookupHandler.findBroker(NamespaceName.get(ns), AmqpProtocolHandler.PROTOCOL_NAME);
-                log.info("admin create namespaceName: {}, hostname: {}, port: {}",
-                        ns, lookupData.getLeft(), lookupData.getRight());
-
             }
         }
         checkPulsarServiceState();
@@ -92,8 +78,8 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
         if (useProxy) {
-//            int proxyPort = getProxyPort();
-            int proxyPort = getProxyPortList().get(0);
+            int proxyPort = getProxyPort();
+//            int proxyPort = getProxyPortList().get(0);
             connectionFactory.setPort(proxyPort);
             log.info("use proxyPort: {}", proxyPort);
         } else {

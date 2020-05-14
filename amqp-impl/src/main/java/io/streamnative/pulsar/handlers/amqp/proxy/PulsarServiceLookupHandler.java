@@ -13,15 +13,20 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
+import java.net.InetSocketAddress;
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.loadbalance.LoadManager;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceBundles;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
 
 /**
@@ -32,12 +37,17 @@ public class PulsarServiceLookupHandler implements LookupHandler {
 
     private PulsarService pulsarService;
 
-    public PulsarServiceLookupHandler(PulsarService pulsarService) {
+    private PulsarClientImpl pulsarClient;
+
+    private PulsarAdmin pulsarAdmin;
+
+    public PulsarServiceLookupHandler(PulsarService pulsarService, PulsarClientImpl pulsarClient) {
         this.pulsarService = pulsarService;
+        this.pulsarClient = pulsarClient;
     }
 
     @Override
-    public Pair<String, Integer> findBroker(NamespaceName namespaceName, String protocolName) throws ProxyException {
+    public Pair<String, Integer> findBroker(NamespaceName namespaceName, String protocolName) throws Exception {
         String hostname = null;
         Integer port = null;
 
@@ -48,7 +58,7 @@ public class PulsarServiceLookupHandler implements LookupHandler {
             NamespaceBundle bundle = bundles.getFullBundle();
 
             Optional<URL> url =  pulsarService.getNamespaceService()
-                    .getWebServiceUrl(bundle, false, false, false);
+                    .getWebServiceUrl(bundle, true, false, false);
             if (url.isPresent()) {
                 hostname = url.get().getHost();
                 httpPort = url.get().getPort();
@@ -78,4 +88,31 @@ public class PulsarServiceLookupHandler implements LookupHandler {
         }
     }
 
+    @Override
+    public Pair<String, Integer> findBroker(TopicName topicName, String protocolHandlerName) throws Exception {
+        Pair<InetSocketAddress, InetSocketAddress> lookup = pulsarClient.getLookup().getBroker(topicName).get();
+        String hostName = lookup.getLeft().getHostName();
+        List<String> children = pulsarService.getZkClient().getChildren(LoadManager.LOADBALANCE_BROKERS_ROOT, null);
+        int amqpBrokerPort = 0;
+        for (String webService : children) {
+            try {
+                byte[] content = pulsarService.getZkClient().getData(LoadManager.LOADBALANCE_BROKERS_ROOT
+                        + "/" + webService, null, null);
+                ServiceLookupData serviceLookupData = pulsarService.getLoadManager().get()
+                        .getLoadReportDeserializer().deserialize("", content);
+                if (serviceLookupData.getPulsarServiceUrl().contains("" + lookup.getLeft().getPort())) {
+                    if (serviceLookupData.getProtocol(protocolHandlerName).isPresent()) {
+                        String amqpBrokerUrl = serviceLookupData.getProtocol(protocolHandlerName).get();
+                        String[] splits = amqpBrokerUrl.split(":");
+                        String port = splits[splits.length - 1];
+                        amqpBrokerPort = Integer.parseInt(port);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return Pair.of(hostName, amqpBrokerPort);
+    }
 }

@@ -7,22 +7,17 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyException;
-import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
-import lombok.Cleanup;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pulsar.common.naming.NamespaceName;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.Cleanup;
+import lombok.extern.slf4j.Slf4j;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 @Slf4j
 public class ProxyTest extends RabbitMQTestBase {
@@ -71,10 +66,6 @@ public class ProxyTest extends RabbitMQTestBase {
         @Cleanup
         Channel channel = connection.createChannel();
         log.info("channel init finish. channelNum: {}", channel.getChannelNumber());
-
-        PulsarServiceLookupHandler lookupHandler = new PulsarServiceLookupHandler(getPulsarServiceList().get(0));
-        Pair<String, Integer> lookupData = lookupHandler.findBroker(NamespaceName.get("public/" + vhost), AmqpProtocolHandler.PROTOCOL_NAME);
-        log.info("Find broker namespaceName: {}, hostname: {}, port: {}", "public/vhost1", lookupData.getLeft(), lookupData.getRight());
 
         channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
 

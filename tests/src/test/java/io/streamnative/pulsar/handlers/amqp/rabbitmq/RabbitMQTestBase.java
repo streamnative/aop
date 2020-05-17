@@ -22,6 +22,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
@@ -63,6 +66,9 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                 admin.namespaces().createNamespace(ns);
                 admin.namespaces().setRetention(ns,
                         new RetentionPolicies(60, 1000));
+                admin.topics().createNonPartitionedTopic(
+                        TopicName.get(TopicDomain.persistent.value(),
+                                NamespaceName.get(ns), "__lookup__").toString());
             }
         }
         checkPulsarServiceState();
@@ -79,7 +85,6 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         connectionFactory.setHost("localhost");
         if (useProxy) {
             int proxyPort = getProxyPort();
-//            int proxyPort = getProxyPortList().get(0);
             connectionFactory.setPort(proxyPort);
             log.info("use proxyPort: {}", proxyPort);
         } else {

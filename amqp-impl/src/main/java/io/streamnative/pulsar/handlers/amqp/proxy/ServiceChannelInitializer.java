@@ -16,19 +16,16 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
-import org.apache.pulsar.broker.PulsarService;
 
 /**
  * Proxy service channel initializer.
  */
 public class ServiceChannelInitializer extends ChannelInitializer<SocketChannel> {
 
-    private PulsarService pulsarService;
     private ProxyService proxyService;
 
-    public ServiceChannelInitializer(ProxyService proxyService, PulsarService pulsarService) {
+    public ServiceChannelInitializer(ProxyService proxyService) {
         this.proxyService = proxyService;
-        this.pulsarService = pulsarService;
     }
 
     @Override
@@ -36,7 +33,7 @@ public class ServiceChannelInitializer extends ChannelInitializer<SocketChannel>
         ch.pipeline().addLast("frameEncoder",
                 new AmqpEncoder());
         ch.pipeline().addLast("handler",
-                new ProxyConnection(proxyService, pulsarService));
+                new ProxyConnection(proxyService));
     }
 
 }

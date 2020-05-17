@@ -16,20 +16,23 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 
+import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -51,9 +54,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
  */
 @Slf4j
 public class ProxyConnection extends ChannelInboundHandlerAdapter implements
-        ServerMethodProcessor<ServerChannelMethodProcessor> {
+        ServerMethodProcessor<ServerChannelMethodProcessor>, FutureListener<Void> {
 
-    private PulsarService pulsarService;
     private ProxyService proxyService;
     private ProxyConfiguration proxyConfig;
     @Getter
@@ -62,11 +64,11 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     private ProxyHandler proxyHandler;
 
     protected AmqpBrokerDecoder brokerDecoder;
+    @Getter
     private MethodRegistry methodRegistry;
     private ProtocolVersion protocolVersion;
-    private int currentClassId;
-    private int currentMethodId;
     private LookupHandler lookupHandler;
+    private AMQShortString virtualHost;
     private String vhost;
 
     private List<Object> connectMsgList = new ArrayList<>();
@@ -75,18 +77,17 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         Init,
         RedirectLookup,
         RedirectToBroker,
-        Close
+        Closed
     }
 
-    public ProxyConnection(ProxyService proxyService, PulsarService pulsarService) throws PulsarClientException {
+    public ProxyConnection(ProxyService proxyService) throws PulsarClientException {
         log.info("ProxyConnection init ...");
-        this.pulsarService = pulsarService;
         this.proxyService = proxyService;
         this.proxyConfig = proxyService.getProxyConfig();
         brokerDecoder = new AmqpBrokerDecoder(this);
         protocolVersion = ProtocolVersion.v0_91;
         methodRegistry = new MethodRegistry(protocolVersion);
-        lookupHandler = new PulsarServiceLookupHandler(pulsarService, proxyService.getPulsarClient());
+        lookupHandler = proxyService.getLookupHandler();
         state = State.Init;
     }
 
@@ -97,12 +98,30 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     }
 
     @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        this.close();
+    }
+
+    @Override
+    public void operationComplete(Future future) throws Exception {
+        // This is invoked when the write operation on the paired connection is
+        // completed
+        if (future.isSuccess()) {
+            cnx.read();
+        } else {
+            log.warn("Error in writing to inbound channel. Closing", future.cause());
+            proxyHandler.getBrokerChannel().close();
+        }
+    }
+
+    @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        log.info("RedirectConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
+        log.info("ProxyConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
         switch (state) {
             case Init:
             case RedirectLookup:
-                log.info("RedirectConnection [channelRead] - RedirectLookup");
+                log.info("ProxyConnection [channelRead] - RedirectLookup");
                 connectMsgList.add(msg);
 
                 // Get a buffer that contains the full frame
@@ -121,14 +140,14 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
                 break;
             case RedirectToBroker:
-                log.info("RedirectConnection [channelRead] - RedirectToBroker");
+                log.info("ProxyConnection [channelRead] - RedirectToBroker");
                 proxyHandler.getBrokerChannel().writeAndFlush(msg);
                 break;
-            case Close:
-                log.info("RedirectConnection [channelRead] - closed");
+            case Closed:
+                log.info("ProxyConnection [channelRead] - closed");
                 break;
             default:
-                log.info("RedirectConnection [channelRead] - invalid state");
+                log.info("ProxyConnection [channelRead] - invalid state");
                 break;
         }
     }
@@ -137,7 +156,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     @Override
     public void receiveProtocolHeader(ProtocolInitiation protocolInitiation) {
         if (log.isDebugEnabled()) {
-            log.debug("RedirectConnection - [receiveProtocolHeader] Protocol Header [{}]", protocolInitiation);
+            log.debug("ProxyConnection - [receiveProtocolHeader] Protocol Header [{}]", protocolInitiation);
         }
         brokerDecoder.setExpectProtocolInitiation(false);
         try {
@@ -161,7 +180,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response,
                                          AMQShortString locale) {
         if (log.isDebugEnabled()) {
-            log.debug("RedirectConnection - [receiveConnectionStartOk] " +
+            log.debug("ProxyConnection - [receiveConnectionStartOk] " +
                             "clientProperties: {}, mechanism: {}, locale: {}", clientProperties, mechanism, locale);
         }
         AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
@@ -172,7 +191,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     @Override
     public void receiveConnectionSecureOk(byte[] response) {
         if (log.isDebugEnabled()) {
-            log.debug("RedirectConnection - [receiveConnectionSecureOk] response: {}", new String(response));
+            log.debug("ProxyConnection - [receiveConnectionSecureOk] response: {}", new String(response));
         }
         // TODO AUTH
         ConnectionTuneBody tuneBody =
@@ -184,18 +203,18 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     // step 4
     @Override
     public void receiveConnectionTuneOk(int i, long l, int i1) {
-        log.info("RedirectConnection - [receiveConnectionTuneOk]");
+        log.info("ProxyConnection - [receiveConnectionTuneOk]");
     }
 
     // step 5
     @Override
     public void receiveConnectionOpen(AMQShortString virtualHost, AMQShortString capabilities, boolean insist) {
-        log.info("RedirectConnection - [receiveConnectionOpen] virtualHost: {}", virtualHost);
+        log.info("ProxyConnection - [receiveConnectionOpen] virtualHost: {}", virtualHost);
         if (log.isDebugEnabled()) {
-            log.debug("RedirectConnection - [receiveConnectionOpen] virtualHost: {} capabilities: {} insist: {}",
+            log.debug("ProxyConnection - [receiveConnectionOpen] virtualHost: {} capabilities: {} insist: {}",
                     virtualHost, capabilities, insist);
         }
-
+        this.virtualHost = virtualHost;
         state = State.RedirectLookup;
         String virtualHostStr = AMQShortString.toString(virtualHost);
         if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
@@ -203,25 +222,57 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         }
         vhost = virtualHostStr;
 
-        String amqpBrokerHost = "";
-        int amqpBrokerPort = 0;
-        if (proxyService.getVhostBrokerMap().containsKey(virtualHostStr)) {
-            amqpBrokerHost = proxyService.getVhostBrokerMap().get(virtualHostStr).getLeft();
-            amqpBrokerPort = proxyService.getVhostBrokerMap().get(virtualHostStr).getRight();
+        proxyService.getVhostConnectionMap().compute(vhost, (v, set) -> {
+            if (set == null) {
+                Set<ProxyConnection> proxyConnectionSet =  Sets.newConcurrentHashSet();
+                proxyConnectionSet.add(this);
+                return proxyConnectionSet;
+            } else {
+                set.add(this);
+                return set;
+            }
+        });
+        createProxyHandler(5);
+    }
+
+    public void createProxyHandler(int retryTimes) {
+        int i = 0;
+        do {
+            log.info("Connect to broker [{}] ...", i);
+            handleConnect();
+            if (proxyHandler != null) {
+                log.info("Connect to broker finish.");
+                break;
+            }
+            i++;
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                log.error("Retry connect to broker failed.");
+            }
+        } while (i < retryTimes);
+    }
+
+    public void handleConnect() {
+        String amqpBrokerHost;
+        int amqpBrokerPort;
+        if (proxyService.getVhostBrokerMap().containsKey(vhost)) {
+            amqpBrokerHost = proxyService.getVhostBrokerMap().get(vhost).getLeft();
+            amqpBrokerPort = proxyService.getVhostBrokerMap().get(vhost).getRight();
         } else {
             try {
-                NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), virtualHostStr);
+                NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), vhost);
 
                 String topic = TopicName.get(TopicDomain.persistent.value(),
                         namespaceName, "__lookup__").toString();
                 Pair<String, Integer> lookupData = lookupHandler.findBroker(
                         TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
-
                 amqpBrokerHost = lookupData.getLeft();
                 amqpBrokerPort = lookupData.getRight();
-                proxyService.getVhostBrokerMap().put(virtualHostStr, lookupData);
+                proxyService.getVhostBrokerMap().put(vhost, lookupData);
             } catch (Exception e) {
                 log.error("Lookup broker failed.", e);
+                resetProxyHandler();
                 return;
             }
         }
@@ -230,63 +281,70 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             if (StringUtils.isEmpty(amqpBrokerHost) || amqpBrokerPort == 0) {
                 log.error("Lookup broker failed. amqpBrokerHost: {}, amqpBrokerPort: {}",
                         amqpBrokerHost, amqpBrokerPort);
+                resetProxyHandler();
                 return;
             }
-            proxyHandler = new ProxyHandler(vhost, proxyService,
-                    this, amqpBrokerHost, amqpBrokerPort, connectMsgList);
-            state = State.RedirectToBroker;
+
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
-            writeFrame(responseBody.generateFrame(0));
+            proxyHandler = new ProxyHandler(vhost, proxyService,
+                    this, amqpBrokerHost, amqpBrokerPort, connectMsgList, responseBody);
+            state = State.RedirectToBroker;
         } catch (Exception e) {
+            resetProxyHandler();
             log.error("Failed to lookup broker.", e);
+        }
+    }
+
+    public void resetProxyHandler() {
+        if (proxyHandler != null) {
+            proxyHandler.close();
+            proxyHandler = null;
         }
     }
 
     @Override
     public void receiveChannelOpen(int i) {
-        log.info("RedirectConnection - [receiveChannelOpen]");
+        log.info("ProxyConnection - [receiveChannelOpen]");
     }
 
     @Override
     public ProtocolVersion getProtocolVersion() {
-        log.info("RedirectConnection - [getProtocolVersion]");
+        log.info("ProxyConnection - [getProtocolVersion]");
         return null;
     }
 
     @Override
     public ServerChannelMethodProcessor getChannelMethodProcessor(int i) {
-        log.info("RedirectConnection - [getChannelMethodProcessor]");
+        log.info("ProxyConnection - [getChannelMethodProcessor]");
         return null;
     }
 
     @Override
     public void receiveConnectionClose(int i, AMQShortString amqShortString, int i1, int i2) {
-        log.info("RedirectConnection - [receiveConnectionClose]");
+        log.info("ProxyConnection - [receiveConnectionClose]");
     }
 
     @Override
     public void receiveConnectionCloseOk() {
-        log.info("RedirectConnection - [receiveConnectionCloseOk]");
+        log.info("ProxyConnection - [receiveConnectionCloseOk]");
     }
 
     @Override
     public void receiveHeartbeat() {
-        log.info("RedirectConnection - [receiveHeartbeat]");
+        log.info("ProxyConnection - [receiveHeartbeat]");
     }
 
 
     @Override
     public void setCurrentMethod(int classId, int methodId) {
         if (log.isDebugEnabled()) {
-            log.debug("RedirectConnection - [setCurrentMethod] classId: {}, methodId: {}", classId, methodId);
+            log.debug("ProxyConnection - [setCurrentMethod] classId: {}, methodId: {}", classId, methodId);
         }
-        currentClassId = classId;
-        currentMethodId = methodId;
     }
 
     @Override
     public boolean ignoreAllButCloseOk() {
-        log.info("RedirectConnection - [ignoreAllButCloseOk]");
+        log.info("ProxyConnection - [ignoreAllButCloseOk]");
         return false;
     }
 
@@ -298,7 +356,22 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     }
 
     public void close() {
+        log.info("ProxyConnection close.");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection close.");
+        }
 
+        if (vhost != null) {
+            Set<ProxyConnection> proxyConnectionSet = proxyService.getVhostConnectionMap().get(vhost);
+            if (proxyConnectionSet != null && proxyConnectionSet.size() > 0) {
+                proxyConnectionSet.remove(this);
+            }
+        }
+        resetProxyHandler();
+        if (cnx != null) {
+            cnx.close();
+        }
+        state = State.Closed;
     }
 
 }

@@ -23,6 +23,7 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
@@ -48,6 +49,8 @@ public class ProxyService implements Closeable {
     private PulsarService pulsarService;
     @Getter
     private PulsarClientImpl pulsarClient;
+    @Getter
+    private LookupHandler lookupHandler;
 
     private Channel listenChannel;
     private EventLoopGroup acceptorGroup;
@@ -61,7 +64,9 @@ public class ProxyService implements Closeable {
     private ZooKeeperClientFactory zkClientFactory = null;
 
     @Getter
-    private Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
+    final private Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
+    @Getter
+    private Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
 
     public ProxyService(ProxyConfiguration proxyConfig, PulsarService pulsarService) {
         checkNotNull(proxyConfig);
@@ -76,7 +81,7 @@ public class ProxyService implements Closeable {
         serverBootstrap.group(acceptorGroup, workerGroup);
         serverBootstrap.channel(EventLoopUtil.getServerSocketChannelClass(workerGroup));
         EventLoopUtil.enableTriggeredMode(serverBootstrap);
-        serverBootstrap.childHandler(new ServiceChannelInitializer(this, pulsarService));
+        serverBootstrap.childHandler(new ServiceChannelInitializer(this));
         try {
             listenChannel = serverBootstrap.bind(proxyConfig.getServicePort().get()).sync().channel();
         } catch (InterruptedException e) {
@@ -84,6 +89,7 @@ public class ProxyService implements Closeable {
         }
 
         this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(proxyConfig.getBrokerServiceURL()).build();
+        this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
 
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
@@ -97,8 +103,12 @@ public class ProxyService implements Closeable {
             @Override
             public void unLoad(NamespaceBundle namespaceBundle) {
                 log.info("unLoad namespaceBundle: {}", namespaceBundle);
-                if (vhostBrokerMap.containsKey(namespaceBundle.getNamespaceObject().getLocalName())) {
-                    log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", namespaceBundle);
+                synchronized (vhostBrokerMap) {
+                    if (vhostBrokerMap.containsKey(namespaceBundle.getNamespaceObject().getLocalName())) {
+                        log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", namespaceBundle);
+                        vhostBrokerMap.remove(namespaceBundle.getNamespaceObject().getLocalName());
+                        reConnection(namespaceBundle.getNamespaceObject().getLocalName());
+                    }
                 }
             }
 
@@ -108,6 +118,17 @@ public class ProxyService implements Closeable {
                 return true;
             }
         });
+    }
+
+    private void reConnection(String namespaceName) {
+        log.info("reConnection namespaceName: {}", namespaceName);
+        if (vhostConnectionMap.containsKey(namespaceName)) {
+            Set<ProxyConnection> proxyConnectionSet = vhostConnectionMap.get(namespaceName);
+            for (ProxyConnection proxyConnection : proxyConnectionSet) {
+                proxyConnection.resetProxyHandler();
+                proxyConnection.createProxyHandler(5);
+            }
+        }
     }
 
     public ZooKeeperClientFactory getZooKeeperClientFactory() {

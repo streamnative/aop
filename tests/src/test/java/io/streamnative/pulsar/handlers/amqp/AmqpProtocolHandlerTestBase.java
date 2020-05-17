@@ -42,6 +42,7 @@ import org.apache.bookkeeper.client.PulsarMockBookKeeper;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.pulsar.broker.BookKeeperClientFactory;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.auth.SameThreadOrderedSafeExecutor;
@@ -224,7 +225,21 @@ public abstract class AmqpProtocolHandlerTestBase {
         for (PulsarService pulsarService : pulsarServiceList) {
             pulsarService.close();
         }
+        brokerPortList.clear();
+        brokerWebservicePortList.clear();
+        brokerWebServicePortTlsList.clear();
+        proxyPortList.clear();
         pulsarServiceList.clear();
+    }
+
+    public void stopBroker(int brokerIndex) throws Exception {
+        pulsarServiceList.get(brokerIndex).close();
+
+        brokerPortList.remove(brokerIndex);
+        brokerWebservicePortList.remove(brokerIndex);
+        brokerWebServicePortTlsList.remove(brokerIndex);
+        proxyPortList.remove(brokerIndex);
+        pulsarServiceList.remove(brokerIndex);
     }
 
     protected void startBroker() throws Exception {

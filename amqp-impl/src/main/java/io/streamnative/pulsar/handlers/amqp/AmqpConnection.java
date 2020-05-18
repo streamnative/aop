@@ -39,6 +39,7 @@ import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
+import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -666,7 +667,25 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE,
             new InMemoryExchange("", AmqpExchange.Type.Direct, false));
 
+        addBuildInExchanges(ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
+        addBuildInExchanges(ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
+        addBuildInExchanges(ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
+
     }
+
+    public void addBuildInExchanges(String exchangeName, AmqpExchange.Type exchangeType) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                getNamespaceName(), exchangeName);
+        PersistentTopic persistentTopic = null;
+        try {
+            persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Create default exchange topic failed!");
+        }
+        ExchangeContainer.putExchange(topicName.toString(), new PersistentExchange(exchangeName,
+                exchangeType, persistentTopic, amqpTopicManager, false));
+    }
+
     @VisibleForTesting
     public ByteBufferSender getBufferSender() {
         return bufferSender;

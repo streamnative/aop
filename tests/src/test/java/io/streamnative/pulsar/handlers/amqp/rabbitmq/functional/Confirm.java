@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Testcase.
@@ -40,9 +42,9 @@ public class Confirm extends BrokerTestCase {
 
     private static final String TTL_ARG = "x-message-ttl";
 
-    @Override
+
+    @Before
     public void setUp() throws Exception {
-        super.setUp();
         channel.confirmSelect();
         channel.queueDeclare("confirm-test", true, true, false, null);
         channel.queueDeclare("confirm-durable-nonexclusive", true, false,
@@ -70,9 +72,9 @@ public class Confirm extends BrokerTestCase {
         channel.queueDelete("confirm-durable-nonexclusive");
     }
 
-    //@Test
+    @Test
     public void persistentMandatoryCombinations()
-            throws IOException, InterruptedException, TimeoutException {
+            throws Exception {
         boolean[] b = {false, true};
         for (boolean persistent : b) {
             for (boolean mandatory : b) {
@@ -81,20 +83,20 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void nonDurable()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("", "confirm-test-nondurable", true, false);
     }
 
-    //@Test
+//    @Test
     public void mandatoryNoRoute()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("", "confirm-test-doesnotexist", false, true);
         confirmTest("", "confirm-test-doesnotexist", true, true);
     }
 
-    //@Test
+    @Test
     public void multipleQueues()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("amq.direct", "confirm-multiple-queues", true, false);
@@ -105,7 +107,7 @@ public class Confirm extends BrokerTestCase {
      * (thus causing a confirm).  I'd manually comment out the line in
      * internal_sync that notifies the clients. */
 
-    //@Test
+    @Test
     public void queueDelete()
             throws IOException, InterruptedException, TimeoutException {
         publishN("", "confirm-test-noconsumer", true, false);

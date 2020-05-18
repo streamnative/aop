@@ -90,7 +90,7 @@ public abstract class AmqpProtocolHandlerTestBase {
     private SameThreadOrderedSafeExecutor sameThreadOrderedSafeExecutor;
     private ExecutorService bkExecutor;
 
-    private int brokerCount = 3;
+    private int brokerCount = 1;
     @Getter
     private List<PulsarService> pulsarServiceList = new ArrayList<>();
     @Getter
@@ -393,4 +393,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         return getProxyPortList().get(RandomUtils.nextInt(0, getProxyPortList().size()));
     }
 
+    public void setBrokerCount(int brokerCount) {
+        this.brokerCount = brokerCount;
+    }
 }

@@ -23,6 +23,7 @@ import com.rabbitmq.client.Envelope;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -34,9 +35,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class ProxyTest extends RabbitMQTestBase {
 
+    @BeforeClass
+    @Override
+    public void setup() throws Exception {
+        setBrokerCount(3);
+        super.setup();
+    }
+
     @Test
     public void proxyBasicTest() throws Exception {
 
+        fanoutTest("test1", "vhost1", "ex1", Arrays.asList("ex1-q1", "ex1-q2"));
         fanoutTest("test2", "vhost2", "ex2", Arrays.asList("ex2-q1", "ex2-q2"));
         fanoutTest("test3", "vhost3", "ex3", Arrays.asList("ex3-q1", "ex3-q2"));
 

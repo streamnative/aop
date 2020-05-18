@@ -392,9 +392,9 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap().get("consumerTag1");
         Assert.assertTrue(consumer != null);
         UnacknowledgedMessageMap unacknowledgedMessageMap = channel.getUnacknowledgedMessageMap();
-        unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
-        unacknowledgedMessageMap.add(2, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
-        unacknowledgedMessageMap.add(3, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
+        unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(2, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(3, PositionImpl.get(1, 1), consumer);
         BasicAckBody basicAckBody = methodRegistry.createBasicAckBody(1, false);
         basicAckBody.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
@@ -409,10 +409,10 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap().get("consumerTag1");
         Assert.assertTrue(consumer != null);
         UnacknowledgedMessageMap unacknowledgedMessageMap = channel.getUnacknowledgedMessageMap();
-        unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
-        unacknowledgedMessageMap.add(2, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
-        unacknowledgedMessageMap.add(3, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
-        unacknowledgedMessageMap.add(4, PositionImpl.get(1, 1), PositionImpl.get(1, 1), "", consumer);
+        unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(2, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(3, PositionImpl.get(1, 1), consumer);
+        unacknowledgedMessageMap.add(4, PositionImpl.get(1, 1), consumer);
         BasicAckBody basicAckBody = methodRegistry.createBasicAckBody(3, true);
         basicAckBody.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();

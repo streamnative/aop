@@ -19,9 +19,13 @@ import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.BrokerServiceException;
@@ -30,6 +34,7 @@ import org.apache.pulsar.broker.service.EntryBatchSizes;
 import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
+import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
@@ -47,6 +52,11 @@ public class AmqpConsumer extends Consumer {
 
     private final String queueName;
 
+    /**
+     * map(exchangeName,treeMap(indexPosition,msgPosition)) .
+     */
+    private final Map<String, TreeMap<PositionImpl, PositionImpl>> unAckMessages;
+
     public AmqpConsumer(Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
@@ -60,6 +70,7 @@ public class AmqpConsumer extends Consumer {
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
         this.queueName = queueName;
+        unAckMessages = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -98,13 +109,13 @@ public class AmqpConsumer extends Consumer {
                         } catch (UnsupportedEncodingException e) {
                             log.error("sendMessages UnsupportedEncodingException", e.getMessage());
                         }
-                        if (autoAck) {
 
-                            messagesAck(index.getPosition(), msg.getPosition(), indexMessage.getExchangeName(),
-                                PulsarApi.CommandAck.AckType.Individual, null);
+                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
+                            (PositionImpl) msg.getPosition());
+                        if (autoAck) {
+                            messagesAck(index.getPosition());
                         } else {
-                            channel.getUnacknowledgedMessageMap().add(deliveryTag, index.getPosition(),
-                                msg.getPosition(), indexMessage.getExchangeName(), this);
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag, index.getPosition(), this);
                         }
                     }
                     msg.release();
@@ -114,16 +125,31 @@ public class AmqpConsumer extends Consumer {
             }
             batchSizes.recyle();
         });
-
         return null;
     }
 
-    public void messagesAck(Position indexPosition, Position messagePosition, String exchangeName,
-        PulsarApi.CommandAck.AckType ackType,
-        Map<String, Long> properties) {
-        getSubscription().acknowledgeMessage(Collections.singletonList(indexPosition), ackType, properties);
-        getQueue().acknowledgeAsync(exchangeName, ((PositionImpl) messagePosition).getLedgerId(),
-            ((PositionImpl) messagePosition).getEntryId());
+    public synchronized void messagesAck(List<Position> position) {
+        ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
+        Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
+        getSubscription().acknowledgeMessage(position, PulsarApi.CommandAck.AckType.Individual, Collections.EMPTY_MAP);
+        if (!cursor.getMarkDeletedPosition().equals(previousMarkDeletePosition)) {
+            synchronized (this) {
+                PositionImpl newDeletePosition = (PositionImpl) cursor.getMarkDeletedPosition();
+                unAckMessages.entrySet().stream().forEach(entry -> {
+                    SortedMap<PositionImpl, PositionImpl> ackMap = entry.getValue().headMap(newDeletePosition);
+                    if (ackMap.size() > 0) {
+                        PositionImpl lastValue = ackMap.get(ackMap.lastKey());
+                        getQueue().acknowledgeAsync(entry.getKey(), lastValue.getLedgerId(), lastValue.getEntryId());
+
+                    }
+                    ackMap.clear();
+                });
+            }
+        }
+    }
+
+    public synchronized void messagesAck(Position position) {
+        messagesAck(Collections.singletonList(position));
     }
 
     public void redeliverAmqpMessages(List<PositionImpl> positions) {
@@ -152,5 +178,10 @@ public class AmqpConsumer extends Consumer {
     public int getAvailablePermits() {
         //TODO Temporarily perform this operation here, This method will be overridden later in flow control impl
         return 1;
+    }
+
+    private void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
+        TreeMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName, treeMap -> new TreeMap());
+        map.put(index, message);
     }
 }

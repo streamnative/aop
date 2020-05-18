@@ -32,29 +32,16 @@ public class UnacknowledgedMessageMap {
      *  unAck positionInfo.
      */
     public static final class MessageConsumerAssociation {
-        private final String exchangeName;
-        private final Position indexPosition;
-        private final Position msgPosition;
+        private final Position position;
         private final AmqpConsumer consumer;
 
-        private MessageConsumerAssociation(Position indexPosition, Position msgPosition, String exchangeName,
-            AmqpConsumer consumer) {
-            this.indexPosition = indexPosition;
-            this.msgPosition = msgPosition;
-            this.exchangeName = exchangeName;
+        private MessageConsumerAssociation(Position position, AmqpConsumer consumer) {
+            this.position = position;
             this.consumer = consumer;
         }
 
-        public Position getIndexPosition() {
-            return indexPosition;
-        }
-
-        public Position getMsgPosition() {
-            return msgPosition;
-        }
-
-        public String getExchangeName() {
-            return exchangeName;
+        public Position getPosition() {
+            return position;
         }
 
         public AmqpConsumer getConsumer() {
@@ -83,13 +70,10 @@ public class UnacknowledgedMessageMap {
         return Collections.emptySet();
     }
 
-    public void add(long deliveryTag, Position indexPosition, Position messagePosition, String exchangeName,
-        AmqpConsumer consumer) {
-        checkNotNull(indexPosition);
-        checkNotNull(messagePosition);
+    public void add(long deliveryTag, Position position, AmqpConsumer consumer) {
+        checkNotNull(position);
         checkNotNull(consumer);
-        checkNotNull(exchangeName);
-        map.put(deliveryTag, new MessageConsumerAssociation(indexPosition, messagePosition, exchangeName, consumer));
+        map.put(deliveryTag, new MessageConsumerAssociation(position, consumer));
     }
 
     public void remove(Collection<Long> deliveryTag) {

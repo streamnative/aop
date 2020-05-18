@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
+import org.apache.bookkeeper.common.util.SafeRunnable;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.PulsarService;
@@ -737,22 +738,24 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
             amqpExchange = connection.getExchange(exchangeName);
-            CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
-            position.whenComplete((position1, throwable) -> {
-                if (throwable == null) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("publish message success position {}", position1.toString());
+            connection.getPulsarService().getOrderedExecutor().executeOrdered(amqpExchange, SafeRunnable.safeRun(() -> {
+                CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
+                position.whenComplete((position1, throwable) -> {
+                    if (throwable == null) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("publish message success position {}", position1.toString());
+                        }
+                        if (confirmOnPublish) {
+                            confirmedMessageCounter++;
+                            BasicAckBody basicAckBody = connection.getMethodRegistry().
+                                createBasicAckBody(confirmedMessageCounter, false);
+                            connection.writeFrame(basicAckBody.generateFrame(channelId));
+                        }
+                    } else {
+                        log.error("publish message error {}", throwable.getMessage());
                     }
-                    if (confirmOnPublish) {
-                        confirmedMessageCounter++;
-                        BasicAckBody basicAckBody = connection.getMethodRegistry().
-                            createBasicAckBody(confirmedMessageCounter, false);
-                        connection.writeFrame(basicAckBody.generateFrame(channelId));
-                    }
-                } else {
-                    log.error("publish message error {}", throwable.getMessage());
-                }
-            });
+                });
+            }));
 
         }
     }
@@ -780,7 +783,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 AmqpConsumer consumer = association.getConsumer();
                 List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
                     list -> new ArrayList<>());
-                positions.add((PositionImpl) association.getIndexPosition());
+                positions.add((PositionImpl) association.getPosition());
             });
             positionMap.entrySet().stream().forEach(entry -> {
                 entry.getKey().redeliverAmqpMessages(entry.getValue());
@@ -801,8 +804,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
             ackedMessages.stream().forEach(entry -> {
-                entry.getConsumer().messagesAck(entry.getIndexPosition(), entry.getMsgPosition(),
-                    entry.getExchangeName(), PulsarApi.CommandAck.AckType.Individual, null);
+                entry.getConsumer().messagesAck(entry.getPosition());
             });
         }
 

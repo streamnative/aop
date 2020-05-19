@@ -77,6 +77,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         Init,
         RedirectLookup,
         RedirectToBroker,
+        ReLookup,
         Closed
     }
 
@@ -117,7 +118,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        log.info("ProxyConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
+//        log.info("ProxyConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
         switch (state) {
             case Init:
             case RedirectLookup:
@@ -141,7 +142,13 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 break;
             case RedirectToBroker:
                 log.info("ProxyConnection [channelRead] - RedirectToBroker");
-                proxyHandler.getBrokerChannel().writeAndFlush(msg);
+                if (proxyHandler != null) {
+                    proxyHandler.getBrokerChannel().writeAndFlush(msg);
+                }
+                break;
+            case ReLookup:
+//                log.info("ProxyConnection [channelRead] - reLookup");
+                ((ByteBuf) msg).release();
                 break;
             case Closed:
                 log.info("ProxyConnection [channelRead] - closed");
@@ -236,58 +243,61 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     }
 
     public void createProxyHandler(int retryTimes) {
-        int i = 0;
-        do {
-            log.info("Connect to broker [{}] ...", i);
-            handleConnect();
-            if (proxyHandler != null) {
-                log.info("Connect to broker finish.");
-                break;
-            }
-            i++;
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                log.error("Retry connect to broker failed.");
-            }
-        } while (i < retryTimes);
+//        int i = 0;
+//        do {
+//            log.info("Connect to broker [{}] ...", i);
+//            handleConnect();
+//            if (proxyHandler != null) {
+//                log.info("Connect to broker finish. retry {} times", i + 1);
+//                break;
+//            }
+//            i++;
+//            try {
+//                Thread.sleep(200);
+//            } catch (InterruptedException e) {
+//                log.error("Retry connect to broker failed.");
+//            }
+//        } while (i < retryTimes);
+        handleConnect();
     }
 
     public void handleConnect() {
-        String amqpBrokerHost;
-        int amqpBrokerPort;
         if (proxyService.getVhostBrokerMap().containsKey(vhost)) {
-            amqpBrokerHost = proxyService.getVhostBrokerMap().get(vhost).getLeft();
-            amqpBrokerPort = proxyService.getVhostBrokerMap().get(vhost).getRight();
+            String aopBrokerHost = proxyService.getVhostBrokerMap().get(vhost).getLeft();
+            int aopBrokerPort = proxyService.getVhostBrokerMap().get(vhost).getRight();
+            handleConnectComplete(aopBrokerHost, aopBrokerPort);
         } else {
             try {
                 NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), vhost);
 
                 String topic = TopicName.get(TopicDomain.persistent.value(),
                         namespaceName, "__lookup__").toString();
-                Pair<String, Integer> lookupData = lookupHandler.findBroker(
+                CompletableFuture<Pair<String, Integer>> lookupData = lookupHandler.findBroker(
                         TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
-                amqpBrokerHost = lookupData.getLeft();
-                amqpBrokerPort = lookupData.getRight();
-                proxyService.getVhostBrokerMap().put(vhost, lookupData);
+                lookupData.whenComplete((pair, throwable) -> {
+                    handleConnectComplete(pair.getLeft(), pair.getRight());
+                    proxyService.cacheVhostMap(vhost, pair);
+                });
             } catch (Exception e) {
                 log.error("Lookup broker failed.", e);
                 resetProxyHandler();
                 return;
             }
         }
+    }
 
+    private void handleConnectComplete(String aopBrokerHost, int aopBrokerPort) {
         try {
-            if (StringUtils.isEmpty(amqpBrokerHost) || amqpBrokerPort == 0) {
-                log.error("Lookup broker failed. amqpBrokerHost: {}, amqpBrokerPort: {}",
-                        amqpBrokerHost, amqpBrokerPort);
+            if (StringUtils.isEmpty(aopBrokerHost) || aopBrokerPort == 0) {
+                log.error("Lookup broker failed. aopBrokerHost: {}, aopBrokerPort: {}",
+                        aopBrokerHost, aopBrokerPort);
                 resetProxyHandler();
                 return;
             }
 
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
             proxyHandler = new ProxyHandler(vhost, proxyService,
-                    this, amqpBrokerHost, amqpBrokerPort, connectMsgList, responseBody);
+                    this, aopBrokerHost, aopBrokerPort, connectMsgList, responseBody);
             state = State.RedirectToBroker;
         } catch (Exception e) {
             resetProxyHandler();
@@ -296,6 +306,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     }
 
     public void resetProxyHandler() {
+        state = State.ReLookup;
         if (proxyHandler != null) {
             proxyHandler.close();
             proxyHandler = null;

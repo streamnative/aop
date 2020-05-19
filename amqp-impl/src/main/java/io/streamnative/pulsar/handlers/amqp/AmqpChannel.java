@@ -106,7 +106,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private volatile int consumerTag;
 
     /**
-     * The delivery tag is unique per channel. This is pre-incremented before putting into the deliver frame so that
+     * The delivery tag is un ique per channel. This is pre-incremented before putting into the deliver frame so that
      * value of this represents the <b>last</b> tag sent out.
      */
     private volatile long deliveryTag = 0;

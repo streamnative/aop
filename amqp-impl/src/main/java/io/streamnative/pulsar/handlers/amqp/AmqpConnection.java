@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static java.nio.charset.StandardCharsets.US_ASCII;
+
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -373,6 +374,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
+        if (this.channels.get(channelId) == null) {
+            log.debug("Connecting to: {}", namespaceName.getLocalName());
+            final AmqpChannel channel = new AmqpChannel(channelId, this);
+            addChannel(channel);
+            return channel;
+        }
         return this.channels.get(channelId);
     }
 

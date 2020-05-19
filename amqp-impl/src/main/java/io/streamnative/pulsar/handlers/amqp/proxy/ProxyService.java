@@ -15,7 +15,9 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.collect.BoundType;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Range;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
@@ -29,12 +31,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
+import org.apache.pulsar.broker.namespace.NamespaceEphemeralData;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.NamespaceBundle;
+import org.apache.pulsar.common.naming.NamespaceBundles;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.util.ObjectMapperFactory;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
 import org.apache.pulsar.zookeeper.ZookeeperClientFactoryImpl;
+import org.apache.zookeeper.AsyncCallback;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.data.Stat;
 
 /**
  * This service is used for redirecting AMQP client request to proper AMQP protocol handler Broker.
@@ -68,10 +78,13 @@ public class ProxyService implements Closeable {
     @Getter
     private Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
 
+    private String tenant;
+
     public ProxyService(ProxyConfiguration proxyConfig, PulsarService pulsarService) {
         checkNotNull(proxyConfig);
         this.proxyConfig = proxyConfig;
         this.pulsarService = pulsarService;
+        this.tenant = this.proxyConfig.getAmqpTenant();
         acceptorGroup = EventLoopUtil.newEventLoopGroup(1, acceptorThreadFactory);
         workerGroup = EventLoopUtil.newEventLoopGroup(numThreads, workerThreadFactory);
     }
@@ -90,34 +103,6 @@ public class ProxyService implements Closeable {
 
         this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(proxyConfig.getBrokerServiceURL()).build();
         this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
-
-        pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
-            @Override
-            public void onLoad(NamespaceBundle namespaceBundle) {
-                log.info("onLoad namespaceBundle: {}", namespaceBundle);
-                if (vhostBrokerMap.containsKey(namespaceBundle.getNamespaceObject().getLocalName())) {
-                    log.info("onLoad vhostBrokerMap contain the namespaceBundle: {}", namespaceBundle);
-                }
-            }
-
-            @Override
-            public void unLoad(NamespaceBundle namespaceBundle) {
-                log.info("unLoad namespaceBundle: {}", namespaceBundle);
-                synchronized (vhostBrokerMap) {
-                    if (vhostBrokerMap.containsKey(namespaceBundle.getNamespaceObject().getLocalName())) {
-                        log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", namespaceBundle);
-                        vhostBrokerMap.remove(namespaceBundle.getNamespaceObject().getLocalName());
-                        reConnection(namespaceBundle.getNamespaceObject().getLocalName());
-                    }
-                }
-            }
-
-            @Override
-            public boolean test(NamespaceBundle namespaceBundle) {
-                log.info("test namespaceBundle: {}", namespaceBundle);
-                return true;
-            }
-        });
     }
 
     private void reConnection(String namespaceName) {
@@ -137,6 +122,54 @@ public class ProxyService implements Closeable {
         }
         // Return default factory
         return zkClientFactory;
+    }
+
+    public void cacheVhostMap(String vhost, Pair<String, Integer> lookupData) {
+        this.vhostBrokerMap.put(vhost, lookupData);
+        try {
+            NamespaceBundle namespaceBundle = new NamespaceBundle(
+                    NamespaceName.get(tenant, vhost),
+                    Range.range(NamespaceBundles.FULL_LOWER_BOUND, BoundType.CLOSED,
+                            NamespaceBundles.FULL_UPPER_BOUND, BoundType.CLOSED),
+                    pulsarService.getNamespaceService().getNamespaceBundleFactory());
+            String path = "/namespace/" + namespaceBundle.toString();
+
+            getPulsarService().getLocalZkCache().getZooKeeper().getData(path, new Watcher() {
+                @Override
+                public void process(WatchedEvent watchedEvent) {
+                    log.info("process watchedEvent: {}", watchedEvent);
+                    synchronized (vhostBrokerMap) {
+                        String path = watchedEvent.getPath();
+                        if (watchedEvent.getType().equals(Event.EventType.NodeDeleted)) {
+                            String[] stringSplits = path.split("/");
+                            String vhost = stringSplits[stringSplits.length - 2];
+                            if (vhostBrokerMap.containsKey(vhost)) {
+                                log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", path);
+                                vhostBrokerMap.remove(vhost);
+                                reConnection(vhost);
+                            }
+                        }
+                    }
+                }
+            }, new AsyncCallback.DataCallback() {
+                @Override
+                public void processResult(int i, String s, Object o, byte[] bytes, Stat stat) {
+                    try {
+                        if (bytes != null) {
+                            NamespaceEphemeralData ephemeralData =
+                                    ObjectMapperFactory.getThreadLocal().readValue(bytes, NamespaceEphemeralData.class);
+                            log.info("processResult ephemeralData: {}", ephemeralData);
+                        } else {
+                            log.info("processResult ephemeralData is null");
+                        }
+                    } catch (IOException e) {
+                        log.error("Read ephemeralData failed", e);
+                    }
+                }
+            }, null);
+        } catch (Exception e) {
+            log.error("Add watcher failed. vhost: {}, lookupData: {}", vhost, lookupData, e);
+        }
     }
 
     @Override

@@ -20,17 +20,20 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import lombok.Cleanup;
-import lombok.extern.slf4j.Slf4j;
-import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.Cleanup;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 @Slf4j
 public class ProxyTest extends RabbitMQTestBase {
@@ -40,6 +43,81 @@ public class ProxyTest extends RabbitMQTestBase {
     public void setup() throws Exception {
         setBrokerCount(3);
         super.setup();
+    }
+
+    @Test
+    public void test() throws PulsarAdminException, KeeperException, InterruptedException {
+        getPulsarServiceList().get(0).getLocalZkCache().getZooKeeper().getData("/namespace/public/vhost1/0x00000000_0xffffffff", new Watcher() {
+            @Override
+            public void process(WatchedEvent watchedEvent) {
+                admin.lookups().lookupTopicAsync("persistent://public/vhost1/__lookup__");
+            }
+        }, null);
+        admin.namespaces().unload("public/vhost1");
+    }
+
+    @Test
+    public void unloadBundleTest() throws Exception {
+
+        @Cleanup
+        Connection connection = getConnection("vhost1", true);
+        @Cleanup
+        Channel channel = connection.createChannel();
+
+        String exchangeName = "ex1";
+        String queueName = "ex1-q1";
+        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, "");
+
+        final String msgContent = "Hello AOP!";
+
+        new Thread(() -> {
+            while (true) {
+                try {
+                    channel.basicPublish(exchangeName, "", null, msgContent.getBytes());
+                    Thread.sleep(100);
+                } catch (Exception e) {
+//                    log.warn("produce message failed.");
+                }
+            }
+        }).start();
+
+        new Thread(() -> {
+            try {
+                log.info("unload ns start.");
+                admin.namespaces().unload("public/vhost1");
+                log.info("unload ns finish.");
+            } catch (Exception e) {
+                log.error("unload failed ns: {}", "public/vhost1", e);
+            }
+        }).start();
+
+        AtomicInteger receiveMsgCnt = new AtomicInteger(0);
+        CountDownLatch countDownLatch = new CountDownLatch(100);
+        new Thread(() -> {
+            Consumer consumer = new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String consumerTag, Envelope envelope,
+                                           AMQP.BasicProperties properties, byte[] body) throws IOException {
+                    String message = new String(body, "UTF-8");
+                    System.out.println(message);
+                    Assert.assertEquals(message, msgContent);
+                    synchronized (countDownLatch) {
+                        countDownLatch.countDown();
+                        receiveMsgCnt.getAndIncrement();
+                    }
+                }
+            };
+            try {
+                channel.basicConsume(queueName, false, consumer);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+        countDownLatch.await();
+        Assert.assertEquals(receiveMsgCnt.get(), 100);
     }
 
     @Test
@@ -75,18 +153,6 @@ public class ProxyTest extends RabbitMQTestBase {
             }
         }).start();
         countDownLatch.await();
-
-//        admin.namespaces().unload("public/vhost1");
-//        admin.namespaces().unload("public/vhost2");
-//        admin.namespaces().unload("public/vhost3");
-//
-//        Thread.sleep(1000 * 2);
-//
-//        log.info("unload namespaces finish");
-//
-//        fanoutTest("test7", "vhost1", "ex7", Arrays.asList("ex7-q1", "ex7-q2"));
-//        fanoutTest("test8", "vhost2", "ex8", Arrays.asList("ex8-q1", "ex8-q2"));
-//        fanoutTest("test9", "vhost3", "ex9", Arrays.asList("ex9-q1", "ex9-q2"));
     }
 
     private void fanoutTest(String testName, String vhost, String exchangeName, List<String> queueList) throws Exception {

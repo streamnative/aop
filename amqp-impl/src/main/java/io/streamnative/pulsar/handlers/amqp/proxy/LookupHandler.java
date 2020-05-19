@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
@@ -40,6 +41,6 @@ public interface LookupHandler {
      * @return Pair consist of brokerHost and brokerPort
      * @throws ProxyException
      */
-    Pair<String, Integer> findBroker(TopicName topicName, String protocolHandlerName) throws Exception;
+    CompletableFuture<Pair<String, Integer>> findBroker(TopicName topicName, String protocolHandlerName) throws Exception;
 
 }

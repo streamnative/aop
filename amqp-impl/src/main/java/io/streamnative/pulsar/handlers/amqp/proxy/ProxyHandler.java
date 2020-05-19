@@ -118,7 +118,6 @@ public class ProxyHandler {
             for (Object msg : connectMsgList) {
                 ((ByteBuf) msg).retain();
                 brokerChannel.writeAndFlush(msg).syncUninterruptibly();
-                ((ByteBuf) msg).release();
             }
             brokerChannel.read();
         }

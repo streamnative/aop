@@ -17,6 +17,7 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
@@ -89,30 +90,43 @@ public class PulsarServiceLookupHandler implements LookupHandler {
     }
 
     @Override
-    public Pair<String, Integer> findBroker(TopicName topicName, String protocolHandlerName) throws Exception {
-        Pair<InetSocketAddress, InetSocketAddress> lookup = pulsarClient.getLookup().getBroker(topicName).get();
-        String hostName = lookup.getLeft().getHostName();
-        List<String> children = pulsarService.getZkClient().getChildren(LoadManager.LOADBALANCE_BROKERS_ROOT, null);
-        int amqpBrokerPort = 0;
-        for (String webService : children) {
+    public CompletableFuture<Pair<String, Integer>> findBroker(TopicName topicName, String protocolHandlerName) throws Exception {
+        CompletableFuture<Pair<String, Integer>> lookupResult = new CompletableFuture<>();
+        CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> lookup =
+                pulsarClient.getLookup().getBroker(topicName);
+
+        lookup.whenComplete((pair, throwable) -> {
+            String hostName = pair.getLeft().getHostName();
+            List<String> children = null;
             try {
-                byte[] content = pulsarService.getZkClient().getData(LoadManager.LOADBALANCE_BROKERS_ROOT
-                        + "/" + webService, null, null);
-                ServiceLookupData serviceLookupData = pulsarService.getLoadManager().get()
-                        .getLoadReportDeserializer().deserialize("", content);
-                if (serviceLookupData.getPulsarServiceUrl().contains("" + lookup.getLeft().getPort())) {
-                    if (serviceLookupData.getProtocol(protocolHandlerName).isPresent()) {
-                        String amqpBrokerUrl = serviceLookupData.getProtocol(protocolHandlerName).get();
-                        String[] splits = amqpBrokerUrl.split(":");
-                        String port = splits[splits.length - 1];
-                        amqpBrokerPort = Integer.parseInt(port);
-                        break;
-                    }
-                }
+                children = pulsarService.getZkClient().getChildren(LoadManager.LOADBALANCE_BROKERS_ROOT, null);
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
-        return Pair.of(hostName, amqpBrokerPort);
+            int amqpBrokerPort = 0;
+            for (String webService : children) {
+                try {
+                    byte[] content = pulsarService.getZkClient().getData(LoadManager.LOADBALANCE_BROKERS_ROOT
+                            + "/" + webService, null, null);
+                    ServiceLookupData serviceLookupData = pulsarService.getLoadManager().get()
+                            .getLoadReportDeserializer().deserialize("", content);
+                    if (serviceLookupData.getPulsarServiceUrl().contains("" + pair.getLeft().getPort())) {
+                        if (serviceLookupData.getProtocol(protocolHandlerName).isPresent()) {
+                            String amqpBrokerUrl = serviceLookupData.getProtocol(protocolHandlerName).get();
+                            String[] splits = amqpBrokerUrl.split(":");
+                            String port = splits[splits.length - 1];
+                            amqpBrokerPort = Integer.parseInt(port);
+                            lookupResult.complete(Pair.of(hostName, amqpBrokerPort));
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+
+        });
+
+        return lookupResult;
     }
 }

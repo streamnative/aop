@@ -439,18 +439,4 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(!unacknowledgedMessageMap.getMap().containsKey(3));
     }
 
-//    @Test
-//    public void treeMapTest(){
-//        TreeMap<Integer,Integer> map=new TreeMap<>();
-//        map.put(6,6);
-//        map.put(10,10);
-//        map.put(3,3);
-//        map.put(5,5);
-//        map.put(4,4);
-//        map.put(2,2);
-//        SortedMap map1=map.headMap(7,true);
-//        System.out.println(map1.lastKey());
-//        SortedMap map2=map.headMap(6,true);
-//        System.out.println(map2.lastKey());
-//    }
 }

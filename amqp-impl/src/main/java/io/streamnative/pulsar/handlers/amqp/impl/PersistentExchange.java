@@ -37,6 +37,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -57,8 +58,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
-        AmqpTopicManager amqpTopicManager) {
-        super(exchangeName, type, new HashSet<>(), true);
+        AmqpTopicManager amqpTopicManager, boolean autoDelete) {
+        super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
         this.amqpTopicManager = amqpTopicManager;
         updateExchangeProperties();
@@ -186,6 +187,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
         updateExchangeProperties();
+    }
+
+    @Override
+    public Topic getTopic(){
+        return persistentTopic;
     }
 
     private void updateExchangeProperties() {

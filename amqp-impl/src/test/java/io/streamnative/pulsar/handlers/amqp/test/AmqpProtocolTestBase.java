@@ -24,13 +24,14 @@ import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
-import io.streamnative.pulsar.handlers.amqp.MockDispatcher;
-import io.streamnative.pulsar.handlers.amqp.MockTopic;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToServerByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
+import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
+import io.streamnative.pulsar.handlers.amqp.test.mock.MockTopic;
 import java.net.SocketAddress;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.log4j.Log4j2;
@@ -137,6 +138,7 @@ public abstract class AmqpProtocolTestBase {
             completableFuture.complete(persistentTopic);
             Mockito.when(amqpTopicManager.getTopic(anyString())).thenReturn(completableFuture);
             Mockito.when(amqpTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(new MockTopic());
+            Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
             super.setAmqpTopicManager(amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }

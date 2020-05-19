@@ -25,15 +25,17 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     protected final AmqpExchange.Type exchangeType;
     protected Set<AmqpQueue> queues;
     protected boolean durable;
+    protected boolean autoDelete;
     public static final String DEFAULT_EXCHANGE = "__default_ex__";
     public static final String DEFAULT_EXCHANGE_DURABLE = "__default_ex_durable__";
 
     protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType,
-                                   Set<AmqpQueue> queues, boolean durable) {
+                                   Set<AmqpQueue> queues, boolean durable, boolean autoDelete) {
         this.exchangeName = exchangeName;
         this.exchangeType = exchangeType;
         this.queues = queues;
         this.durable = durable;
+        this.autoDelete = autoDelete;
     }
 
     @Override
@@ -47,6 +49,11 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     }
 
     @Override
+    public int getQueueSize() {
+        return queues.size();
+    }
+
+    @Override
     public String getName() {
         return exchangeName;
     }
@@ -54,6 +61,11 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     @Override
     public boolean getDurable() {
         return durable;
+    }
+
+    @Override
+    public boolean getAutoDelete() {
+        return autoDelete;
     }
 
     @Override

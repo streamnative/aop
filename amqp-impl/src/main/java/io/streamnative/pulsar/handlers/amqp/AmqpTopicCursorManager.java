@@ -71,7 +71,7 @@ public class AmqpTopicCursorManager implements Closeable {
                 }
                 ManagedCursor newCursor;
                 try {
-                    newCursor = ledger.openCursor(name, PulsarApi.CommandSubscribe.InitialPosition.Earliest);
+                    newCursor = ledger.openCursor(name, PulsarApi.CommandSubscribe.InitialPosition.Latest);
                 } catch (ManagedLedgerException | InterruptedException e) {
                     log.error("Error new cursor for topic {} - {}. will cause fetch data error.",
                         topic.getName(), e);

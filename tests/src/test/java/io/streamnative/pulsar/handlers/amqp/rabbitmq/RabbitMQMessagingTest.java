@@ -17,7 +17,6 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
@@ -26,7 +25,6 @@ import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -178,53 +176,6 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertNotNull(redeliveredMessageEnvelope.get());
         Assert.assertTrue(redeliveredMessageEnvelope.get().isRedeliver());
 
-    }
-
-    @Test(timeOut = 5000)
-    private void inMemoryE2ETest() throws IOException, TimeoutException, InterruptedException {
-        ConnectionFactory connectionFactory = new ConnectionFactory();
-        connectionFactory.setHost("localhost");
-        connectionFactory.setPort(5672);
-        connectionFactory.setVirtualHost("vhost1");
-
-        final String exchangeName = "ex1";
-        final String queueName1 = "ex1-q1";
-        final String queueName2 = "ex1-q2";
-        final boolean durable = false;
-
-        @Cleanup
-        Connection connection = connectionFactory.newConnection();
-
-        @Cleanup
-        Channel channel = connection.createChannel();
-
-        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, durable);
-        channel.queueDeclare(queueName1, durable, false, false, null);
-        channel.queueDeclare(queueName2, durable, false, false, null);
-
-        channel.queueBind(queueName1, exchangeName, "");
-        channel.queueBind(queueName2, exchangeName, "");
-
-        final String str = "Hello AMQP";
-        channel.basicPublish(exchangeName, "", null, (str).getBytes(StandardCharsets.UTF_8));
-
-        CountDownLatch countDownLatch = new CountDownLatch(2);
-        channel.basicConsume(queueName1, (consumeTag, delivery) -> {
-            String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
-            log.info("{} receive: {}", queueName1, message);
-            Assert.assertEquals(message, str);
-            countDownLatch.countDown();
-        }, consumerTag -> {
-        });
-
-        channel.basicConsume(queueName2, (consumeTag, delivery) -> {
-            String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
-            log.info("{} receive: {}", queueName2, message);
-            Assert.assertEquals(message, str);
-            countDownLatch.countDown();
-        }, consumerTag -> {
-        });
-        countDownLatch.await();
     }
 
     @Test

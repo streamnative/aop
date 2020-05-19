@@ -218,6 +218,14 @@ public class AmqpTopicManager {
             });
     }
 
+    public void deleteTopic(String topicName) {
+
+        if (null != exchangeTopics.get(topicName)){
+            exchangeTopics.remove(topicName);
+        }
+
+    }
+
     public CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(String topicName) {
         return topicCursorManagers.computeIfAbsent(
             topicName,

@@ -128,7 +128,7 @@ public class AmqpConsumer extends Consumer {
         return null;
     }
 
-    public synchronized void messagesAck(List<Position> position) {
+    public void messagesAck(List<Position> position) {
         ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
         Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
         getSubscription().acknowledgeMessage(position, PulsarApi.CommandAck.AckType.Individual, Collections.EMPTY_MAP);
@@ -136,7 +136,7 @@ public class AmqpConsumer extends Consumer {
             synchronized (this) {
                 PositionImpl newDeletePosition = (PositionImpl) cursor.getMarkDeletedPosition();
                 unAckMessages.entrySet().stream().forEach(entry -> {
-                    SortedMap<PositionImpl, PositionImpl> ackMap = entry.getValue().headMap(newDeletePosition);
+                    SortedMap<PositionImpl, PositionImpl> ackMap = entry.getValue().headMap(newDeletePosition, true);
                     if (ackMap.size() > 0) {
                         PositionImpl lastValue = ackMap.get(ackMap.lastKey());
                         getQueue().acknowledgeAsync(entry.getKey(), lastValue.getLedgerId(), lastValue.getEntryId());
@@ -148,7 +148,7 @@ public class AmqpConsumer extends Consumer {
         }
     }
 
-    public synchronized void messagesAck(Position position) {
+    public void messagesAck(Position position) {
         messagesAck(Collections.singletonList(position));
     }
 
@@ -157,7 +157,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     public AmqpQueue getQueue() {
-        return channel.getConnection().getQueue(queueName);
+        return QueueContainer.getQueue(queueName);
     }
 
     public RedeliveryTracker getRedeliveryTracker() {

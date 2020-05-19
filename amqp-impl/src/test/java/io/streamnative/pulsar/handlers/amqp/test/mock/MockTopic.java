@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp;
+package io.streamnative.pulsar.handlers.amqp.test.mock;
 
 import io.netty.buffer.ByteBuf;
 import java.util.Map;
@@ -130,6 +130,7 @@ public class MockTopic implements Topic {
     public void checkGC(int i, InactiveTopicDeleteMode inactiveTopicDeleteMode) {
 
     }
+
 
     @Override
     public void checkInactiveSubscriptions() {

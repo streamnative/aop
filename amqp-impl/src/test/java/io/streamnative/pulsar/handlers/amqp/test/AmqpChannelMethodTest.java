@@ -94,7 +94,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testExchangeDeclareFail() {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
-            .createExchangeDeclareBody(0, "test", "fanout", false, true, false, false, false, null);
+            .createExchangeDeclareBody(0, "test", "fanout", false, false, false, false, true, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -172,15 +172,25 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testExchangeDelete() {
         String tenant = "public";
         String namespace = "ns";
-        String exchange = "test";
+        String exchange = "test1";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
-        ExchangeDeleteBody cmd = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
+        ExchangeDeclareBody cmd = methodRegistry
+                .createExchangeDeclareBody(0, exchange, "fanout", false, false, false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+
+        ExchangeDeleteBody cmd1 = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
+        cmd1.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+
         AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ExchangeDeleteOkBody);
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        AMQBody response1 = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response1 instanceof ExchangeDeleteOkBody);
     }
 
     @Test
@@ -275,12 +285,21 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
+        exchangeDeclare(exchange, true);
+        queueDeclare(queue, true);
 
         QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString(queue),
             AMQShortString.createAMQShortString(exchange), AMQShortString.createAMQShortString("key"), null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+
         AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
+
+        response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueUnbindOkBody);
     }
 
@@ -420,4 +439,18 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertTrue(!unacknowledgedMessageMap.getMap().containsKey(3));
     }
 
+//    @Test
+//    public void treeMapTest(){
+//        TreeMap<Integer,Integer> map=new TreeMap<>();
+//        map.put(6,6);
+//        map.put(10,10);
+//        map.put(3,3);
+//        map.put(5,5);
+//        map.put(4,4);
+//        map.put(2,2);
+//        SortedMap map1=map.headMap(7,true);
+//        System.out.println(map1.lastKey());
+//        SortedMap map2=map.headMap(6,true);
+//        System.out.println(map2.lastKey());
+//    }
 }

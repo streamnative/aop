@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
+import org.apache.bookkeeper.common.util.SafeRunnable;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.PulsarService;
@@ -792,39 +793,43 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
             amqpExchange = ExchangeContainer.getExchange(exchangeName);
-            CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
-            position.whenComplete((position1, throwable) -> {
-                if (throwable == null) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("publish message success position {}", position1.toString());
-                    }
-                    if (confirmOnPublish) {
-                        confirmedMessageCounter++;
-                        recordFuture(Futures.immediateFuture(null),
+            connection.getPulsarService().getOrderedExecutor().executeOrdered(amqpExchange, SafeRunnable.safeRun(() -> {
+                CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
+                position.whenComplete((position1, throwable) -> {
+                    if (throwable == null) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("publish message success position {}", position1.toString());
+                        }
+                        if (confirmOnPublish) {
+                            confirmedMessageCounter++;
+                            recordFuture(Futures.immediateFuture(null),
                                 new ServerTransaction.Action() {
                                     private final long deliveryTag = confirmedMessageCounter;
 
                                     @Override
                                     public void postCommit() {
                                         BasicAckBody body = connection.getMethodRegistry()
-                                                .createBasicAckBody(
-                                                        deliveryTag, false);
+                                            .createBasicAckBody(
+                                                deliveryTag, false);
                                         connection.writeFrame(body.generateFrame(channelId));
                                     }
 
                                     @Override
                                     public void onRollback() {
                                         final BasicNackBody body = new BasicNackBody(deliveryTag,
-                                                false,
-                                                false);
+                                            false,
+                                            false);
                                         connection.writeFrame(new AMQFrame(channelId, body));
                                     }
                                 });
+                        }
+
+                    } else {
+                        log.error("publish message error {}", throwable.getMessage());
                     }
-                } else {
-                    log.error("publish message error {}", throwable.getMessage());
-                }
-            });
+                });
+
+            }));
 
         }
     }
@@ -894,8 +899,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
             ackedMessages.stream().forEach(entry -> {
-                entry.getConsumer().messagesAck(entry.getPosition(), entry.getExchangeName(),
-                        PulsarApi.CommandAck.AckType.Individual, null);
+                entry.getConsumer().messagesAck(entry.getPosition());
             });
         }
 

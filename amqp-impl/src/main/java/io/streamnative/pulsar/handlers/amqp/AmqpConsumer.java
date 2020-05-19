@@ -156,12 +156,12 @@ public class AmqpConsumer extends Consumer {
         getSubscription().getDispatcher().redeliverUnacknowledgedMessages(this, positions);
     }
 
-    public AmqpQueue getQueue() {
-        return QueueContainer.getQueue(queueName);
-    }
-
     public RedeliveryTracker getRedeliveryTracker() {
         return getSubscription().getDispatcher().getRedeliveryTracker();
+    }
+
+    public AmqpQueue getQueue() {
+        return QueueContainer.getQueue(queueName);
     }
 
     @Override

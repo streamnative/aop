@@ -173,9 +173,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             exchangeName, AmqpExchange.Type.value(type.toString()), autoDelete);
                     ExchangeContainer.putExchange(exchange.toString(), inMemoryExchange);
                 }
-
-                // if declare a default exchange, return success.
-                connection.writeFrame(declareOkBody.generateFrame(channelId));
+                if (!nowait) {
+                    sync();
+                    // if declare a default exchange, return success.
+                    connection.writeFrame(declareOkBody.generateFrame(channelId));
+                }
             }
         } else {
             AmqpExchange amqpExchange = ExchangeContainer.getExchange(exchangeName);

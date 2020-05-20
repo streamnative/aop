@@ -133,6 +133,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
             future.complete(null);
             return future;
         }
+        if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
+            future.complete(null);
+            return future;
+        }
         cursor.asyncMarkDelete(position, new AsyncCallbacks.MarkDeleteCallback() {
             @Override
             public void markDeleteComplete(Object ctx) {

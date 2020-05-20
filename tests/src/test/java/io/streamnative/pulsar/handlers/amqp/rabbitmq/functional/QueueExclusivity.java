@@ -50,7 +50,7 @@ public class QueueExclusivity extends BrokerTestCase {
         }
     }
 
-//    @Test
+    @Test
     public void queueExclusiveForPassiveDeclare() throws Exception {
         try {
             channel.queueDeclarePassive(q);

@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.SafeRunnable;
+import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.PulsarService;
@@ -171,7 +172,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 if (!durable) {
                     InMemoryExchange inMemoryExchange = new InMemoryExchange(
                             exchangeName, AmqpExchange.Type.value(type.toString()), autoDelete);
-                    ExchangeContainer.putExchange(exchange.toString(), inMemoryExchange);
+                    ExchangeContainer.putExchange(connection.getNamespaceName(), exchange.toString(), inMemoryExchange);
                 }
                 if (!nowait) {
                     sync();
@@ -180,7 +181,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
         } else {
-            AmqpExchange amqpExchange = ExchangeContainer.getExchange(exchangeName);
+            AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
             if (passive) {
                 if (null == amqpExchange) {
                     closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
@@ -223,7 +224,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             // in-memory integration
                             InMemoryExchange inMemoryExchange = new InMemoryExchange(
                                     exchangeName, AmqpExchange.Type.value(type.toString()), autoDelete);
-                            ExchangeContainer.putExchange(exchangeName, inMemoryExchange);
+                            ExchangeContainer.putExchange(connection.getNamespaceName(), exchangeName, inMemoryExchange);
                             if (!nowait) {
                                 sync();
                                 connection.writeFrame(declareOkBody.generateFrame(channelId));
@@ -240,9 +241,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                         "AOP Create Exchange failed.", channelId);
                                 return;
                             }
-                            ExchangeContainer.putExchange(exchangeName, new PersistentExchange(
-                                    exchangeName, AmqpExchange.Type.value(type.toString()), persistentTopic,
-                                    amqpTopicManager, autoDelete));
+                            ExchangeContainer.putExchange(connection.getNamespaceName(),
+                                    exchangeName,
+                                    new PersistentExchange(
+                                            exchangeName, AmqpExchange.Type.value(type.toString()),
+                                            persistentTopic, amqpTopicManager, autoDelete));
                             if (!nowait) {
                                 sync();
                                 connection.writeFrame(declareOkBody.generateFrame(channelId));
@@ -271,7 +274,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (isDefaultExchange(exchange)) {
             connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Default Exchange cannot be deleted. ", channelId);
         } else {
-            AmqpExchange amqpExchange = ExchangeContainer.getExchange(exchangeName);
+            AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
             if (null == amqpExchange) {
                 closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
             } else {
@@ -351,7 +354,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         AmqpQueue amqpQueue;
         if (passive) {
-            amqpQueue = QueueContainer.getQueue(queue.toString());
+            amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), queue.toString());
             if (null == amqpQueue) {
                 closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
             } else {
@@ -375,7 +378,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     return;
                 }
             }
-            QueueContainer.putQueue(queue.toString(), amqpQueue);
+            QueueContainer.putQueue(connection.getNamespaceName(), queue.toString(), amqpQueue);
             setDefaultQueue(amqpQueue);
             // return success.
             // when call QueueBind, then create Pulsar sub.
@@ -405,9 +408,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
         } else {
-            amqpQueue = QueueContainer.getQueue(queue.toString());
+            amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), queue.toString());
         }
-        AmqpExchange amqpExchange = ExchangeContainer.getExchange(exchange.toString());
+        AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchange.toString());
 
         AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
         if (messageRouter == null) {
@@ -474,8 +477,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         // in-memory integration
-        AmqpQueue amqpQueue = QueueContainer.getQueue(queue.toString());
-        AmqpExchange amqpExchange = ExchangeContainer.getExchange(exchange.toString());
+        AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), queue.toString());
+        AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchange.toString());
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
             amqpQueue.unbindExchange(amqpExchange);
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
@@ -525,7 +528,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             consumerTag1 = consumerTag.toString();
         }
         // in-memory integration
-        AmqpQueue amqpQueue = QueueContainer.getQueue(queue.toString());
+        AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), queue.toString());
         if (amqpQueue instanceof InMemoryQueue) {
             try {
                 if (!nowait) {
@@ -601,7 +604,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             PulsarApi.CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
                             consumerTag, 0, connection.getServerCnx(), "", null,
                             false, PulsarApi.CommandSubscribe.InitialPosition.Earliest,
-                            null, this, consumerTag, queueName, ack);
+                            null, this, consumerTag, queueName, ack, connection.getNamespaceName());
             subscription.addConsumer(consumer);
             // TODO Temporarily perform this operation here
             subscription.getDispatcher().consumerFlow(consumer, 10000);
@@ -635,8 +638,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         if (exchangeName == null || exchangeName.length() == 0) {
-            AmqpExchange amqpExchange = ExchangeContainer.getExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-            AmqpQueue amqpQueue = QueueContainer.getQueue(routingKey.toString());
+            AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(),
+                    AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+            AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), routingKey.toString());
 
             if (amqpQueue == null) {
                 log.error("Queue[{}] is not declared!", routingKey.toString());
@@ -783,7 +787,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 return;
             }
 
-            AmqpQueue amqpQueue = QueueContainer.getQueue(routingKey);
+            AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), routingKey);
             AmqpExchange amqpExchange;
             if (exchangeName == null || exchangeName.length() == 0) {
                 if (amqpQueue.getDurable()) {
@@ -792,7 +796,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE;
                 }
             }
-            amqpExchange = ExchangeContainer.getExchange(exchangeName);
+            amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
             connection.getPulsarService().getOrderedExecutor().executeOrdered(amqpExchange, SafeRunnable.safeRun(() -> {
                 CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
                 position.whenComplete((position1, throwable) -> {

@@ -36,6 +36,7 @@ import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**
@@ -52,6 +53,8 @@ public class AmqpConsumer extends Consumer {
 
     private final String queueName;
 
+    private final NamespaceName namespaceName;
+
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
@@ -63,13 +66,14 @@ public class AmqpConsumer extends Consumer {
         String appId, Map<String, String> metadata, boolean readCompacted,
         PulsarApi.CommandSubscribe.InitialPosition subscriptionInitialPosition,
         PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) throws BrokerServiceException {
+        boolean autoAck, NamespaceName namespaceName) throws BrokerServiceException {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta);
         this.channel = channel;
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
         this.queueName = queueName;
+        this.namespaceName = namespaceName;
         unAckMessages = new ConcurrentHashMap<>();
     }
 
@@ -161,7 +165,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     public AmqpQueue getQueue() {
-        return QueueContainer.getQueue(queueName);
+        return QueueContainer.getQueue(namespaceName, queueName);
     }
 
     @Override

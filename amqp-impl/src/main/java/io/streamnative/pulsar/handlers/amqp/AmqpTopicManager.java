@@ -41,21 +41,19 @@ public class AmqpTopicManager {
 
     private BrokerService brokerService;
 
-    private AmqpConnection amqpConnection;
-
     public static final ConcurrentHashMap<String, CompletableFuture<InetSocketAddress>>
         LOOKUP_CACHE = new ConcurrentHashMap<>();
 
     // cache for topics: <topicName, persistentTopic>
     private final ConcurrentHashMap<String, CompletableFuture<PersistentTopic>> topics;
+    @Getter
     private final ConcurrentHashMap<String, CompletableFuture<Topic>> exchangeTopics;
 
     @Getter
     private final ConcurrentHashMap<String, CompletableFuture<AmqpTopicCursorManager>> topicCursorManagers;
 
-    public AmqpTopicManager(AmqpConnection amqpConnection) {
-        this.amqpConnection = amqpConnection;
-        this.pulsarService = amqpConnection.getPulsarService();
+    public AmqpTopicManager(PulsarService pulsarService) {
+        this.pulsarService = pulsarService;
         this.brokerService = pulsarService.getBrokerService();
         topics = new ConcurrentHashMap<>();
         exchangeTopics = new ConcurrentHashMap<>();
@@ -183,6 +181,7 @@ public class AmqpTopicManager {
                 // setup ownership of service unit to this broker
                 pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), true).
                     whenComplete((addr, th) -> {
+                        log.info("Find getBrokerServiceUrl {}, return null Topic.: {}", addr, t);
                         if (th != null || addr == null || addr.get() == null) {
                             log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", t, th);
                             topicCompletableFuture.complete(null);

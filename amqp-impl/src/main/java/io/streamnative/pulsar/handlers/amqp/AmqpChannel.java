@@ -285,7 +285,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     } else {
                         try {
                             amqpTopicManager.deleteTopic(exchangeName);
-                            ExchangeContainer.deleteExchange(exchangeName);
+                            ExchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
                             topic.delete().get();
                             ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().
                                     createExchangeDeleteOkBody();
@@ -301,7 +301,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                     }
                     amqpTopicManager.deleteTopic(exchangeName);
-                    ExchangeContainer.deleteExchange(exchangeName);
+                    ExchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
                     ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
                     connection.writeFrame(responseBody.generateFrame(channelId));
                 }

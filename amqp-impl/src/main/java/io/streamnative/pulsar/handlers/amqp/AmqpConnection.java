@@ -27,7 +27,6 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 
-import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -271,7 +270,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
         defaultExchangeInit();
-        ResourceContainer.addConnection(namespaceName, this);
+        ConnectionContainer.addConnection(namespaceName, this);
 //        } else {
 //            sendConnectionClose(ErrorCodes.NOT_FOUND,
 //                "Unknown virtual host: '" + virtualHostStr + "'", 0);

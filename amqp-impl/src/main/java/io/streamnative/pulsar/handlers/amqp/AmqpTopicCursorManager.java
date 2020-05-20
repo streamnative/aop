@@ -123,16 +123,5 @@ public class AmqpTopicCursorManager implements Closeable {
 
     @Override
     public void close() throws IOException {
-        this.closed = true;
-        topic.close();
-        if (cursors != null) {
-            for (ManagedCursor cursor : cursors.values()) {
-                try {
-                    cursor.close();
-                } catch (Exception e) {
-                    log.error("Failed to close cursor.", e);
-                }
-            }
-        }
     }
 }

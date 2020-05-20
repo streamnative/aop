@@ -14,10 +14,9 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
-import com.google.common.collect.Maps;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -25,7 +24,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 /**
  * Container for all queues in the broker.
  */
-public class QueueContainer extends TopicContainer {
+public class QueueContainer {
 
     @Getter
     private final static Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
@@ -52,10 +51,12 @@ public class QueueContainer extends TopicContainer {
         return map.getOrDefault(queueName, null);
     }
 
-    public static void deleteQueue(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
+    public static void deleteQueue(NamespaceName namespaceName, String queueName) {
+        if (StringUtils.isEmpty(queueName)) {
             return;
         }
-        queueMap.remove(exchangeName);
+        if (queueMap.containsKey(namespaceName)) {
+            queueMap.get(namespaceName).remove(queueName);
+        }
     }
 }

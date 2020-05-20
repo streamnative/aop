@@ -40,6 +40,7 @@ public interface AmqpExchange {
             if (type == null || type.length() == 0) {
                 return null;
             }
+            type = type.toLowerCase();
             switch (type) {
                 case "direct":
                     return Direct;

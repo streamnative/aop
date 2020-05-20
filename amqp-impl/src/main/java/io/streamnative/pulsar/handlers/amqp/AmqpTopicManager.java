@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static com.google.common.base.Preconditions.checkState;
+
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,8 +29,6 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.Backoff;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
-
-
 
 /**
  * Exchange topic manager.

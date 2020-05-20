@@ -92,6 +92,10 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testExchangeDeclareFail() {
+        String tenant = "public";
+        String namespace = "ns";
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
             .createExchangeDeclareBody(0, "test", "fanout", false, false, false, false, true, null);

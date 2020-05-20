@@ -28,6 +28,7 @@ import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.pulsar.broker.PulsarService;
@@ -75,6 +76,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         OPEN
     }
 
+    private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
+
+    private long connectionId;
     private final ConcurrentLongHashMap<AmqpChannel> channels;
     private final ConcurrentLongLongHashMap closingChannelsList = new ConcurrentLongLongHashMap();
     private final AmqpServiceConfiguration amqpConfig;
@@ -97,6 +101,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
+        this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
@@ -113,6 +118,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
         AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
+        this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
@@ -661,10 +667,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         } catch (InterruptedException | ExecutionException e) {
             log.error("Create default exchange topic failed!");
         }
-        ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
+        ExchangeContainer.putExchange(getNamespaceName().toString(),
+                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
+                new PersistentExchange("",
             AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
 
-        ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE,
+        ExchangeContainer.putExchange(getNamespaceName().toString(), AbstractAmqpExchange.DEFAULT_EXCHANGE,
             new InMemoryExchange("", AmqpExchange.Type.Direct, false));
 
         addBuildInExchanges(ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
@@ -682,8 +690,13 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         } catch (InterruptedException | ExecutionException e) {
             log.error("Create default exchange topic failed!");
         }
-        ExchangeContainer.putExchange(topicName.toString(), new PersistentExchange(exchangeName,
+        ExchangeContainer.putExchange(getNamespaceName().toString(), exchangeName,
+                new PersistentExchange(exchangeName,
                 exchangeType, persistentTopic, amqpTopicManager, false));
+    }
+
+    public long getConnectionId() {
+        return connectionId;
     }
 
     @VisibleForTesting

@@ -69,4 +69,22 @@ public interface AmqpQueue {
      * @param exchange
      */
     void unbindExchange(AmqpExchange exchange);
+
+    /**
+     * Get the connection id which created the queue.
+     * @return
+     */
+    long getConnectionId();
+
+    /**
+     * Check the queue is exclusive queue.
+     * @return
+     */
+    boolean isExclusive();
+
+    /**
+     * Check the queue can be auto deleted.
+     * @return
+     */
+    boolean isAutoDelete();
 }

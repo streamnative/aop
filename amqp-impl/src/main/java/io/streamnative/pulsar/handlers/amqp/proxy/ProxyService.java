@@ -105,13 +105,12 @@ public class ProxyService implements Closeable {
         this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
     }
 
-    private void reConnection(String namespaceName) {
-        log.info("reConnection namespaceName: {}", namespaceName);
+    private void releaseConnection(String namespaceName) {
+        log.info("release connection");
         if (vhostConnectionMap.containsKey(namespaceName)) {
             Set<ProxyConnection> proxyConnectionSet = vhostConnectionMap.get(namespaceName);
             for (ProxyConnection proxyConnection : proxyConnectionSet) {
-                proxyConnection.resetProxyHandler();
-                proxyConnection.createProxyHandler(5);
+                proxyConnection.close();
             }
         }
     }
@@ -146,7 +145,7 @@ public class ProxyService implements Closeable {
                             if (vhostBrokerMap.containsKey(vhost)) {
                                 log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", path);
                                 vhostBrokerMap.remove(vhost);
-                                reConnection(vhost);
+                                releaseConnection(vhost);
                             }
                         }
                     }

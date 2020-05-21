@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -77,7 +78,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         Init,
         RedirectLookup,
         RedirectToBroker,
-        ReLookup,
         Closed
     }
 
@@ -145,10 +145,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 if (proxyHandler != null) {
                     proxyHandler.getBrokerChannel().writeAndFlush(msg);
                 }
-                break;
-            case ReLookup:
-//                log.info("ProxyConnection [channelRead] - reLookup");
-                ((ByteBuf) msg).release();
                 break;
             case Closed:
                 log.info("ProxyConnection [channelRead] - closed");
@@ -239,33 +235,19 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 return set;
             }
         });
-        createProxyHandler(5);
+        handleConnect(new AtomicInteger(5));
     }
 
-    public void createProxyHandler(int retryTimes) {
-//        int i = 0;
-//        do {
-//            log.info("Connect to broker [{}] ...", i);
-//            handleConnect();
-//            if (proxyHandler != null) {
-//                log.info("Connect to broker finish. retry {} times", i + 1);
-//                break;
-//            }
-//            i++;
-//            try {
-//                Thread.sleep(200);
-//            } catch (InterruptedException e) {
-//                log.error("Retry connect to broker failed.");
-//            }
-//        } while (i < retryTimes);
-        handleConnect();
-    }
-
-    public void handleConnect() {
+    public void handleConnect(AtomicInteger retryTimes) {
+        log.info("handle connect residue retryTimes: {}", retryTimes);
+        if (retryTimes.get() == 0) {
+            log.warn("Handle connect retryTime is 0.");
+            return;
+        }
         if (proxyService.getVhostBrokerMap().containsKey(vhost)) {
             String aopBrokerHost = proxyService.getVhostBrokerMap().get(vhost).getLeft();
             int aopBrokerPort = proxyService.getVhostBrokerMap().get(vhost).getRight();
-            handleConnectComplete(aopBrokerHost, aopBrokerPort);
+            handleConnectComplete(aopBrokerHost, aopBrokerPort, retryTimes);
         } else {
             try {
                 NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), vhost);
@@ -275,38 +257,38 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 CompletableFuture<Pair<String, Integer>> lookupData = lookupHandler.findBroker(
                         TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
                 lookupData.whenComplete((pair, throwable) -> {
-                    handleConnectComplete(pair.getLeft(), pair.getRight());
+                    handleConnectComplete(pair.getLeft(), pair.getRight(), retryTimes);
                     proxyService.cacheVhostMap(vhost, pair);
                 });
             } catch (Exception e) {
                 log.error("Lookup broker failed.", e);
                 resetProxyHandler();
-                return;
             }
         }
     }
 
-    private void handleConnectComplete(String aopBrokerHost, int aopBrokerPort) {
+    private void handleConnectComplete(String aopBrokerHost, int aopBrokerPort, AtomicInteger retryTimes) {
         try {
             if (StringUtils.isEmpty(aopBrokerHost) || aopBrokerPort == 0) {
-                log.error("Lookup broker failed. aopBrokerHost: {}, aopBrokerPort: {}",
-                        aopBrokerHost, aopBrokerPort);
-                resetProxyHandler();
-                return;
+                throw new ProxyException();
             }
 
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
             proxyHandler = new ProxyHandler(vhost, proxyService,
                     this, aopBrokerHost, aopBrokerPort, connectMsgList, responseBody);
             state = State.RedirectToBroker;
+            log.info("Handle connect complete. aopBrokerHost: {}, aopBrokerPort: {}", aopBrokerHost, aopBrokerPort);
         } catch (Exception e) {
+            retryTimes.decrementAndGet();
             resetProxyHandler();
-            log.error("Failed to lookup broker.", e);
+            String errorMSg = String.format("Lookup broker failed. aopBrokerHost: %S, aopBrokerPort: %S",
+                    aopBrokerHost, aopBrokerPort);
+            log.error(errorMSg, e);
+            handleConnect(retryTimes);
         }
     }
 
     public void resetProxyHandler() {
-        state = State.ReLookup;
         if (proxyHandler != null) {
             proxyHandler.close();
             proxyHandler = null;
@@ -372,13 +354,9 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             log.debug("ProxyConnection close.");
         }
 
-        if (vhost != null) {
-            Set<ProxyConnection> proxyConnectionSet = proxyService.getVhostConnectionMap().get(vhost);
-            if (proxyConnectionSet != null && proxyConnectionSet.size() > 0) {
-                proxyConnectionSet.remove(this);
-            }
+        if (proxyHandler != null) {
+            resetProxyHandler();
         }
-        resetProxyHandler();
         if (cnx != null) {
             cnx.close();
         }

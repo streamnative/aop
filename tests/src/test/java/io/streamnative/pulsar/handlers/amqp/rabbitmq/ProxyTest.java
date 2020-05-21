@@ -76,20 +76,10 @@ public class ProxyTest extends RabbitMQTestBase {
             while (true) {
                 try {
                     channel.basicPublish(exchangeName, "", null, msgContent.getBytes());
-                    Thread.sleep(100);
+                    Thread.sleep(1000);
                 } catch (Exception e) {
 //                    log.warn("produce message failed.");
                 }
-            }
-        }).start();
-
-        new Thread(() -> {
-            try {
-                log.info("unload ns start.");
-                admin.namespaces().unload("public/vhost1");
-                log.info("unload ns finish.");
-            } catch (Exception e) {
-                log.error("unload failed ns: {}", "public/vhost1", e);
             }
         }).start();
 
@@ -105,8 +95,8 @@ public class ProxyTest extends RabbitMQTestBase {
                     Assert.assertEquals(message, msgContent);
                     synchronized (countDownLatch) {
                         countDownLatch.countDown();
-                        receiveMsgCnt.getAndIncrement();
                     }
+                    receiveMsgCnt.addAndGet(1);
                 }
             };
             try {
@@ -115,6 +105,14 @@ public class ProxyTest extends RabbitMQTestBase {
                 e.printStackTrace();
             }
         }).start();
+
+        try {
+            log.info("unload ns start.");
+            admin.namespaces().unload("public/vhost1");
+            log.info("unload ns finish.");
+        } catch (Exception e) {
+            Assert.fail("Failed to unload bundle.");
+        }
 
         countDownLatch.await();
         Assert.assertEquals(receiveMsgCnt.get(), 100);

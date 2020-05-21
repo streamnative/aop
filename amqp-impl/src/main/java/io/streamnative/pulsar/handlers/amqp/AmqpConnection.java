@@ -26,11 +26,9 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
-
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
@@ -60,8 +58,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
-
-
 
 /**
  * Amqp server level method processor.
@@ -400,12 +396,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
-        if (this.channels.get(channelId) == null) {
-            log.info("getChannelMethodProcessor Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this);
-            addChannel(channel);
-            return channel;
-        }
         return this.channels.get(channelId);
     }
 

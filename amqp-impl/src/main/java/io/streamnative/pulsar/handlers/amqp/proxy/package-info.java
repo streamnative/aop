@@ -11,24 +11,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.proxy;
 
 /**
- * The proxy service starter.
+ * Package info.
  */
-public class ProxyServiceStarter {
-
-    public ProxyServiceStarter(String[] args) throws Exception {
-        ProxyConfiguration proxyConfig = new ProxyConfiguration();
-        ProxyService proxyService = new ProxyService(proxyConfig, null);
-        proxyService.start();
-
-        WebServer webServer = new WebServer(proxyConfig, null);
-        webServer.start();
-    }
-
-    public static void main(String[] args) throws Exception {
-        new ProxyServiceStarter(args);
-    }
-
-}
+package io.streamnative.pulsar.handlers.amqp.proxy;

@@ -42,7 +42,6 @@ import org.apache.bookkeeper.client.PulsarMockBookKeeper;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.pulsar.broker.BookKeeperClientFactory;
-import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.auth.SameThreadOrderedSafeExecutor;
@@ -66,19 +65,12 @@ import org.mockito.Mockito;
 public abstract class AmqpProtocolHandlerTestBase {
 
     protected ServiceConfiguration conf;
-//    protected PulsarService pulsar;
     protected PulsarAdmin admin;
     protected URL brokerUrl;
     protected URL brokerUrlTls;
     protected URI lookupUrl;
     protected PulsarClient pulsarClient;
 
-//    protected int brokerWebservicePort = PortManager.nextFreePort();
-//    protected int brokerWebservicePortTls = PortManager.nextFreePort();
-//    @Getter
-//    protected int brokerPort = PortManager.nextFreePort();
-//    @Getter
-//    protected int amqpBrokerPort = PortManager.nextFreePort();
     @Getter
     protected int amqpBrokerPortTls = PortManager.nextFreePort();
 
@@ -110,9 +102,7 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     protected void resetConfig() {
         AmqpServiceConfiguration amqpConfig = new AmqpServiceConfiguration();
-//        amqpConfig.setBrokerServicePort(Optional.ofNullable(brokerPort));
         amqpConfig.setAdvertisedAddress("localhost");
-//        amqpConfig.setWebServicePort(Optional.ofNullable(brokerWebservicePort));
         amqpConfig.setClusterName(configClusterName);
 
         amqpConfig.setManagedLedgerCacheSizeMB(8);
@@ -389,10 +379,17 @@ public abstract class AmqpProtocolHandlerTestBase {
         }
     }
 
+    /**
+     * Get available proxy port.
+     * @return random proxy port
+     */
     public int getProxyPort() {
         return getProxyPortList().get(RandomUtils.nextInt(0, getProxyPortList().size()));
     }
 
+    /**
+     * Set the starting broker count for test.
+     */
     public void setBrokerCount(int brokerCount) {
         this.brokerCount = brokerCount;
     }

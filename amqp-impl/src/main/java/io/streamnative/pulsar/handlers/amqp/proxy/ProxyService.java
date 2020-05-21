@@ -30,7 +30,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
 import org.apache.pulsar.broker.namespace.NamespaceEphemeralData;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
@@ -74,19 +73,26 @@ public class ProxyService implements Closeable {
     private ZooKeeperClientFactory zkClientFactory = null;
 
     @Getter
-    final private Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
+    private static final Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
     @Getter
-    private Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
+    private static final Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
 
     private String tenant;
 
     public ProxyService(ProxyConfiguration proxyConfig, PulsarService pulsarService) {
-        checkNotNull(proxyConfig);
+        configValid(proxyConfig);
+
         this.proxyConfig = proxyConfig;
         this.pulsarService = pulsarService;
         this.tenant = this.proxyConfig.getAmqpTenant();
         acceptorGroup = EventLoopUtil.newEventLoopGroup(1, acceptorThreadFactory);
         workerGroup = EventLoopUtil.newEventLoopGroup(numThreads, workerThreadFactory);
+    }
+
+    private void configValid(ProxyConfiguration proxyConfig) {
+        checkNotNull(proxyConfig);
+        checkNotNull(proxyConfig.getProxyPort());
+        checkNotNull(proxyConfig.getBrokerServiceURL());
     }
 
     public void start() throws Exception {
@@ -96,12 +102,14 @@ public class ProxyService implements Closeable {
         EventLoopUtil.enableTriggeredMode(serverBootstrap);
         serverBootstrap.childHandler(new ServiceChannelInitializer(this));
         try {
-            listenChannel = serverBootstrap.bind(proxyConfig.getServicePort().get()).sync().channel();
+            listenChannel = serverBootstrap.bind(proxyConfig.getProxyPort().get()).sync().channel();
         } catch (InterruptedException e) {
-            throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getServicePort().get(), e);
+            throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getProxyPort().get(), e);
         }
 
-        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(proxyConfig.getBrokerServiceURL()).build();
+        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(
+                proxyConfig.getBrokerServiceURL()).build();
+
         this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
     }
 

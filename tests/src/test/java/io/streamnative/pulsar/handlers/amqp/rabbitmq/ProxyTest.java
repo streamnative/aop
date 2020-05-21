@@ -27,14 +27,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.client.admin.PulsarAdminException;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+/**
+ * AMQP proxy related test.
+ */
 @Slf4j
 public class ProxyTest extends RabbitMQTestBase {
 
@@ -43,17 +42,6 @@ public class ProxyTest extends RabbitMQTestBase {
     public void setup() throws Exception {
         setBrokerCount(3);
         super.setup();
-    }
-
-    @Test
-    public void test() throws PulsarAdminException, KeeperException, InterruptedException {
-        getPulsarServiceList().get(0).getLocalZkCache().getZooKeeper().getData("/namespace/public/vhost1/0x00000000_0xffffffff", new Watcher() {
-            @Override
-            public void process(WatchedEvent watchedEvent) {
-                admin.lookups().lookupTopicAsync("persistent://public/vhost1/__lookup__");
-            }
-        }, null);
-        admin.namespaces().unload("public/vhost1");
     }
 
     @Test
@@ -153,7 +141,8 @@ public class ProxyTest extends RabbitMQTestBase {
         countDownLatch.await();
     }
 
-    private void fanoutTest(String testName, String vhost, String exchangeName, List<String> queueList) throws Exception {
+    private void fanoutTest(String testName, String vhost, String exchangeName,
+                            List<String> queueList) throws Exception {
         log.info("[{}] test start ...", testName);
         @Cleanup
         Connection connection = getConnection(vhost, true);

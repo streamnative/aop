@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
@@ -137,7 +138,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                     log.error("error while handle command:", e);
                     close();
                 }
-                brokerDecoder.getMethodProcessor();
 
                 break;
             case RedirectToBroker:
@@ -183,8 +183,8 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response,
                                          AMQShortString locale) {
         if (log.isDebugEnabled()) {
-            log.debug("ProxyConnection - [receiveConnectionStartOk] " +
-                            "clientProperties: {}, mechanism: {}, locale: {}", clientProperties, mechanism, locale);
+            log.debug("ProxyConnection - [receiveConnectionStartOk] clientProperties: {}, mechanism: {}, locale: {}",
+                    clientProperties, mechanism, locale);
         }
         AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
         writeFrame(responseBody.generateFrame(0));
@@ -194,7 +194,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     @Override
     public void receiveConnectionSecureOk(byte[] response) {
         if (log.isDebugEnabled()) {
-            log.debug("ProxyConnection - [receiveConnectionSecureOk] response: {}", new String(response));
+            log.debug("ProxyConnection - [receiveConnectionSecureOk] response: {}", new String(response, UTF_8));
         }
         // TODO AUTH
         ConnectionTuneBody tuneBody =
@@ -206,13 +206,14 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     // step 4
     @Override
     public void receiveConnectionTuneOk(int i, long l, int i1) {
-        log.info("ProxyConnection - [receiveConnectionTuneOk]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [receiveConnectionTuneOk]");
+        }
     }
 
     // step 5
     @Override
     public void receiveConnectionOpen(AMQShortString virtualHost, AMQShortString capabilities, boolean insist) {
-        log.info("ProxyConnection - [receiveConnectionOpen] virtualHost: {}", virtualHost);
         if (log.isDebugEnabled()) {
             log.debug("ProxyConnection - [receiveConnectionOpen] virtualHost: {} capabilities: {} insist: {}",
                     virtualHost, capabilities, insist);
@@ -297,34 +298,46 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void receiveChannelOpen(int i) {
-        log.info("ProxyConnection - [receiveChannelOpen]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [receiveChannelOpen]");
+        }
     }
 
     @Override
     public ProtocolVersion getProtocolVersion() {
-        log.info("ProxyConnection - [getProtocolVersion]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [getProtocolVersion]");
+        }
         return null;
     }
 
     @Override
     public ServerChannelMethodProcessor getChannelMethodProcessor(int i) {
-        log.info("ProxyConnection - [getChannelMethodProcessor]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [getChannelMethodProcessor]");
+        }
         return null;
     }
 
     @Override
     public void receiveConnectionClose(int i, AMQShortString amqShortString, int i1, int i2) {
-        log.info("ProxyConnection - [receiveConnectionClose]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [receiveConnectionClose]");
+        }
     }
 
     @Override
     public void receiveConnectionCloseOk() {
-        log.info("ProxyConnection - [receiveConnectionCloseOk]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [receiveConnectionCloseOk]");
+        }
     }
 
     @Override
     public void receiveHeartbeat() {
-        log.info("ProxyConnection - [receiveHeartbeat]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [receiveHeartbeat]");
+        }
     }
 
 
@@ -337,7 +350,9 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public boolean ignoreAllButCloseOk() {
-        log.info("ProxyConnection - [ignoreAllButCloseOk]");
+        if (log.isDebugEnabled()) {
+            log.debug("ProxyConnection - [ignoreAllButCloseOk]");
+        }
         return false;
     }
 

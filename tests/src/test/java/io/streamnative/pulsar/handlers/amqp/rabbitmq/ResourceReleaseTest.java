@@ -22,13 +22,11 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.junit.Assert;
 import org.testng.annotations.Test;
 
@@ -39,7 +37,7 @@ import org.testng.annotations.Test;
 public class ResourceReleaseTest extends RabbitMQTestBase {
 
     @Test
-    public void bundleUnloadTest() throws IOException, TimeoutException, PulsarAdminException, ExecutionException, InterruptedException {
+    public void bundleUnloadTest() throws IOException, TimeoutException, InterruptedException {
 
         @Cleanup
         final Connection connection = getConnection();

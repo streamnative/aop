@@ -27,7 +27,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 public class QueueContainer {
 
     @Getter
-    private final static Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
+    private static Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
 
     public static void putQueue(NamespaceName namespaceName, String queueName, AmqpQueue amqpQueue) {
         queueMap.compute(namespaceName, (ns, map) -> {

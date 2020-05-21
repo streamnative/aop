@@ -29,7 +29,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 public class ExchangeContainer {
 
     @Getter
-    private final static Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
+    private static Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
 
     public static void putExchange(NamespaceName namespaceName, String exchangeName, AmqpExchange amqpExchange) {
         exchangeMap.compute(namespaceName, (name, map) -> {

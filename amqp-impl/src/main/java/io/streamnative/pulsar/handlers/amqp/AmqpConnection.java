@@ -664,8 +664,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         } catch (InterruptedException | ExecutionException e) {
             log.error("Create default exchange topic failed!");
         }
-        ExchangeContainer.putExchange(getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
-            AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
+        ExchangeContainer.putExchange(getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
+                new PersistentExchange("",
+                        AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
 
         ExchangeContainer.putExchange(getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE,
             new InMemoryExchange("", AmqpExchange.Type.Direct, false));

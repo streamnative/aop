@@ -33,8 +33,8 @@ public class ConnectionContainer {
     public static PulsarService pulsarService;
     public static ZooKeeper zooKeeper;
 
-    private final static Set<NamespaceName> namespaceSet = Sets.newConcurrentHashSet();
-    private final static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
+    private static Set<NamespaceName> namespaceSet = Sets.newConcurrentHashSet();
+    private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     public static void init(PulsarService pulsarService) {
         ConnectionContainer.pulsarService = pulsarService;

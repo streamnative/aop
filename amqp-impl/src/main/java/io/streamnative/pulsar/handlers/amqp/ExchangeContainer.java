@@ -14,36 +14,52 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.common.naming.NamespaceName;
 
 /**
  * Container for all exchanges in the broker.
  */
+@Slf4j
 public class ExchangeContainer {
 
-    private static Map<String, AmqpExchange> exchangeMap = new ConcurrentHashMap<>();
+    @Getter
+    private static Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
 
-    public static void putExchange(String namespaceName, String exchangeName, AmqpExchange amqpExchange) {
-        exchangeMap.computeIfAbsent(generateKey(namespaceName, exchangeName), name -> amqpExchange);
+    public static void putExchange(NamespaceName namespaceName, String exchangeName, AmqpExchange amqpExchange) {
+        exchangeMap.compute(namespaceName, (name, map) -> {
+            Map<String, AmqpExchange> amqpExchangeMap = map;
+            if (amqpExchangeMap == null) {
+                amqpExchangeMap = Maps.newConcurrentMap();
+            }
+            amqpExchangeMap.put(exchangeName, amqpExchange);
+            return amqpExchangeMap;
+        });
     }
 
-    public static AmqpExchange getExchange(String namespaceName, String exchangeName) {
-        if (StringUtils.isEmpty(generateKey(namespaceName, exchangeName))) {
+    public static AmqpExchange getExchange(NamespaceName namespaceName, String exchangeName) {
+        if (namespaceName == null || StringUtils.isEmpty(exchangeName)) {
             return null;
         }
-        return exchangeMap.getOrDefault(generateKey(namespaceName, exchangeName), null);
+        Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
+        if (map == null) {
+            return null;
+        }
+        return map.getOrDefault(exchangeName, null);
     }
 
-    public static void deleteExchange(String namespaceName, String exchangeName) {
-        if (StringUtils.isEmpty(generateKey(namespaceName, exchangeName))) {
+    public static void deleteExchange(NamespaceName namespaceName, String exchangeName) {
+        if (StringUtils.isEmpty(exchangeName)) {
             return;
         }
-        exchangeMap.remove(generateKey(namespaceName, exchangeName));
+        if (exchangeMap.containsKey(namespaceName)) {
+            exchangeMap.get(namespaceName).remove(exchangeName);
+        }
     }
 
-    private static String generateKey(String namespaceName, String exchangeName) {
-        return namespaceName + "/" + exchangeName;
-    }
 }

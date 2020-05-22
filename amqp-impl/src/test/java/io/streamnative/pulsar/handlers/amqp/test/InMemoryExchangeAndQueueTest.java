@@ -42,7 +42,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-
 /**
  * Unit test for InMemoryExchange and InMemoryQueue.
  */

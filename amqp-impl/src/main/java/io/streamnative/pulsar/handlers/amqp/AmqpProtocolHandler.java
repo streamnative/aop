@@ -84,7 +84,10 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public void start(BrokerService service) {
         brokerService = service;
 
-        log.info("Starting AmqpProtocolHandler, aop version is: '{}'", AopVersion.getVersion());
+        ConnectionContainer.init(brokerService.getPulsar());
+
+        log.info("Starting AmqpProtocolHandler, listener: {}, aop version is: '{}'",
+                amqpConfig.getAmqpListeners(), AopVersion.getVersion());
         log.info("Git Revision {}", AopVersion.getGitSha());
         log.info("Built by {} on {} at {}",
             AopVersion.getBuildUser(),

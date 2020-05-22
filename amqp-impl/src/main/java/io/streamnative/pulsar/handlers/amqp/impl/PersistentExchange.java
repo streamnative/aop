@@ -72,6 +72,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         Map<String, Object> properties = MessageConvertUtils.getHeaders(message);
         publishFuture.whenComplete((position, throwable) -> {
             if (throwable != null) {
+                log.error("Exchange persistent topic: {} failed.", persistentTopic.getName(), throwable);
                 publishFuture.completeExceptionally(throwable);
             } else {
                 for (AmqpQueue queue : queues) {

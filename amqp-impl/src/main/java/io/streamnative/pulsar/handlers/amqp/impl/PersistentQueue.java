@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -45,12 +46,14 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String QUEUE = "QUEUE";
     public static final String ROUTERS = "ROUTERS";
 
+    @Getter
     private PersistentTopic indexTopic;
 
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
 
-    public PersistentQueue(String queueName, PersistentTopic indexTopic) {
-        super(queueName, true);
+    public PersistentQueue(String queueName, PersistentTopic indexTopic, long connectionId,
+                           boolean exclusive, boolean autoDelete) {
+        super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
     }
 

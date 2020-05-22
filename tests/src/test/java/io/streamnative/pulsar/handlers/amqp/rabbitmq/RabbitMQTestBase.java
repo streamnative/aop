@@ -77,7 +77,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
     @AfterClass
     @Override
     public void cleanup() throws Exception {
-//        super.internalCleanup();
+        super.internalCleanup();
     }
 
     protected Connection getConnection(String vhost, boolean useProxy) throws IOException, TimeoutException {

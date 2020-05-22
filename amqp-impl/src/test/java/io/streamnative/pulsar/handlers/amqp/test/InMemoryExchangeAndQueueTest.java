@@ -42,7 +42,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-
 /**
  * Unit test for InMemoryExchange and InMemoryQueue.
  */
@@ -52,7 +51,7 @@ public class InMemoryExchangeAndQueueTest {
     public void testQueueBind() {
         String exchangeName = "test";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
-        AmqpQueue queue = new InMemoryQueue("test");
+        AmqpQueue queue = new InMemoryQueue("test", 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         Assert.assertNotNull(queue.getRouter(exchangeName));
         Assert.assertEquals(queue.getRouter(exchangeName).getExchange(), exchange);
@@ -65,7 +64,7 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
-        AmqpQueue queue = new InMemoryQueue(queueName);
+        AmqpQueue queue = new InMemoryQueue(queueName, 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
 
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -92,7 +91,7 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
-        AmqpQueue queue = new InMemoryQueue(queueName);
+        AmqpQueue queue = new InMemoryQueue(queueName, 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positions = new ArrayList<>(10);
@@ -120,7 +119,7 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
-        AmqpQueue queue = new InMemoryQueue(queueName);
+        AmqpQueue queue = new InMemoryQueue(queueName, 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positions = new ArrayList<>(10);
@@ -164,8 +163,8 @@ public class InMemoryExchangeAndQueueTest {
         String queueName2 = "test-queue-2";
         AmqpExchange exchange1 = new InMemoryExchange(exchangeName1, AmqpExchange.Type.Direct, false);
         AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct, false);
-        AmqpQueue queue1 = new InMemoryQueue(queueName1);
-        AmqpQueue queue2 = new InMemoryQueue(queueName2);
+        AmqpQueue queue1 = new InMemoryQueue(queueName1, 0);
+        AmqpQueue queue2 = new InMemoryQueue(queueName2, 0);
         queue1.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
         queue1.bindExchange(exchange2, new FanoutMessageRouter(), "", null);
         queue2.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
@@ -197,8 +196,8 @@ public class InMemoryExchangeAndQueueTest {
         String queueName2 = "test-queue-2";
         AmqpExchange exchange1 = new InMemoryExchange(exchangeName1, AmqpExchange.Type.Direct, false);
         AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct, false);
-        AmqpQueue queue1 = new InMemoryQueue(queueName1);
-        AmqpQueue queue2 = new InMemoryQueue(queueName2);
+        AmqpQueue queue1 = new InMemoryQueue(queueName1, 0);
+        AmqpQueue queue2 = new InMemoryQueue(queueName2, 0);
         queue1.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
         queue1.bindExchange(exchange2, new FanoutMessageRouter(), "", null);
         queue2.bindExchange(exchange1, new FanoutMessageRouter(), "", null);

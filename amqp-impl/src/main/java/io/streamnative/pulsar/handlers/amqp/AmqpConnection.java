@@ -24,19 +24,15 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
-import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
-import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -58,8 +54,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 
-
-
 /**
  * Amqp server level method processor.
  */
@@ -75,8 +69,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         OPEN
     }
 
+    private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
+
+    private long connectionId;
     private final ConcurrentLongHashMap<AmqpChannel> channels;
     private final ConcurrentLongLongHashMap closingChannelsList = new ConcurrentLongLongHashMap();
+    @Getter
     private final AmqpServiceConfiguration amqpConfig;
     private ProtocolVersion protocolVersion;
     private MethodRegistry methodRegistry;
@@ -84,6 +82,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private volatile ConnectionState state = ConnectionState.INIT;
     private volatile int currentClassId;
     private volatile int currentMethodId;
+    @Getter
     private final AtomicBoolean orderlyClose = new AtomicBoolean(false);
     private volatile int maxChannels;
     private volatile int maxFrameSize;
@@ -91,12 +90,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private NamespaceName namespaceName;
     private final Object channelAddRemoveLock = new Object();
     private AtomicBoolean blocked = new AtomicBoolean();
+    @Getter
     private AmqpTopicManager amqpTopicManager;
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
+        this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
@@ -105,7 +106,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
-        this.amqpTopicManager = new AmqpTopicManager(this);
+        this.amqpTopicManager = new AmqpTopicManager(getPulsarService());
         this.amqpOutputConverter = new AmqpOutputConverter(this);
     }
 
@@ -113,6 +114,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
         AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
+        this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
@@ -263,7 +265,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
-        defaultExchangeInit();
+        ConnectionContainer.addConnection(namespaceName, this);
 //        } else {
 //            sendConnectionClose(ErrorCodes.NOT_FOUND,
 //                "Unknown virtual host: '" + virtualHostStr + "'", 0);
@@ -421,7 +423,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             && closingChannelsList.containsKey(channelId));
     }
 
-    private void completeAndCloseAllChannels() {
+    public void completeAndCloseAllChannels() {
         try {
             receivedCompleteAllChannels();
         } finally {
@@ -658,22 +660,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.pulsarServerCnx = pulsarServerCnx;
     }
 
-    public void defaultExchangeInit() {
-        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-            getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-        PersistentTopic persistentTopic = null;
-        try {
-            persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
-        } catch (InterruptedException | ExecutionException e) {
-            log.error("Create default exchange topic failed!");
-        }
-        ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, new PersistentExchange("",
-            AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
-
-        ExchangeContainer.putExchange(AbstractAmqpExchange.DEFAULT_EXCHANGE,
-            new InMemoryExchange("", AmqpExchange.Type.Direct, false));
-
+    public long getConnectionId() {
+        return connectionId;
     }
+
+
     @VisibleForTesting
     public ByteBufferSender getBufferSender() {
         return bufferSender;

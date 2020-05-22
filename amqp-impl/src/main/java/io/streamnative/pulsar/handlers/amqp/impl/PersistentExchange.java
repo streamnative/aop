@@ -72,6 +72,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         Map<String, Object> properties = MessageConvertUtils.getHeaders(message);
         publishFuture.whenComplete((position, throwable) -> {
             if (throwable != null) {
+                log.error("Exchange persistent topic: {} failed.", persistentTopic.getName(), throwable);
                 publishFuture.completeExceptionally(throwable);
             } else {
                 for (AmqpQueue queue : queues) {
@@ -130,6 +131,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
         CompletableFuture<Void> future = new CompletableFuture();
         ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
         if (cursor == null) {
+            future.complete(null);
+            return future;
+        }
+        if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
             future.complete(null);
             return future;
         }

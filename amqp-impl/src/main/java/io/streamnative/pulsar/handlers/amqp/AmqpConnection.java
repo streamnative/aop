@@ -265,7 +265,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
-        defaultExchangeInit();
         ConnectionContainer.addConnection(namespaceName, this);
 //        } else {
 //            sendConnectionClose(ErrorCodes.NOT_FOUND,
@@ -655,23 +654,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.pulsarServerCnx = pulsarServerCnx;
     }
 
-    public void defaultExchangeInit() {
-        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-            getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-        PersistentTopic persistentTopic = null;
-        try {
-            persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
-        } catch (InterruptedException | ExecutionException e) {
-            log.error("Create default exchange topic failed!");
-        }
-        ExchangeContainer.putExchange(getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
-                new PersistentExchange("",
-                        AmqpExchange.Type.Direct, persistentTopic, amqpTopicManager, false));
-
-        ExchangeContainer.putExchange(getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE,
-            new InMemoryExchange("", AmqpExchange.Type.Direct, false));
-
-    }
     @VisibleForTesting
     public ByteBufferSender getBufferSender() {
         return bufferSender;

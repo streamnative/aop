@@ -15,13 +15,20 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
+import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.zookeeper.ZooKeeper;
 
 /**
@@ -32,23 +39,24 @@ public class ConnectionContainer {
 
     public static PulsarService pulsarService;
     public static ZooKeeper zooKeeper;
-
-    private static Set<NamespaceName> namespaceSet = Sets.newConcurrentHashSet();
+    private static AmqpTopicManager amqpTopicManager;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     public static void init(PulsarService pulsarService) {
         ConnectionContainer.pulsarService = pulsarService;
         ConnectionContainer.zooKeeper = pulsarService.getLocalZkCache().getZooKeeper();
+        ConnectionContainer.amqpTopicManager = new AmqpTopicManager(pulsarService);
 
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
-                log.info("ResourceContainer [onLoad] namespaceBundle: {}", namespaceBundle);
+                log.info("ConnectionContainer [onLoad] namespaceBundle: {}", namespaceBundle);
+                defaultExchangeInit(namespaceBundle.getNamespaceObject());
             }
 
             @Override
             public void unLoad(NamespaceBundle namespaceBundle) {
-                log.info("ResourceContainer [unLoad] namespaceBundle: {}", namespaceBundle);
+                log.info("ConnectionContainer [unLoad] namespaceBundle: {}", namespaceBundle);
                 NamespaceName namespaceName = namespaceBundle.getNamespaceObject();
                 if (connectionMap.containsKey(namespaceName)) {
                     Set<AmqpConnection> connectionSet = connectionMap.get(namespaceName);
@@ -60,6 +68,8 @@ public class ConnectionContainer {
                             connection.close();
                         }
                     }
+                    connectionSet.clear();
+                    connectionMap.remove(namespaceName);
                 }
 
                 if (ExchangeContainer.getExchangeMap().containsKey(namespaceName)) {
@@ -81,8 +91,7 @@ public class ConnectionContainer {
     }
 
     public static void addConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
-        connectionMap.computeIfAbsent(namespaceName, ns -> {
-            Set<AmqpConnection> connectionSet = connectionMap.get(ns);
+        connectionMap.compute(namespaceName, (ns, connectionSet) -> {
             if (connectionSet == null) {
                 connectionSet = Sets.newConcurrentHashSet();
             }
@@ -90,5 +99,36 @@ public class ConnectionContainer {
             return connectionSet;
         });
     }
+
+    private static void defaultExchangeInit(NamespaceName namespaceName) {
+        AmqpExchange persistentExchange = ExchangeContainer.getExchange(namespaceName,
+                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+
+        if (persistentExchange == null) {
+            try {
+                TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
+                        namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+                CompletableFuture<Topic> persistentTopic = amqpTopicManager.getTopic(
+                        topicName.toString(), true);
+                persistentTopic.whenComplete((topic, throwable) -> {
+                    ExchangeContainer.putExchange(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
+                            new PersistentExchange("", AmqpExchange.Type.Direct,
+                                    (PersistentTopic) topic, amqpTopicManager, false));
+                });
+            } catch (Exception e) {
+                log.error("Create default exchange topic failed!");
+            }
+        }
+
+        AmqpExchange inMemoryExchange = ExchangeContainer.getExchange(namespaceName,
+                AbstractAmqpExchange.DEFAULT_EXCHANGE);
+
+        if (inMemoryExchange == null) {
+            ExchangeContainer.putExchange(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE,
+                    new InMemoryExchange("", AmqpExchange.Type.Direct, false));
+        }
+
+    }
+
 
 }

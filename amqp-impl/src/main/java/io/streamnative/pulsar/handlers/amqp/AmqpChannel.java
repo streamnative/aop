@@ -235,7 +235,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         TopicName topicName = TopicName.get(
                                 TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
                         try {
-                            PersistentTopic persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
+                            PersistentTopic persistentTopic = (PersistentTopic) amqpTopicManager.getOrCreateTopic(
+                                    topicName.toString(), true);
                             if (persistentTopic == null) {
                                 connection.sendConnectionClose(INTERNAL_ERROR,
                                         "AOP Create Exchange failed.", channelId);
@@ -369,10 +370,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 amqpQueue = new InMemoryQueue(queue.toString());
             } else {
                 try {
-                    PersistentTopic indexTopic = amqpTopicManager.getTopic(
-                            PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queue.toString())).get();
+                    PersistentTopic indexTopic = (PersistentTopic) amqpTopicManager.getOrCreateTopic(
+                            PersistentQueue.getIndexTopicName(
+                                    connection.getNamespaceName(), queue.toString()), true);
                     amqpQueue = new PersistentQueue(queue.toString(), indexTopic);
-                } catch (ExecutionException | InterruptedException e) {
+                } catch (Exception e) {
                     log.error(channelId + "Queue declare failed! queueName: {}", queue.toString());
                     connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Queue failed.", channelId);
                     return;
@@ -561,7 +563,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         String queueName = AMQShortString.toString(queue);
         // TODO Temporarily treat queue as exchange
         connection.getAmqpTopicManager()
-                .getTopic(PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queueName))
+                .getTopic(PersistentQueue.getIndexTopicName(connection.getNamespaceName(), queueName), true)
                 .whenComplete((topic, throwable) -> {
                     if (throwable != null) {
                         closeChannel(ErrorCodes.NOT_FOUND, "No such queue, '" + queueName + "'");

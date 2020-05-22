@@ -228,7 +228,7 @@ public class AmqpTopicManager {
         return topicCursorManagers.computeIfAbsent(
             topicName,
             t -> {
-                CompletableFuture<PersistentTopic> topic = getTopic(t);
+                CompletableFuture<Topic> topic = getTopic(t, true);
                 checkState(topic != null);
 
                 return topic.thenApply(t2 -> {

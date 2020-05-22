@@ -24,11 +24,28 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
 
     protected final String queueName;
     protected final boolean durable;
+    // which connection create the queue.
+    protected final long connectionId;
+    protected boolean exclusive;
+    protected boolean autoDelete;
     protected final Map<String, AmqpMessageRouter> routers = new ConcurrentHashMap<>();
 
-    protected AbstractAmqpQueue(String queueName, boolean durable) {
+    protected AbstractAmqpQueue(String queueName, boolean durable, long connectionId) {
         this.queueName = queueName;
         this.durable = durable;
+        this.connectionId = connectionId;
+        this.autoDelete = false;
+        this.exclusive = false;
+    }
+
+    protected AbstractAmqpQueue(String queueName,
+                                boolean durable, long connectionId,
+                                boolean exclusive, boolean autoDelete) {
+        this.queueName = queueName;
+        this.durable = durable;
+        this.connectionId = connectionId;
+        this.exclusive = exclusive;
+        this.autoDelete = autoDelete;
     }
 
     @Override
@@ -93,4 +110,20 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
             return false;
         }
     }
+
+    @Override
+    public long getConnectionId() {
+        return connectionId;
+    }
+
+    @Override
+    public boolean isExclusive() {
+        return exclusive;
+    }
+
+    @Override
+    public boolean isAutoDelete() {
+        return autoDelete;
+    }
+
 }

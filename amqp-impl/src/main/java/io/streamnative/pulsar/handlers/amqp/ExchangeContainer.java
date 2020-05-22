@@ -25,21 +25,25 @@ public class ExchangeContainer {
 
     private static Map<String, AmqpExchange> exchangeMap = new ConcurrentHashMap<>();
 
-    public static void putExchange(String exchangeName, AmqpExchange amqpExchange) {
-        exchangeMap.computeIfAbsent(exchangeName, name -> amqpExchange);
+    public static void putExchange(String namespaceName, String exchangeName, AmqpExchange amqpExchange) {
+        exchangeMap.computeIfAbsent(generateKey(namespaceName, exchangeName), name -> amqpExchange);
     }
 
-    public static AmqpExchange getExchange(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
+    public static AmqpExchange getExchange(String namespaceName, String exchangeName) {
+        if (StringUtils.isEmpty(generateKey(namespaceName, exchangeName))) {
             return null;
         }
-        return exchangeMap.getOrDefault(exchangeName, null);
+        return exchangeMap.getOrDefault(generateKey(namespaceName, exchangeName), null);
     }
 
-    public static void deleteExchange(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
+    public static void deleteExchange(String namespaceName, String exchangeName) {
+        if (StringUtils.isEmpty(generateKey(namespaceName, exchangeName))) {
             return;
         }
-        exchangeMap.remove(exchangeName);
+        exchangeMap.remove(generateKey(namespaceName, exchangeName));
+    }
+
+    private static String generateKey(String namespaceName, String exchangeName) {
+        return namespaceName + "/" + exchangeName;
     }
 }

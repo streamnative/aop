@@ -25,21 +25,25 @@ public class QueueContainer {
 
     private static Map<String, AmqpQueue> queueMap = new ConcurrentHashMap<>();
 
-    public static void putQueue(String queueName, AmqpQueue amqpQueue) {
-        queueMap.computeIfAbsent(queueName, name -> amqpQueue);
+    public static void putQueue(String namespaceName, String queueName, AmqpQueue amqpQueue) {
+        queueMap.computeIfAbsent(generateKey(namespaceName, queueName), name -> amqpQueue);
     }
 
-    public static AmqpQueue getQueue(String queueName) {
-        if (StringUtils.isEmpty(queueName)) {
+    public static AmqpQueue getQueue(String namespaceName, String queueName) {
+        if (StringUtils.isEmpty(generateKey(namespaceName, queueName))) {
             return null;
         }
-        return queueMap.getOrDefault(queueName, null);
+        return queueMap.getOrDefault(generateKey(namespaceName, queueName), null);
     }
 
-    public static void deleteQueue(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
+    public static void deleteQueue(String namespaceName, String queueName) {
+        if (StringUtils.isEmpty(generateKey(namespaceName, queueName))) {
             return;
         }
-        queueMap.remove(exchangeName);
+        queueMap.remove(generateKey(namespaceName, queueName));
+    }
+
+    private static String generateKey(String namespaceName, String exchangeName) {
+        return namespaceName + "/" + exchangeName;
     }
 }

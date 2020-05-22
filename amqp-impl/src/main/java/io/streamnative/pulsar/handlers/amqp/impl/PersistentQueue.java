@@ -51,8 +51,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
 
-    public PersistentQueue(String queueName, PersistentTopic indexTopic) {
-        super(queueName, true);
+    public PersistentQueue(String queueName, PersistentTopic indexTopic, long connectionId,
+                           boolean exclusive, boolean autoDelete) {
+        super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
     }
 

@@ -29,8 +29,12 @@ public class InMemoryQueue extends AbstractAmqpQueue {
 
     private final Map<String, LinkedList<PositionImpl>> indexStore = new ConcurrentHashMap<>();
 
-    public InMemoryQueue(String queueName) {
-        super(queueName, false);
+    public InMemoryQueue(String queueName, long connectionId) {
+        super(queueName, false, connectionId);
+    }
+
+    public InMemoryQueue(String queueName, long connectionId, boolean exclusive, boolean autoDelete) {
+        super(queueName, false, connectionId, exclusive, autoDelete);
     }
 
     @Override

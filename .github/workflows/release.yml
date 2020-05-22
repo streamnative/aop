@@ -2,6 +2,7 @@ name: amqpop Release
 
 on:
   release:
+    types: [created]
 
 jobs:
   upload:

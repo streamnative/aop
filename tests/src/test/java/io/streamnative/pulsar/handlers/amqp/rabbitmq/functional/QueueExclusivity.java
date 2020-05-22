@@ -23,6 +23,7 @@ import com.rabbitmq.client.test.QueueingConsumer;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.concurrent.TimeoutException;
+import org.junit.Test;
 
 /**
  * Test queue auto-delete and exclusive semantics.
@@ -49,7 +50,7 @@ public class QueueExclusivity extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void queueExclusiveForPassiveDeclare() throws Exception {
         try {
             channel.queueDeclarePassive(q);
@@ -62,7 +63,7 @@ public class QueueExclusivity extends BrokerTestCase {
 
     // This is a different scenario because active declare takes notice of
     // the all the arguments
-    //@Test
+//    @Test
     public void queueExclusiveForDeclare() throws Exception {
         try {
             channel.queueDeclare(q, false, true, false, noArgs);
@@ -73,7 +74,7 @@ public class QueueExclusivity extends BrokerTestCase {
         fail("Active queue declaration of an exclusive queue from another connection should fail");
     }
 
-    //@Test
+//    @Test
     public void queueExclusiveForConsume() throws Exception {
         QueueingConsumer c = new QueueingConsumer(channel);
         try {
@@ -107,7 +108,7 @@ public class QueueExclusivity extends BrokerTestCase {
         fail("Exclusive queue should be locked for queue delete from another connection");
     }
 
-    //@Test
+//    @Test
     public void queueExclusiveForBind() throws Exception {
         try {
             channel.queueBind(q, "amq.direct", "");
@@ -125,7 +126,7 @@ public class QueueExclusivity extends BrokerTestCase {
     // basic.cancel is inherently local to a channel, so it
     // *doesn't* make sense to include it.
 
-    //@Test
+//    @Test
     public void queueExclusiveForUnbind() throws Exception {
         altChannel.queueBind(q, "amq.direct", "");
         try {

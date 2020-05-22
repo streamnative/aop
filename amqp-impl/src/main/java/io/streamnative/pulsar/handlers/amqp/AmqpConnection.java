@@ -26,6 +26,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
@@ -68,6 +69,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         OPEN
     }
 
+    private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
+
+    private long connectionId;
     private final ConcurrentLongHashMap<AmqpChannel> channels;
     private final ConcurrentLongLongHashMap closingChannelsList = new ConcurrentLongLongHashMap();
     @Getter
@@ -93,6 +97,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         super(pulsarService, amqpConfig);
+        this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
@@ -109,6 +114,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
         AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
+        this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
@@ -647,6 +653,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public void setPulsarServerCnx(ServerCnx pulsarServerCnx) {
         this.pulsarServerCnx = pulsarServerCnx;
     }
+
+    public long getConnectionId() {
+        return connectionId;
+    }
+
 
     @VisibleForTesting
     public ByteBufferSender getBufferSender() {

@@ -34,6 +34,7 @@ import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.log4j.Log4j2;
+import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -57,8 +58,6 @@ import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
-
-
 
 /**
  * Base test for AMQP protocol tests.
@@ -126,6 +125,9 @@ public abstract class AmqpProtocolTestBase {
             Mockito.when(brokerService.pulsar()).thenReturn(getPulsarService());
             Mockito.when(getPulsarService().getConfiguration()).thenReturn(serviceConfiguration);
 //            Mockito.when(serviceConfiguration.get).thenReturn(serviceConfiguration);
+            Mockito.when(getPulsarService().getOrderedExecutor()).thenReturn(
+                    OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
+
             PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
             CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
             Subscription subscription = Mockito.mock(Subscription.class);

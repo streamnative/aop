@@ -29,6 +29,7 @@ import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.zookeeper.ZooKeeper;
 
 /**
@@ -133,7 +134,22 @@ public class ConnectionContainer {
                     new InMemoryExchange("", AmqpExchange.Type.Direct, false));
         }
 
+        addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
+        addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
+        addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
     }
 
+    private static void addBuildInExchanges(NamespaceName namespaceName,
+                                            String exchangeName, AmqpExchange.Type exchangeType) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), namespaceName, exchangeName);
+        PersistentTopic persistentTopic = null;
+        try {
+            persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
+        } catch (Exception e) {
+            log.error("Create default exchange topic failed!");
+        }
+        ExchangeContainer.putExchange(namespaceName, exchangeName,
+                new PersistentExchange(exchangeName, exchangeType, persistentTopic, amqpTopicManager, false));
+    }
 
 }

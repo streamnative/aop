@@ -123,14 +123,6 @@ public class ProxyService implements Closeable {
         }
     }
 
-    public ZooKeeperClientFactory getZooKeeperClientFactory() {
-        if (zkClientFactory == null) {
-            zkClientFactory = new ZookeeperClientFactoryImpl();
-        }
-        // Return default factory
-        return zkClientFactory;
-    }
-
     public void cacheVhostMap(String vhost, Pair<String, Integer> lookupData) {
         this.vhostBrokerMap.put(vhost, lookupData);
         try {
@@ -165,9 +157,13 @@ public class ProxyService implements Closeable {
                         if (bytes != null) {
                             NamespaceEphemeralData ephemeralData =
                                     ObjectMapperFactory.getThreadLocal().readValue(bytes, NamespaceEphemeralData.class);
-                            log.info("processResult ephemeralData: {}", ephemeralData);
+                            if (log.isDebugEnabled()) {
+                                log.debug("processResult ephemeralData: {}", ephemeralData);
+                            }
                         } else {
-                            log.info("processResult ephemeralData is null");
+                            if (log.isDebugEnabled()) {
+                                log.debug("processResult ephemeralData is null");
+                            }
                         }
                     } catch (IOException e) {
                         log.error("Read ephemeralData failed", e);

@@ -395,12 +395,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
-        if (this.channels.get(channelId) == null) {
-            log.debug("Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this);
-            addChannel(channel);
-            return channel;
-        }
         return this.channels.get(channelId);
     }
 

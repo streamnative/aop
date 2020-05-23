@@ -809,6 +809,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             }
             amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
             connection.getPulsarService().getOrderedExecutor().executeOrdered(amqpExchange, SafeRunnable.safeRun(() -> {
+                if (amqpExchange == null) {
+                    log.error("publish message error amqpExchange is null.");
+                    return;
+                }
                 CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
                 position.whenComplete((position1, throwable) -> {
                     if (throwable == null) {

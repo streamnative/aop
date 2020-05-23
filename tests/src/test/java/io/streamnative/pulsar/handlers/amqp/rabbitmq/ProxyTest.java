@@ -13,21 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.BuiltinExchangeType;
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.Consumer;
-import com.rabbitmq.client.DefaultConsumer;
-import com.rabbitmq.client.Envelope;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
-import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -45,78 +32,16 @@ public class ProxyTest extends RabbitMQTestBase {
     }
 
     @Test
-    public void unloadBundleTest() throws Exception {
-
-        @Cleanup
-        Connection connection = getConnection("vhost1", true);
-        @Cleanup
-        Channel channel = connection.createChannel();
-
-        String exchangeName = "ex1";
-        String queueName = "ex1-q1";
-        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-        channel.queueDeclare(queueName, true, false, false, null);
-        channel.queueBind(queueName, exchangeName, "");
-
-        final String msgContent = "Hello AOP!";
-
-        new Thread(() -> {
-            while (true) {
-                try {
-                    channel.basicPublish(exchangeName, "", null, msgContent.getBytes());
-                    Thread.sleep(1000);
-                } catch (Exception e) {
-//                    log.warn("produce message failed.");
-                }
-            }
-        }).start();
-
-        AtomicInteger receiveMsgCnt = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(100);
-        new Thread(() -> {
-            Consumer consumer = new DefaultConsumer(channel) {
-                @Override
-                public void handleDelivery(String consumerTag, Envelope envelope,
-                                           AMQP.BasicProperties properties, byte[] body) throws IOException {
-                    String message = new String(body, "UTF-8");
-                    System.out.println(message);
-                    Assert.assertEquals(message, msgContent);
-                    synchronized (countDownLatch) {
-                        countDownLatch.countDown();
-                    }
-                    receiveMsgCnt.addAndGet(1);
-                }
-            };
-            try {
-                channel.basicConsume(queueName, false, consumer);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        try {
-            log.info("unload ns start.");
-            admin.namespaces().unload("public/vhost1");
-            log.info("unload ns finish.");
-        } catch (Exception e) {
-            Assert.fail("Failed to unload bundle.");
-        }
-
-        countDownLatch.await();
-        Assert.assertEquals(receiveMsgCnt.get(), 100);
-    }
-
-    @Test
     public void proxyBasicTest() throws Exception {
 
-        fanoutTest("test1", "vhost1", "ex1", Arrays.asList("ex1-q1", "ex1-q2"));
-        fanoutTest("test2", "vhost2", "ex2", Arrays.asList("ex2-q1", "ex2-q2"));
-        fanoutTest("test3", "vhost3", "ex3", Arrays.asList("ex3-q1", "ex3-q2"));
+        basicFanoutTest("test1", "vhost1", false, 2);
+        basicFanoutTest("test2", "vhost2", false, 3);
+        basicFanoutTest("test3", "vhost3", false, 2);
 
         CountDownLatch countDownLatch = new CountDownLatch(3);
         new Thread(() -> {
             try {
-                fanoutTest("test4", "vhost1", "ex4", Arrays.asList("ex4-q1", "ex4-q2", "ex4-q3"));
+                basicFanoutTest("test4", "vhost1", false, 2);
                 countDownLatch.countDown();
             } catch (Exception e) {
                 log.error("Test4 error for vhost1.", e);
@@ -124,7 +49,7 @@ public class ProxyTest extends RabbitMQTestBase {
         }).start();
         new Thread(() -> {
             try {
-                fanoutTest("test5", "vhost2", "ex5", Arrays.asList("ex5-q1", "ex5-q2"));
+                basicFanoutTest("test5", "vhost2", false, 3);
                 countDownLatch.countDown();
             } catch (Exception e) {
                 log.error("Test5 error for vhost2.", e);
@@ -132,7 +57,7 @@ public class ProxyTest extends RabbitMQTestBase {
         }).start();
         new Thread(() -> {
             try {
-                fanoutTest("test6", "vhost3", "ex6", Arrays.asList("ex6-q1", "ex6-q2", "ex6-q3"));
+                basicFanoutTest("test6", "vhost3", false, 3);
                 countDownLatch.countDown();
             } catch (Exception e) {
                 log.error("Test6 error for vhost3.", e);
@@ -141,56 +66,11 @@ public class ProxyTest extends RabbitMQTestBase {
         countDownLatch.await();
     }
 
-    private void fanoutTest(String testName, String vhost, String exchangeName,
-                            List<String> queueList) throws Exception {
-        log.info("[{}] test start ...", testName);
-        @Cleanup
-        Connection connection = getConnection(vhost, true);
-        log.info("[{}] connection init finish. address: {}:{} open: {}",
-                testName, connection.getAddress(), connection.getPort(), connection.isOpen());
-        @Cleanup
-        Channel channel = connection.createChannel();
-        log.info("[{}] channel init finish. channelNum: {}", testName, channel.getChannelNumber());
-
-        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-
-        for (String queueName : queueList) {
-            channel.queueDeclare(queueName, true, false, false, null);
-            channel.queueBind(queueName, exchangeName, "");
-        }
-
-        String contentMsg = "Hello AOP!";
-        int msgCnt = 100;
-        for (int i = 0; i < msgCnt; i++) {
-            channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
-        }
-        log.info("[{}] send msg finish. msgCnt: {}", testName, msgCnt);
-
-        AtomicInteger totalMsgCnt = new AtomicInteger(0);
-        CountDownLatch countDownLatch = new CountDownLatch(msgCnt * queueList.size());
-
-        for (String queueName : queueList) {
-            Channel consumeChannel = connection.createChannel();
-            log.info("[{}] consumeChannel init finish. channelNum: {}", testName, consumeChannel.getChannelNumber());
-            Consumer consumer = new DefaultConsumer(consumeChannel) {
-                @Override
-                public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
-                                           byte[] body) throws IOException {
-                    String message = new String(body, "UTF-8");
-                    Assert.assertEquals(message, contentMsg);
-                    synchronized (countDownLatch) {
-                        countDownLatch.countDown();
-                    }
-                    totalMsgCnt.addAndGet(1);
-                }
-            };
-            consumeChannel.basicConsume(queueName, false, consumer);
-            log.info("[{}] consume start. queueName: {}", testName, queueName);
-        }
-
-        countDownLatch.await();
-        System.out.println("[" + testName + "] Total msg cnt: " + totalMsgCnt);
-        Assert.assertEquals(msgCnt * queueList.size(), totalMsgCnt.get());
+    @Test
+    public void unloadBundleTest() throws Exception {
+        basicFanoutTest("test1", "vhost1", true, 3);
+        basicFanoutTest("test2", "vhost2", true, 2);
+        basicFanoutTest("test3", "vhost3", true, 2);
     }
 
 }

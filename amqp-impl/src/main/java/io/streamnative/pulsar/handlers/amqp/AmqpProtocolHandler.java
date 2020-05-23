@@ -88,6 +88,8 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public void start(BrokerService service) {
         brokerService = service;
 
+        ConnectionContainer.init(brokerService.getPulsar());
+
         if (amqpConfig.isUseProxy()) {
             ProxyConfiguration proxyConfig = new ProxyConfiguration();
             proxyConfig.setProxyPort(Optional.of(amqpConfig.getAmqpProxyPort()));
@@ -101,9 +103,6 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                 log.error("Failed to start amqp proxy service.");
             }
         }
-
-        log.info("Starting AmqpProtocolHandler, aop version is: '{}'", AopVersion.getVersion());
-        ConnectionContainer.init(brokerService.getPulsar());
 
         log.info("Starting AmqpProtocolHandler, listener: {}, aop version is: '{}'",
                 amqpConfig.getAmqpListeners(), AopVersion.getVersion());

@@ -141,7 +141,9 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
                 break;
             case RedirectToBroker:
-                log.info("ProxyConnection [channelRead] - RedirectToBroker");
+                if (log.isDebugEnabled()) {
+                    log.debug("ProxyConnection [channelRead] - RedirectToBroker");
+                }
                 if (proxyHandler != null) {
                     proxyHandler.getBrokerChannel().writeAndFlush(msg);
                 }

@@ -124,7 +124,9 @@ public class ProxyHandler {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            log.info("[{}] ProxyBackendHandler [channelRead]", vhost);
+            if (log.isDebugEnabled()) {
+                log.debug("[{}] ProxyBackendHandler [channelRead]", vhost);
+            }
             switch (state) {
                 case Init:
                 case Failed:
@@ -158,7 +160,7 @@ public class ProxyHandler {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            log.error("[" + vhost + "] ProxyBackendHandler [channelInactive]");
+            log.warn("[{}] ProxyBackendHandler [channelInactive]", vhost);
             super.channelInactive(ctx);
         }
 

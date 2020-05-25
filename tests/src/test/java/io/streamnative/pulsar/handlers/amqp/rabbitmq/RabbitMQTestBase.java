@@ -174,8 +174,8 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                                            byte[] body) throws IOException {
                     String message = new String(body, "UTF-8");
                     Assert.assertEquals(message, contentMsg);
-                    countDownLatch.countDown();
                     totalReceiveMsgCnt.incrementAndGet();
+                    countDownLatch.countDown();
                 }
             };
             try {

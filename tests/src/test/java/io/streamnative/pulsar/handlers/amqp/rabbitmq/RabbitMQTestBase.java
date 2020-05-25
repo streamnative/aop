@@ -136,19 +136,19 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                         if (!isBundleUnload.get() && sendMsgCnt.get() < (expectedMsgCntPerQueue / 2)) {
                             // if bundle will be unloaded, we send half of `expectedMsgCntPerQueue`
                             channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
-                            sendMsgCnt.addAndGet(1);
+                            sendMsgCnt.incrementAndGet();
                         } else if (isBundleUnload.get()) {
                             // send message until consumer get enough messages
                             // TODO If add send confirm, only send expected messages is enough
                             channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
-                            sendMsgCnt.addAndGet(1);
+                            sendMsgCnt.incrementAndGet();
                             Thread.sleep(10);
                         }
                     } else {
                         // bundle not change
                         if (sendMsgCnt.get() < expectedMsgCntPerQueue) {
                             channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
-                            sendMsgCnt.addAndGet(1);
+                            sendMsgCnt.incrementAndGet();
                         } else {
                             log.info("message send finish. produce msg cnt: {}", sendMsgCnt.get());
                             break;
@@ -177,7 +177,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                     synchronized (countDownLatch) {
                         countDownLatch.countDown();
                     }
-                    totalReceiveMsgCnt.addAndGet(1);
+                    totalReceiveMsgCnt.incrementAndGet();
                 }
             };
             try {

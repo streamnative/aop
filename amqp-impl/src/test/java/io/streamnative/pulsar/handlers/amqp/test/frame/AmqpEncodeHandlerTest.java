@@ -12,8 +12,10 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp.test.frame;
+
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertTrue;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -29,6 +31,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
 import java.net.SocketAddress;
 import java.util.concurrent.CountDownLatch;
@@ -44,16 +47,13 @@ import org.junit.Before;
 import org.junit.Test;
 import org.testng.Assert;
 
-
-;
-
 /**
  * Amqp Encode Handler Tests.
  */
 @Log4j2
 public class AmqpEncodeHandlerTest {
 
-    private ClientDecoder clientDecoder;
+    private AmqpClientDecoder clientDecoder;
 
     private EventLoopGroup group;
 
@@ -65,7 +65,7 @@ public class AmqpEncodeHandlerTest {
     public void setup() {
         group = new NioEventLoopGroup();
         clientChannel = new AmqpClientChannel();
-        clientDecoder = new ClientDecoder(new AmqpClientMethodProcessor(clientChannel));
+        clientDecoder = new AmqpClientDecoder(new AmqpClientMethodProcessor(clientChannel));
         methodRegistry = new MethodRegistry(ProtocolVersion.v0_91);
 
     }

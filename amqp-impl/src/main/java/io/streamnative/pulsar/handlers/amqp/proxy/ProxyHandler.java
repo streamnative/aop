@@ -25,6 +25,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
+import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
 import java.util.List;
 import lombok.Getter;
@@ -89,11 +90,11 @@ public class ProxyHandler {
 
         private ChannelHandlerContext cnx;
         private AMQMethodBody connectResponseBody;
-        private AMQClientDecoder clientDecoder;
+        private AmqpClientDecoder clientDecoder;
 
         ProxyBackendHandler(AMQMethodBody responseBody) {
             this.connectResponseBody = responseBody;
-            clientDecoder = new AMQClientDecoder(this);
+            clientDecoder = new AmqpClientDecoder(this);
         }
 
         @Override
@@ -162,6 +163,8 @@ public class ProxyHandler {
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             log.warn("[{}] ProxyBackendHandler [channelInactive]", vhost);
             super.channelInactive(ctx);
+            proxyService.cacheVhostMapRemove(vhost);
+            proxyConnection.close();
         }
 
         @Override

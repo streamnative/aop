@@ -15,9 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.collect.BoundType;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Range;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
@@ -30,19 +28,10 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.namespace.NamespaceEphemeralData;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
-import org.apache.pulsar.common.naming.NamespaceBundle;
-import org.apache.pulsar.common.naming.NamespaceBundles;
-import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.util.ObjectMapperFactory;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
-import org.apache.zookeeper.AsyncCallback;
-import org.apache.zookeeper.WatchedEvent;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.data.Stat;
 
 /**
  * This service is used for redirecting AMQP client request to proper AMQP protocol handler Broker.
@@ -124,54 +113,10 @@ public class ProxyService implements Closeable {
 
     public void cacheVhostMap(String vhost, Pair<String, Integer> lookupData) {
         this.vhostBrokerMap.put(vhost, lookupData);
-        try {
-            NamespaceBundle namespaceBundle = new NamespaceBundle(
-                    NamespaceName.get(tenant, vhost),
-                    Range.range(NamespaceBundles.FULL_LOWER_BOUND, BoundType.CLOSED,
-                            NamespaceBundles.FULL_UPPER_BOUND, BoundType.CLOSED),
-                    pulsarService.getNamespaceService().getNamespaceBundleFactory());
-            String path = "/namespace/" + namespaceBundle.toString();
+    }
 
-            getPulsarService().getLocalZkCache().getZooKeeper().getData(path, new Watcher() {
-                @Override
-                public void process(WatchedEvent watchedEvent) {
-                    log.info("process watchedEvent: {}", watchedEvent);
-                    synchronized (vhostBrokerMap) {
-                        String path = watchedEvent.getPath();
-                        if (watchedEvent.getType().equals(Event.EventType.NodeDeleted)) {
-                            String[] stringSplits = path.split("/");
-                            String vhost = stringSplits[stringSplits.length - 2];
-                            if (vhostBrokerMap.containsKey(vhost)) {
-                                log.info("unLoad vhostBrokerMap contain the namespaceBundle: {}", path);
-                                vhostBrokerMap.remove(vhost);
-                                releaseConnection(vhost);
-                            }
-                        }
-                    }
-                }
-            }, new AsyncCallback.DataCallback() {
-                @Override
-                public void processResult(int i, String s, Object o, byte[] bytes, Stat stat) {
-                    try {
-                        if (bytes != null) {
-                            NamespaceEphemeralData ephemeralData =
-                                    ObjectMapperFactory.getThreadLocal().readValue(bytes, NamespaceEphemeralData.class);
-                            if (log.isDebugEnabled()) {
-                                log.debug("processResult ephemeralData: {}", ephemeralData);
-                            }
-                        } else {
-                            if (log.isDebugEnabled()) {
-                                log.debug("processResult ephemeralData is null");
-                            }
-                        }
-                    } catch (IOException e) {
-                        log.error("Read ephemeralData failed", e);
-                    }
-                }
-            }, null);
-        } catch (Exception e) {
-            log.error("Add watcher failed. vhost: {}, lookupData: {}", vhost, lookupData, e);
-        }
+    public void cacheVhostMapRemove(String vhost) {
+        this.vhostBrokerMap.remove(vhost);
     }
 
     @Override

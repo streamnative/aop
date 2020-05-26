@@ -20,13 +20,13 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
+import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
-import io.streamnative.pulsar.handlers.amqp.test.frame.ClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToServerByteBufferSender;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
@@ -96,7 +96,7 @@ public abstract class AmqpProtocolTestBase {
         //   the connection. So that the response ByteBuffer from the AMQP server sends to the client by
         //   ToClientByteBufferSender and decodes by ClientDecoder, then the decoder add decoded protocol body to the
         //   client channel. So, we can get a response from the client channel straightforward.
-        connection.setBufferSender(new ToClientByteBufferSender(new ClientDecoder
+        connection.setBufferSender(new ToClientByteBufferSender(new AmqpClientDecoder
             (new AmqpClientMethodProcessor(clientChannel))));
         AmqpPulsarServerCnx serverCnx = new AmqpPulsarServerCnx(connection.getPulsarService(), ctx);
         connection.setPulsarServerCnx(serverCnx);

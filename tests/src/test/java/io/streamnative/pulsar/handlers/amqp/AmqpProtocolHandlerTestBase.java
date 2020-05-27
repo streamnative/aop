@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -40,6 +41,7 @@ import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.EnsemblePlacementPolicy;
 import org.apache.bookkeeper.client.PulsarMockBookKeeper;
 import org.apache.bookkeeper.util.ZkUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.pulsar.broker.BookKeeperClientFactory;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -55,6 +57,7 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.MockZooKeeper;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
+import org.mockito.Mockito;
 
 /**
  * Unit test to test AoP handler.
@@ -63,19 +66,12 @@ import org.apache.zookeeper.data.ACL;
 public abstract class AmqpProtocolHandlerTestBase {
 
     protected ServiceConfiguration conf;
-    protected PulsarService pulsar;
     protected PulsarAdmin admin;
     protected URL brokerUrl;
     protected URL brokerUrlTls;
     protected URI lookupUrl;
     protected PulsarClient pulsarClient;
 
-    protected int brokerWebservicePort = PortManager.nextFreePort();
-    protected int brokerWebservicePortTls = PortManager.nextFreePort();
-    @Getter
-    protected int brokerPort = PortManager.nextFreePort();
-    @Getter
-    protected int amqpBrokerPort = PortManager.nextFreePort();
     @Getter
     protected int amqpBrokerPortTls = PortManager.nextFreePort();
 
@@ -87,15 +83,27 @@ public abstract class AmqpProtocolHandlerTestBase {
     private SameThreadOrderedSafeExecutor sameThreadOrderedSafeExecutor;
     private ExecutorService bkExecutor;
 
+    private int brokerCount = 1;
+    @Getter
+    private List<PulsarService> pulsarServiceList = new ArrayList<>();
+    @Getter
+    private List<Integer > brokerPortList = new ArrayList<>();
+    @Getter
+    private List<Integer> brokerWebservicePortList = new ArrayList<>();
+    @Getter
+    private List<Integer> brokerWebServicePortTlsList = new ArrayList<>();
+    @Getter
+    private List<Integer> amqpBrokerPortList = new ArrayList<>();
+    @Getter
+    private List<Integer> proxyPortList = new ArrayList<>();
+
     public AmqpProtocolHandlerTestBase() {
         resetConfig();
     }
 
     protected void resetConfig() {
         AmqpServiceConfiguration amqpConfig = new AmqpServiceConfiguration();
-        amqpConfig.setBrokerServicePort(Optional.ofNullable(brokerPort));
         amqpConfig.setAdvertisedAddress("localhost");
-        amqpConfig.setWebServicePort(Optional.ofNullable(brokerWebservicePort));
         amqpConfig.setClusterName(configClusterName);
 
         amqpConfig.setManagedLedgerCacheSizeMB(8);
@@ -135,7 +143,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         init();
         lookupUrl = new URI(brokerUrl.toString());
         if (isTcpLookup) {
-            lookupUrl = new URI("broker://localhost:" + brokerPort);
+            lookupUrl = new URI("broker://localhost:" + brokerPortList.get(0));
         }
         pulsarClient = newPulsarClient(lookupUrl.toString(), 0);
     }
@@ -156,8 +164,10 @@ public abstract class AmqpProtocolHandlerTestBase {
 
         startBroker();
 
-        brokerUrl = new URL("http://" + pulsar.getAdvertisedAddress() + ":" + brokerWebservicePort);
-        brokerUrlTls = new URL("https://" + pulsar.getAdvertisedAddress() + ":" + brokerWebservicePortTls);
+        brokerUrl = new URL("http://" + pulsarServiceList.get(0).getAdvertisedAddress() + ":"
+                + pulsarServiceList.get(0).getConfiguration().getWebServicePort().get());
+        brokerUrlTls = new URL("https://" + pulsarServiceList.get(0).getAdvertisedAddress() + ":"
+                + pulsarServiceList.get(0).getConfiguration().getWebServicePortTls().get());
 
         admin = spy(PulsarAdmin.builder().serviceHttpUrl(brokerUrl.toString()).build());
     }
@@ -172,7 +182,7 @@ public abstract class AmqpProtocolHandlerTestBase {
             if (pulsarClient != null) {
                 pulsarClient.close();
             }
-            if (pulsar != null) {
+            if (pulsarServiceList != null && !pulsarServiceList.isEmpty()) {
                 stopBroker();
             }
             if (mockBookKeeper != null) {
@@ -203,11 +213,55 @@ public abstract class AmqpProtocolHandlerTestBase {
     }
 
     protected void stopBroker() throws Exception {
-        pulsar.close();
+        for (PulsarService pulsarService : pulsarServiceList) {
+            pulsarService.close();
+        }
+        brokerPortList.clear();
+        brokerWebservicePortList.clear();
+        brokerWebServicePortTlsList.clear();
+        proxyPortList.clear();
+        pulsarServiceList.clear();
+    }
+
+    public void stopBroker(int brokerIndex) throws Exception {
+        pulsarServiceList.get(brokerIndex).close();
+
+        brokerPortList.remove(brokerIndex);
+        brokerWebservicePortList.remove(brokerIndex);
+        brokerWebServicePortTlsList.remove(brokerIndex);
+        proxyPortList.remove(brokerIndex);
+        pulsarServiceList.remove(brokerIndex);
     }
 
     protected void startBroker() throws Exception {
-        this.pulsar = startBroker(conf);
+        for (int i = 0; i < brokerCount; i++) {
+
+            int brokerPort = PortManager.nextFreePort();
+            brokerPortList.add(brokerPort);
+
+            int amqpBrokerPort = PortManager.nextFreePort();
+            amqpBrokerPortList.add(amqpBrokerPort);
+
+            int proxyPort = PortManager.nextFreePort();
+            proxyPortList.add(proxyPort);
+
+            int brokerWebServicePort = PortManager.nextFreePort();
+            brokerWebservicePortList.add(brokerWebServicePort);
+
+            int brokerWebServicePortTls = PortManager.nextFreePort();
+            brokerWebServicePortTlsList.add(brokerWebServicePortTls);
+
+            conf.setBrokerServicePort(Optional.of(brokerPort));
+            ((AmqpServiceConfiguration) conf).setAmqpListeners("amqp://127.0.0.1:" + amqpBrokerPort);
+            ((AmqpServiceConfiguration) conf).setAmqpProxyPort(proxyPort);
+            ((AmqpServiceConfiguration) conf).setUseProxy(true);
+            conf.setWebServicePort(Optional.of(brokerWebServicePort));
+            conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
+
+            log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, proxyPort: {}",
+                    i, brokerPort, amqpBrokerPort, proxyPort);
+            this.pulsarServiceList.add(startBroker(conf));
+        }
     }
 
     protected PulsarService startBroker(ServiceConfiguration conf) throws Exception {
@@ -318,6 +372,43 @@ public abstract class AmqpProtocolHandlerTestBase {
         Field field = clazz.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(classObj, fieldValue);
+    }
+
+    public void checkPulsarServiceState() {
+        for (PulsarService pulsarService : pulsarServiceList) {
+            Mockito.when(pulsarService.getState()).thenReturn(PulsarService.State.Started);
+        }
+    }
+
+    /**
+     * Get available proxy port.
+     * @return random proxy port
+     */
+    public int getProxyPort() {
+        return getProxyPortList().get(RandomUtils.nextInt(0, getProxyPortList().size()));
+    }
+
+    /**
+     * Set the starting broker count for test.
+     */
+    public void setBrokerCount(int brokerCount) {
+        this.brokerCount = brokerCount;
+    }
+
+    public String randExName() {
+        return randomName("ex-", 4);
+    }
+
+    public String randQuName() {
+        return randomName("qu-", 4);
+    }
+
+    public String randomName(String prefix, int numChars) {
+        StringBuilder sb = new StringBuilder(prefix);
+        for (int i = 0; i < numChars; i++) {
+            sb.append((char) (ThreadLocalRandom.current().nextInt(26) + 'a'));
+        }
+        return sb.toString();
     }
 
 }

@@ -56,7 +56,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String routingKey = "test.key";
         String queueName = "test-queue";
         @Cleanup
-        Connection conn = getConnection();
+        Connection conn = getConnection("vhost1", false);
         @Cleanup
         Channel channel = conn.createChannel();
 
@@ -95,7 +95,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         final Semaphore waitForAtLeastOneDelivery = new Semaphore(0);
         final Semaphore waitForCancellation = new Semaphore(0);
         @Cleanup
-        Connection conn = getConnection();
+        Connection conn = getConnection("vhost1", false);
         @Cleanup
         Channel channel = conn.createChannel();
 
@@ -142,7 +142,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String routingKey = "test.key";
         String queueName = "test-queue1";
         @Cleanup
-        Connection conn = getConnection();
+        Connection conn = getConnection("vhost1", false);
         CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
         @Cleanup
         Channel channel = conn.createChannel();
@@ -186,10 +186,10 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
         @Cleanup
         PulsarAdmin pulsarAdmin = PulsarAdmin.builder().serviceHttpUrl("http://127.0.0.1:"
-            + brokerWebservicePort).build();
+            + getBrokerWebservicePortList().get(0)).build();
         log.info("topics: {}", pulsarAdmin.topics());
 
-        try (Connection connection = getConnection();
+        try (Connection connection = getConnection("vhost1", false);
              Channel channel = connection.createChannel()) {
             channel.queueDeclare(queueName, true, false, false, null);
             for (int i = 0; i < messagesNum; i++) {
@@ -200,7 +200,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
         @Cleanup
         PulsarClient pulsarClient = PulsarClient.builder()
-            .serviceUrl("pulsar://localhost:" + brokerPort).build();
+            .serviceUrl("pulsar://localhost:" + getBrokerPortList().get(0)).build();
         @Cleanup
         org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()
             .topic("persistent://public/vhost1/" + AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)
@@ -223,7 +223,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         final String queueName2 = "ex-q2";
 
         @Cleanup
-        Connection connection = getConnection();
+        Connection connection = getConnection("vhost1", false);
         @Cleanup
         Channel channel = connection.createChannel();
 
@@ -237,7 +237,8 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
 
         @Cleanup
-        PulsarClient pulsarClient = PulsarClient.builder().serviceUrl("pulsar://localhost:" + brokerPort).build();
+        PulsarClient pulsarClient = PulsarClient.builder().serviceUrl(
+                "pulsar://localhost:" + getBrokerPortList().get(0)).build();
         String exchangeTopic = "persistent://public/vhost1/ex";
         NamespaceName namespaceName = NamespaceName.get("public", vhost);
         String queueIndexTopic1 = PersistentQueue.getIndexTopicName(namespaceName, queueName1);
@@ -292,7 +293,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         final String queueName2 = "ex1-q2";
 
         @Cleanup
-        Connection connection = getConnection();
+        Connection connection = getConnection(vhost, false);
         @Cleanup
         Channel channel = connection.createChannel();
 

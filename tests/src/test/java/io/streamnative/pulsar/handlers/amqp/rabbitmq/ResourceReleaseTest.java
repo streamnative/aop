@@ -39,13 +39,13 @@ public class ResourceReleaseTest extends RabbitMQTestBase {
     public void bundleUnloadTest() throws IOException, TimeoutException, InterruptedException {
 
         @Cleanup
-        final Connection connection = getConnection();
+        final Connection connection = getConnection("vhost1", false);
         @Cleanup
         Channel channel = connection.createChannel();
 
         String msgContent = "Hello AOP.";
-        String exchange = "ex1";
-        String queue = "qu1";
+        String exchange = randExName();
+        String queue = randQuName();
         channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(queue, true, false, false, null);
         channel.queueBind(queue, exchange, "");
@@ -70,26 +70,24 @@ public class ResourceReleaseTest extends RabbitMQTestBase {
         }).start();
 
         CountDownLatch consumeLatch = new CountDownLatch(msgCnt);
-        new Thread(() -> {
-            try {
-                Channel consumeChannel = connection.createChannel();
-                Consumer consumer = new DefaultConsumer(consumeChannel) {
-                    @Override
-                    public void handleDelivery(String consumerTag, Envelope envelope,
-                                               AMQP.BasicProperties properties, byte[] body) throws IOException {
-                        synchronized (consumeLatch) {
-                            consumeLatch.countDown();
-                        }
-                        consumeCnt.addAndGet(1);
-                        log.info("Receive msg [{}]", consumeCnt.get());
-                        Assert.assertEquals(msgContent, new String(body));
+        try {
+            Channel consumeChannel = connection.createChannel();
+            Consumer consumer = new DefaultConsumer(consumeChannel) {
+                @Override
+                public void handleDelivery(String consumerTag, Envelope envelope,
+                                           AMQP.BasicProperties properties, byte[] body) throws IOException {
+                    synchronized (consumeLatch) {
+                        consumeLatch.countDown();
                     }
-                };
-                consumeChannel.basicConsume(queue, consumer);
-            } catch (Exception e) {
-                log.error("Failed to consume message.", e);
-            }
-        }).start();
+                    consumeCnt.addAndGet(1);
+                    log.info("Receive msg [{}]", consumeCnt.get());
+                    Assert.assertEquals(msgContent, new String(body));
+                }
+            };
+            consumeChannel.basicConsume(queue, consumer);
+        } catch (Exception e) {
+            log.error("Failed to consume message.", e);
+        }
 
         try {
             admin.namespaces().unload("public/vhost1");

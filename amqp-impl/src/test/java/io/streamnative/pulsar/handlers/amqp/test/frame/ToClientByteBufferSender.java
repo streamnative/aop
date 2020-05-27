@@ -14,15 +14,16 @@
 package io.streamnative.pulsar.handlers.amqp.test.frame;
 
 import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSender;
+import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 
 /**
  * Sender for the server send byte buffer to the client.
  */
 public class ToClientByteBufferSender extends AmqpByteBufferSender {
 
-    private final ClientDecoder clientDecoder;
+    private final AmqpClientDecoder clientDecoder;
 
-    public ToClientByteBufferSender(ClientDecoder clientDecoder) {
+    public ToClientByteBufferSender(AmqpClientDecoder clientDecoder) {
         this.clientDecoder = clientDecoder;
     }
 

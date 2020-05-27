@@ -14,17 +14,29 @@
 package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 
 import com.google.common.collect.Sets;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.BuiltinExchangeType;
+import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Consumer;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
-import org.mockito.Mockito;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -43,10 +55,10 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         if (!admin.clusters().getClusters().contains(configClusterName)) {
             // so that clients can test short names
             admin.clusters().createCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + brokerWebservicePort));
+                    new ClusterData("http://127.0.0.1:" + getBrokerWebservicePortList().get(0)));
         } else {
             admin.clusters().updateCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + brokerWebservicePort));
+                    new ClusterData("http://127.0.0.1:" + getBrokerWebServicePortTlsList().get(0)));
         }
         if (!admin.tenants().getTenants().contains("public")) {
             admin.tenants().createTenant("public",
@@ -56,12 +68,16 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                     new TenantInfo(Sets.newHashSet("appid1", "appid2"), Sets.newHashSet("test")));
         }
 
-        if (!admin.namespaces().getNamespaces("public").contains("public/vhost1")) {
-            admin.namespaces().createNamespace("public/vhost1");
-            admin.namespaces().setRetention("public/vhost1",
-                    new RetentionPolicies(60, 1000));
+        List<String> vhostList = Arrays.asList("vhost1", "vhost2", "vhost3");
+        for (String vhost : vhostList) {
+            String ns = "public/" + vhost;
+            if (!admin.namespaces().getNamespaces("public").contains(ns)) {
+                admin.namespaces().createNamespace(ns);
+                admin.namespaces().setRetention(ns,
+                        new RetentionPolicies(60, 1000));
+            }
         }
-        Mockito.when(pulsar.getState()).thenReturn(PulsarService.State.Started);
+        checkPulsarServiceState();
     }
 
     @AfterClass
@@ -70,11 +86,120 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         super.internalCleanup();
     }
 
-    protected Connection getConnection() throws IOException, TimeoutException {
+    protected Connection getConnection(String vhost, boolean useProxy) throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        connectionFactory.setPort(5672);
-        connectionFactory.setVirtualHost("vhost1");
+        if (useProxy) {
+            int proxyPort = getProxyPort();
+            connectionFactory.setPort(proxyPort);
+            log.info("use proxyPort: {}", proxyPort);
+        } else {
+            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
+            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
+        }
+        connectionFactory.setVirtualHost(vhost);
         return connectionFactory.newConnection();
+    }
+
+    public void basicFanoutTest(String testName, String vhost, boolean bundleUnloadTest,
+                                int queueCnt) throws Exception {
+        log.info("[{}] test start ...", testName);
+        @Cleanup
+        Connection connection = getConnection(vhost, true);
+        log.info("[{}] connection init finish. address: {}:{} open: {}",
+                testName, connection.getAddress(), connection.getPort(), connection.isOpen());
+        @Cleanup
+        Channel channel = connection.createChannel();
+        log.info("[{}] channel init finish. channelNum: {}", testName, channel.getChannelNumber());
+
+        String exchangeName = randExName();
+        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+
+        List<String> queueList = new ArrayList<>();
+        for (int i = 0; i < queueCnt; i++) {
+            String queueName = randQuName();
+            queueList.add(queueName);
+            channel.queueDeclare(queueName, true, false, false, null);
+            channel.queueBind(queueName, exchangeName, "");
+        }
+
+        String contentMsg = "Hello AOP!";
+        AtomicBoolean isBundleUnload = new AtomicBoolean(false);
+        AtomicInteger sendMsgCnt = new AtomicInteger(0);
+        int expectedMsgCntPerQueue = 100;
+        log.info("[{}] send msg start.", testName);
+        new Thread(() -> {
+            while (true) {
+                try {
+                    // bundle will be unloaded
+                    if (bundleUnloadTest) {
+                        if (!isBundleUnload.get() && sendMsgCnt.get() < (expectedMsgCntPerQueue / 2)) {
+                            // if bundle will be unloaded, we send half of `expectedMsgCntPerQueue`
+                            channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+                            sendMsgCnt.incrementAndGet();
+                        } else if (isBundleUnload.get()) {
+                            // send message until consumer get enough messages
+                            // TODO If add send confirm, only send expected messages is enough
+                            channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+                            sendMsgCnt.incrementAndGet();
+                            Thread.sleep(10);
+                        }
+                    } else {
+                        // bundle not change
+                        if (sendMsgCnt.get() < expectedMsgCntPerQueue) {
+                            channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+                            sendMsgCnt.incrementAndGet();
+                        } else {
+                            log.info("message send finish. produce msg cnt: {}", sendMsgCnt.get());
+                            break;
+                        }
+                    }
+                } catch (Exception e) {
+                    if (!bundleUnloadTest) {
+                        Assert.fail("[" + testName + "] Failed to send message. exchangeName: " + exchangeName, e);
+                    }
+                }
+            }
+        }).start();
+
+        AtomicInteger totalReceiveMsgCnt = new AtomicInteger(0);
+        CountDownLatch countDownLatch = new CountDownLatch(expectedMsgCntPerQueue * queueList.size());
+
+        for (String queueName : queueList) {
+            Channel consumeChannel = connection.createChannel();
+            log.info("[{}] consumeChannel init finish. channelNum: {}", testName, consumeChannel.getChannelNumber());
+            Consumer consumer = new DefaultConsumer(consumeChannel) {
+                @Override
+                public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                                           byte[] body) throws IOException {
+                    String message = new String(body, "UTF-8");
+                    Assert.assertEquals(message, contentMsg);
+                    totalReceiveMsgCnt.incrementAndGet();
+                    countDownLatch.countDown();
+                }
+            };
+            try {
+                consumeChannel.basicConsume(queueName, false, consumer);
+                log.info("[{}] consume start. queueName: {}", testName, queueName);
+            } catch (Exception e) {
+                Assert.fail("[" + testName + "] Failed to start consume. queueName: " + queueName, e);
+            }
+        }
+
+        if (bundleUnloadTest) {
+            try {
+                log.info("unload bundle start.");
+                admin.namespaces().unloadAsync("public/" + vhost).whenComplete((ignore, throwable) -> {
+                    isBundleUnload.set(true);
+                    log.info("unload bundle finish.");
+                });
+            } catch (Exception e) {
+                Assert.fail("[" + testName + "] Failed to unload bundle. vhost: " + vhost, e);
+            }
+        }
+
+        countDownLatch.await();
+        System.out.println("[" + testName + "] Test finish. Receive total msg cnt: " + totalReceiveMsgCnt);
+        Assert.assertEquals(expectedMsgCntPerQueue * queueList.size(), totalReceiveMsgCnt.get());
     }
 }

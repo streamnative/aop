@@ -33,7 +33,7 @@ jobs:
       run: mvn spotbugs:check
 
     - name: test after build
-      run: mvn test -DfailIfNoTests=false -X
+      run: mvn test -DfailIfNoTests=false
 
     - name: package surefire artifacts
       if: failure()

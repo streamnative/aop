@@ -66,7 +66,7 @@ public class ProxyTest extends RabbitMQTestBase {
         countDownLatch.await();
     }
 
-    @Test
+//    @Test
     public void unloadBundleTest() throws Exception {
         basicFanoutTest("test1", "vhost1", true, 3);
         basicFanoutTest("test2", "vhost2", true, 2);

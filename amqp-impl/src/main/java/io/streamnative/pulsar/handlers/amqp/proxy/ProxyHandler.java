@@ -163,8 +163,8 @@ public class ProxyHandler {
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             log.warn("[{}] ProxyBackendHandler [channelInactive]", vhost);
             super.channelInactive(ctx);
-            proxyService.cacheVhostMapRemove(vhost);
-            proxyConnection.close();
+//            proxyService.cacheVhostMapRemove(vhost);
+//            proxyConnection.close();
         }
 
         @Override

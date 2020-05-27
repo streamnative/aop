@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
-import org.testng.annotations.Test;
 
 /**
  * Resource release test.
@@ -36,7 +35,7 @@ import org.testng.annotations.Test;
 @Slf4j
 public class ResourceReleaseTest extends RabbitMQTestBase {
 
-    @Test
+    //@Test
     public void bundleUnloadTest() throws IOException, TimeoutException, InterruptedException {
 
         @Cleanup

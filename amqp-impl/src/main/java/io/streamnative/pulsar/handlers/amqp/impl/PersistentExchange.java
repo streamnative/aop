@@ -101,7 +101,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         // TODO Temporarily put the creation operation here, and later put the operation in router
         ManagedCursor cursor = getTopicCursorManager().getOrCreateCursor(queueName);
         if (cursor == null) {
-            future.complete(null);
+            future.completeExceptionally(new ManagedLedgerException("cursor is null"));
             return future;
         }
         ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();

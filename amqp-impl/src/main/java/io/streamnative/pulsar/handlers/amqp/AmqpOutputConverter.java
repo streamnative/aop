@@ -17,7 +17,6 @@ import java.io.IOException;
 import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
-import org.apache.qpid.server.message.InstanceProperties;
 import org.apache.qpid.server.message.MessageContentSource;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.ProtocolOutputConverterImpl;
@@ -68,7 +67,7 @@ public class AmqpOutputConverter {
 
         int bodySize = (int) message.getContentHeaderBody().getBodySize();
         boolean msgCompressed = isCompressed(contentHeaderBody);
-        AmqpOutputConverter.DisposableMessageContentSource modifiedContent = null;
+        DisposableMessageContentSource modifiedContent = null;
 
         boolean compressionSupported = connection.isCompressionSupported();
 
@@ -105,18 +104,18 @@ public class AmqpOutputConverter {
         return length;
     }
 
-    private AmqpOutputConverter.DisposableMessageContentSource deflateIfPossible(AmqpMessageData message) {
+    private DisposableMessageContentSource deflateIfPossible(AmqpMessageData message) {
         try (QpidByteBuffer contentBuffers = message.getContentBody().getPayload()) {
-            return new AmqpOutputConverter.ModifiedContentSource(QpidByteBuffer.deflate(contentBuffers));
+            return new ModifiedContentSource(QpidByteBuffer.deflate(contentBuffers));
         } catch (IOException e) {
             log.warn("Unable to compress message payload for consumer with gzip, message will be sent as is", e);
             return null;
         }
     }
 
-    private AmqpOutputConverter.DisposableMessageContentSource inflateIfPossible(AmqpMessageData message) {
+    private DisposableMessageContentSource inflateIfPossible(AmqpMessageData message) {
         try (QpidByteBuffer contentBuffers = message.getContentBody().getPayload()) {
-            return new AmqpOutputConverter.ModifiedContentSource(QpidByteBuffer.inflate(contentBuffers));
+            return new ModifiedContentSource(QpidByteBuffer.inflate(contentBuffers));
         } catch (IOException e) {
             log.warn("Unable to decompress message payload for consumer with gzip, message will be sent as is", e);
             return null;
@@ -146,10 +145,10 @@ public class AmqpOutputConverter {
             try (QpidByteBuffer contentByteBuffer = content.getContent()) {
                 int contentChunkSize = bodySize > maxFrameBodySize ? maxFrameBodySize : bodySize;
                 QpidByteBuffer chunk = contentByteBuffer.view(0, contentChunkSize);
-                writeFrame(new AmqpOutputConverter.CompositeAMQBodyBlock(channelId,
+                writeFrame(new CompositeAMQBodyBlock(channelId,
                     deliverBody,
                     contentHeaderBody,
-                    new AmqpOutputConverter.MessageContentSourceBody(chunk)));
+                    new MessageContentSourceBody(chunk)));
 
                 int writtenSize = contentChunkSize;
                 while (writtenSize < bodySize) {
@@ -157,7 +156,7 @@ public class AmqpOutputConverter {
                         (bodySize - writtenSize) > maxFrameBodySize ? maxFrameBodySize : bodySize - writtenSize;
                     QpidByteBuffer chunkElement = contentByteBuffer.view(writtenSize, contentChunkSize);
                     writtenSize += contentChunkSize;
-                    writeFrame(new AMQFrame(channelId, new AmqpOutputConverter.MessageContentSourceBody(chunkElement)));
+                    writeFrame(new AMQFrame(channelId, new MessageContentSourceBody(chunkElement)));
 
                 }
             }
@@ -210,12 +209,9 @@ public class AmqpOutputConverter {
 
     }
 
-    public long writeGetOk(final AmqpMessageData message,
-        final InstanceProperties props,
-        int channelId,
-        long deliveryTag,
-        int queueSize) {
-        AMQBody deliver = createEncodedGetOkBody(message, props, deliveryTag, queueSize);
+    public long writeGetOk(final AmqpMessageData message, int channelId,
+        boolean isRedelivered, long deliveryTag, int messageCount) {
+        AMQBody deliver = createEncodedGetOkBody(message, isRedelivered, deliveryTag, messageCount);
         return writeMessageDelivery(message, channelId, deliver);
     }
 
@@ -231,7 +227,7 @@ public class AmqpOutputConverter {
         exchangeName = pb.getExchange();
         routingKey = pb.getRoutingKey();
 
-        return new AmqpOutputConverter.EncodedDeliveryBody(deliveryTag, routingKey,
+        return new EncodedDeliveryBody(deliveryTag, routingKey,
             exchangeName, consumerTag, isRedelivered);
     }
 
@@ -293,8 +289,10 @@ public class AmqpOutputConverter {
         }
     }
 
-    private AMQBody createEncodedGetOkBody(AmqpMessageData message, InstanceProperties props, long deliveryTag,
-        int queueSize) {
+    private AMQBody createEncodedGetOkBody(AmqpMessageData message,
+        boolean isRedelivered,
+        final long deliveryTag,
+        int messageCount) {
         final AMQShortString exchangeName;
         final AMQShortString routingKey;
 
@@ -302,13 +300,11 @@ public class AmqpOutputConverter {
         exchangeName = pb.getExchange();
         routingKey = pb.getRoutingKey();
 
-        final boolean isRedelivered = Boolean.TRUE.equals(props.getProperty(InstanceProperties.Property.REDELIVERED));
-
         return connection.getMethodRegistry().createBasicGetOkBody(deliveryTag,
             isRedelivered,
             exchangeName,
             routingKey,
-            queueSize);
+            messageCount);
     }
 
     private AMQBody createEncodedReturnFrame(MessagePublishInfo messagePublishInfo,
@@ -427,7 +423,7 @@ public class AmqpOutputConverter {
         }
     }
 
-    private static class ModifiedContentSource implements AmqpOutputConverter.DisposableMessageContentSource {
+    private static class ModifiedContentSource implements DisposableMessageContentSource {
         private final QpidByteBuffer buffer;
         private final int size;
 

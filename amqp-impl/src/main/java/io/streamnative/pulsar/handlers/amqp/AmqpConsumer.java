@@ -23,6 +23,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -51,12 +52,12 @@ public class AmqpConsumer extends Consumer {
     private final String consumerTag;
 
     private final String queueName;
-
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
     private final Map<String, TreeMap<PositionImpl, PositionImpl>> unAckMessages;
-
+    private final AtomicInteger totalPermits = new AtomicInteger(0);
+    private final AtomicInteger permits = new AtomicInteger(0);
     public AmqpConsumer(Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
@@ -70,7 +71,7 @@ public class AmqpConsumer extends Consumer {
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
         this.queueName = queueName;
-        unAckMessages = new ConcurrentHashMap<>();
+        this.unAckMessages = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -84,7 +85,7 @@ public class AmqpConsumer extends Consumer {
 
             return null;
         }
-
+        checkPermits();
         connection.ctx.channel().eventLoop().execute(() -> {
             for (int i = 0; i < entries.size(); i++) {
                 Entry index = entries.get(i);
@@ -115,8 +116,12 @@ public class AmqpConsumer extends Consumer {
                         if (autoAck) {
                             messagesAck(index.getPosition());
                         } else {
-                            channel.getUnacknowledgedMessageMap().add(deliveryTag, index.getPosition(), this);
+                            channel.useCreditForMessage(msg.getLength());
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                index.getPosition(), this, msg.getLength());
                         }
+                    } else {
+                        messagesAck(index.getPosition());
                     }
                     msg.release();
                     index.release();
@@ -176,12 +181,28 @@ public class AmqpConsumer extends Consumer {
 
     @Override
     public int getAvailablePermits() {
-        //TODO Temporarily perform this operation here, This method will be overridden later in flow control impl
-        return 1;
+        return this.channel.hasCredit() ? permits.get() : 0;
     }
 
-    private void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
+    void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
         TreeMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName, treeMap -> new TreeMap());
         map.put(index, message);
+    }
+
+    public String getConsumerTag() {
+        return consumerTag;
+    }
+
+    public void handleFlow(int permits) {
+        this.totalPermits.getAndAdd(permits);
+        this.permits.getAndAdd(permits);
+        getSubscription().getDispatcher().consumerFlow(this, permits);
+    }
+
+    private void checkPermits() {
+        if (permits.get() < totalPermits.get() / 2) {
+            permits.getAndSet(totalPermits.get());
+            getSubscription().getDispatcher().consumerFlow(this, totalPermits.get() / 2);
+        }
     }
 }

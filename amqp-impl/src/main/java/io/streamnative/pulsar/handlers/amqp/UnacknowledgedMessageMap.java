@@ -29,15 +29,17 @@ import org.apache.bookkeeper.mledger.Position;
 public class UnacknowledgedMessageMap {
 
     /**
-     *  unAck positionInfo.
+     * unAck positionInfo.
      */
     public static final class MessageConsumerAssociation {
         private final Position position;
         private final AmqpConsumer consumer;
+        private final int size;
 
-        private MessageConsumerAssociation(Position position, AmqpConsumer consumer) {
+        private MessageConsumerAssociation(Position position, AmqpConsumer consumer, int size) {
             this.position = position;
             this.consumer = consumer;
+            this.size = size;
         }
 
         public Position getPosition() {
@@ -47,9 +49,18 @@ public class UnacknowledgedMessageMap {
         public AmqpConsumer getConsumer() {
             return consumer;
         }
+
+        public int getSize() {
+            return size;
+        }
     }
 
     private final Map<Long, MessageConsumerAssociation> map = new ConcurrentHashMap<>();
+    private final AmqpChannel channel;
+
+    public UnacknowledgedMessageMap(AmqpChannel channel) {
+        this.channel = channel;
+    }
 
     public Collection<MessageConsumerAssociation> acknowledge(long deliveryTag, boolean multiple) {
         if (multiple) {
@@ -70,15 +81,18 @@ public class UnacknowledgedMessageMap {
         return Collections.emptySet();
     }
 
-    public void add(long deliveryTag, Position position, AmqpConsumer consumer) {
+    public void add(long deliveryTag, Position position, AmqpConsumer consumer, int size) {
         checkNotNull(position);
         checkNotNull(consumer);
-        map.put(deliveryTag, new MessageConsumerAssociation(position, consumer));
+        map.put(deliveryTag, new MessageConsumerAssociation(position, consumer, size));
     }
 
     public void remove(Collection<Long> deliveryTag) {
         deliveryTag.stream().forEach(tag -> {
-            map.remove(tag);
+            MessageConsumerAssociation entry = map.remove(tag);
+            if (entry != null) {
+                channel.restoreCredit(1, entry.getSize());
+            }
         });
     }
 

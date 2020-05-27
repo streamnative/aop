@@ -1,5 +1,3 @@
-
-
 /**
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,36 +23,27 @@ import com.rabbitmq.client.AlreadyClosedException;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeoutException;
+import org.junit.Test;
+
+
+
 /**
  * Testcase.
  */
 public class BasicGet extends BrokerTestCase {
-    //@Test
-    public void basicGetWithEnqueuedMessages() throws IOException, InterruptedException {
-        assertTrue(channel.isOpen());
-        String q = channel.queueDeclare().getQueue();
 
-        basicPublishPersistent("msg".getBytes(StandardCharsets.UTF_8), q);
-        Thread.sleep(250);
-
-        assertNotNull(channel.basicGet(q, true));
-        channel.queuePurge(q);
-        assertNull(channel.basicGet(q, true));
-        channel.queueDelete(q);
-    }
-
-    //@Test
+    @Test
     public void basicGetWithEmptyQueue() throws IOException, InterruptedException {
+        String queueName = "qu-2";
         assertTrue(channel.isOpen());
-        String q = channel.queueDeclare().getQueue();
-
-        assertNull(channel.basicGet(q, true));
-        channel.queueDelete(q);
+        channel.queueDeclare(queueName, true, false, false, null);
+        Thread.sleep(250);
+        assertNull(channel.basicGet(queueName, true));
+        channel.queueDelete(queueName);
     }
 
-    //@Test
+    @Test
     public void basicGetWithClosedChannel() throws IOException, InterruptedException, TimeoutException {
         assertTrue(channel.isOpen());
         String q = channel.queueDeclare().getQueue();
@@ -73,4 +62,24 @@ public class BasicGet extends BrokerTestCase {
         }
 
     }
+
+    @Test
+    public void basicGetWithEnqueuedMessagesbasicGetWithEmptyQueue() throws IOException, InterruptedException {
+        String exchangeName = "ex-1";
+        String queueName = "qu-1";
+        String routingKey = "key-2";
+        assertTrue(channel.isOpen());
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
+        for (int i = 0; i < 10; i++) {
+            basicPublishPersistent(exchangeName, routingKey);
+            Thread.sleep(250);
+            assertNotNull(channel.basicGet(queueName, true));
+        }
+        channel.queueDelete(queueName);
+
+    }
+
+
 }

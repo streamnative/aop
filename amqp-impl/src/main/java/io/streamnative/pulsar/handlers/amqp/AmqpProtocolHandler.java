@@ -72,6 +72,8 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             // when loaded with PulsarService as NAR, `conf` will be type of ServiceConfiguration
             amqpConfig = ConfigurationUtils.create(conf.getProperties(), AmqpServiceConfiguration.class);
         }
+        // disable topic auto delete.
+        amqpConfig.setBrokerDeleteInactiveTopicsEnabled(false);
         this.bindAddress = ServiceConfigurationUtils.getDefaultOrConfiguredAddress(amqpConfig.getBindAddress());
     }
 

@@ -24,6 +24,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -137,6 +139,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         isActive.set(true);
         this.brokerDecoder = new AmqpBrokerDecoder(this);
         this.pulsarServerCnx = new AmqpPulsarServerCnx(getPulsarService(), ctx);
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        completeAndCloseAllChannels();
+        ConnectionContainer.removeConnection(namespaceName, this);
+        this.brokerDecoder.close();
     }
 
     @Override
@@ -664,6 +674,22 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         return connectionId;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AmqpConnection that = (AmqpConnection) o;
+        return connectionId == that.connectionId && Objects.equals(namespaceName, that.namespaceName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(connectionId, namespaceName);
+    }
 
     @VisibleForTesting
     public ByteBufferSender getBufferSender() {

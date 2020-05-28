@@ -124,6 +124,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      */
     private volatile long deliveryTag = 0;
     private AmqpFlowCreditManager creditManager;
+
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
         this.connection = connection;

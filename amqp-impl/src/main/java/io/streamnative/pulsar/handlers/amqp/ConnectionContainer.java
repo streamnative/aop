@@ -17,6 +17,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -101,6 +103,10 @@ public class ConnectionContainer {
             connectionSet.add(amqpConnection);
             return connectionSet;
         });
+    }
+
+    public static void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+        connectionMap.getOrDefault(namespaceName, Collections.emptySet()).remove(amqpConnection);
     }
 
     private static void defaultExchangeInit(NamespaceName namespaceName) {

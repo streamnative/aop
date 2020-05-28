@@ -124,7 +124,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      */
     private volatile long deliveryTag = 0;
     private AmqpFlowCreditManager creditManager;
-    private MessagePublishInfo messagePublishInfo;
 
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
@@ -686,7 +685,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {
-        messagePublishInfo = info;
         currentMessage = new IncomingMessage(info);
         currentMessage.setMessageDestination(e);
     }

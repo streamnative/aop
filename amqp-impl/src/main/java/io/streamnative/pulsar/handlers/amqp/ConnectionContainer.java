@@ -49,6 +49,7 @@ public class ConnectionContainer {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
                 log.info("ConnectionContainer [onLoad] namespaceBundle: {}", namespaceBundle);
+                defaultExchangeInit(namespaceBundle.getNamespaceObject());
             }
 
             @Override

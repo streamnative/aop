@@ -137,6 +137,13 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        completeAndCloseAllChannels();
+        this.brokerDecoder.close();
+    }
+
+    @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         // Get a buffer that contains the full frame
         ByteBuf buffer = (ByteBuf) msg;

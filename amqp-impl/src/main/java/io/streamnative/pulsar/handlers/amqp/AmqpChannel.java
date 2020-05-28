@@ -124,6 +124,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      */
     private volatile long deliveryTag = 0;
     private AmqpFlowCreditManager creditManager;
+    private MessagePublishInfo messagePublishInfo;
+
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
         this.connection = connection;
@@ -684,6 +686,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {
+        messagePublishInfo = info;
         currentMessage = new IncomingMessage(info);
         currentMessage.setMessageDestination(e);
     }
@@ -839,6 +842,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             Message<byte[]> message;
             try {
                 message = MessageConvertUtils.toPulsarMessage(currentMessage);
+                currentMessage = new IncomingMessage(messagePublishInfo);
             } catch (UnsupportedEncodingException e) {
                 connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
                 return;

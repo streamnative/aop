@@ -26,7 +26,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
  */
 public class AmqpBrokerDecoder extends ServerDecoder {
 
-    private static final int NETWORK_BUFFER_SIZE = 100 * 1024 * 1024;
+    private static final int NETWORK_BUFFER_SIZE = 16 * 1024 * 1024;
     private volatile QpidByteBuffer netInputBuffer;
 
     /**
@@ -75,5 +75,9 @@ public class AmqpBrokerDecoder extends ServerDecoder {
                 netInputBuffer.put(currentBuffer);
             }
         }
+    }
+
+    public void close() {
+        netInputBuffer = null;
     }
 }

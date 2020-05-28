@@ -188,7 +188,31 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
             if (passive) {
                 if (null == amqpExchange) {
-                    closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
+                    if (durable) {
+                        TopicName topicName = TopicName.get(
+                            TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
+                        CompletableFuture<Topic> tf = amqpTopicManager.getTopic(topicName.toString(), false);
+                        tf.whenComplete((t, e) -> {
+                            if (e != null) {
+                                closeChannel(INTERNAL_ERROR, e.getMessage());
+                                return;
+                            }
+                            if (t == null) {
+                                closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
+                                return;
+                            }
+                            ExchangeContainer.
+                                putExchange(connection.getNamespaceName(), exchangeName,
+                                    new PersistentExchange(exchangeName, AmqpExchange.Type.value(
+                                        type.toString()), (PersistentTopic) t, amqpTopicManager, autoDelete));
+                            if (!nowait) {
+                                sync();
+                                connection.writeFrame(declareOkBody.generateFrame(channelId));
+                            }
+                        });
+                    } else {
+                        closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
+                    }
                 } else if (!(type == null || type.length() == 0)
                         && !amqpExchange.getType().toString().equalsIgnoreCase(type.toString())) {
                     connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Attempt to redeclare exchange: '"

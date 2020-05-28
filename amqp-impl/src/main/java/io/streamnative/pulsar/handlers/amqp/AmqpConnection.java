@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -68,6 +69,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AWAIT_OPEN,
         OPEN
     }
+
+    private static final String DEFAULT_NAMESPACE = "default";
 
     private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 
@@ -261,6 +264,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         String virtualHostStr = AMQShortString.toString(virtualHost);
         if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
             virtualHostStr = virtualHostStr.substring(1);
+            if (StringUtils.isEmpty(virtualHostStr)){
+                virtualHostStr = DEFAULT_NAMESPACE;
+            }
         }
 
         NamespaceName namespaceName = NamespaceName.get(amqpConfig.getAmqpTenant(), virtualHostStr);

@@ -26,7 +26,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
  */
 public class AmqpBrokerDecoder extends ServerDecoder {
 
-    private static final int NETWORK_BUFFER_SIZE = 16 * 1024 * 1024;
+    private static final int bufferSize = 4 * 1024 * 1024;
     private volatile QpidByteBuffer netInputBuffer;
 
     /**
@@ -36,7 +36,7 @@ public class AmqpBrokerDecoder extends ServerDecoder {
      */
     public AmqpBrokerDecoder(ServerMethodProcessor<? extends ServerChannelMethodProcessor> methodProcessor) {
         super(methodProcessor);
-        netInputBuffer = QpidByteBuffer.allocateDirect(NETWORK_BUFFER_SIZE);
+        netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize);
     }
 
     @Override
@@ -47,6 +47,9 @@ public class AmqpBrokerDecoder extends ServerDecoder {
     @Override
     public void decodeBuffer(QpidByteBuffer buf) throws AMQFrameDecodingException, AMQProtocolVersionException,
             IOException {
+        if (netInputBuffer.remaining() < buf.remaining()) {
+            netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize);
+        }
         netInputBuffer.put(buf);
         netInputBuffer.flip();
         super.decodeBuffer(netInputBuffer);
@@ -66,10 +69,10 @@ public class AmqpBrokerDecoder extends ServerDecoder {
         } else {
             try (QpidByteBuffer currentBuffer = netInputBuffer) {
                 int newBufSize;
-                if (currentBuffer.capacity() < NETWORK_BUFFER_SIZE) {
-                    newBufSize = NETWORK_BUFFER_SIZE;
+                if (currentBuffer.capacity() < bufferSize) {
+                    newBufSize = bufferSize;
                 } else {
-                    newBufSize = currentBuffer.capacity() + NETWORK_BUFFER_SIZE;
+                    newBufSize = currentBuffer.capacity() + bufferSize;
                 }
                 netInputBuffer = QpidByteBuffer.allocateDirect(newBufSize);
                 netInputBuffer.put(currentBuffer);

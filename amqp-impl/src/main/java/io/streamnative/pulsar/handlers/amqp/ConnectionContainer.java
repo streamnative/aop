@@ -19,12 +19,9 @@ import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
-import org.apache.pulsar.broker.service.Topic;
-import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -107,25 +104,6 @@ public class ConnectionContainer {
     }
 
     private static void defaultExchangeInit(NamespaceName namespaceName) {
-        AmqpExchange persistentExchange = ExchangeContainer.getExchange(namespaceName,
-                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-
-        if (persistentExchange == null) {
-            try {
-                TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                        namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-                CompletableFuture<Topic> persistentTopic = amqpTopicManager.getTopic(
-                        topicName.toString(), true);
-                persistentTopic.whenComplete((topic, throwable) -> {
-                    ExchangeContainer.putExchange(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
-                            new PersistentExchange("", AmqpExchange.Type.Direct,
-                                    (PersistentTopic) topic, amqpTopicManager, false));
-                });
-            } catch (Exception e) {
-                log.error("Create default exchange topic failed!");
-            }
-        }
-
         AmqpExchange inMemoryExchange = ExchangeContainer.getExchange(namespaceName,
                 AbstractAmqpExchange.DEFAULT_EXCHANGE);
 
@@ -134,6 +112,7 @@ public class ConnectionContainer {
                     new InMemoryExchange("", AmqpExchange.Type.Direct, false));
         }
 
+        addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
         addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
         addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
         addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
@@ -142,14 +121,14 @@ public class ConnectionContainer {
     private static void addBuildInExchanges(NamespaceName namespaceName,
                                             String exchangeName, AmqpExchange.Type exchangeType) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(), namespaceName, exchangeName);
-        PersistentTopic persistentTopic = null;
-        try {
-            persistentTopic = amqpTopicManager.getTopic(topicName.toString()).get();
-        } catch (Exception e) {
-            log.error("Create default exchange topic failed!");
-        }
-        ExchangeContainer.putExchange(namespaceName, exchangeName,
-                new PersistentExchange(exchangeName, exchangeType, persistentTopic, amqpTopicManager, false));
+        amqpTopicManager.getTopic(topicName.toString()).whenComplete((topic, throwable) -> {
+            if (throwable != null) {
+                log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
+                return;
+            }
+            ExchangeContainer.putExchange(namespaceName, exchangeName,
+                    new PersistentExchange(exchangeName, exchangeType, topic, amqpTopicManager, false));
+        });
     }
 
 }

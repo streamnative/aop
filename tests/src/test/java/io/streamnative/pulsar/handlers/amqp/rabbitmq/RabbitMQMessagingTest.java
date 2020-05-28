@@ -178,7 +178,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
     }
 
-    @Test
+    @Test(timeOut = 1000 * 10)
     private void basicPublishTest() throws IOException, TimeoutException {
         final String queueName = "testQueue";
         final String message = "Hello AOP!";
@@ -215,7 +215,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         }
     }
 
-    @Test
+    @Test(timeOut = 1000 * 10)
     private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException {
         final String vhost = "vhost1";
         final String exchangeName = "ex";
@@ -284,7 +284,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertEquals(entryId, byteBuf2.readLong());
     }
 
-    @Test
+    @Test(timeOut = 1000 * 10)
     private void fanoutConsumeTest() throws IOException, TimeoutException, InterruptedException {
 
         final String vhost = "vhost1";

@@ -20,9 +20,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
@@ -55,7 +55,7 @@ public class AmqpConsumer extends Consumer {
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
-    private final Map<String, TreeMap<PositionImpl, PositionImpl>> unAckMessages;
+    private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
     private final AtomicInteger totalPermits = new AtomicInteger(0);
     private final AtomicInteger permits = new AtomicInteger(0);
     public AmqpConsumer(Subscription subscription,
@@ -140,12 +140,11 @@ public class AmqpConsumer extends Consumer {
         if (!cursor.getMarkDeletedPosition().equals(previousMarkDeletePosition)) {
             synchronized (this) {
                 PositionImpl newDeletePosition = (PositionImpl) cursor.getMarkDeletedPosition();
-                unAckMessages.entrySet().stream().forEach(entry -> {
-                    SortedMap<PositionImpl, PositionImpl> ackMap = entry.getValue().headMap(newDeletePosition, true);
+                unAckMessages.forEach((key, value) -> {
+                    SortedMap<PositionImpl, PositionImpl> ackMap = value.headMap(newDeletePosition, true);
                     if (ackMap.size() > 0) {
                         PositionImpl lastValue = ackMap.get(ackMap.lastKey());
-                        getQueue().acknowledgeAsync(entry.getKey(), lastValue.getLedgerId(), lastValue.getEntryId());
-
+                        getQueue().acknowledgeAsync(key, lastValue.getLedgerId(), lastValue.getEntryId());
                     }
                     ackMap.clear();
                 });
@@ -185,7 +184,8 @@ public class AmqpConsumer extends Consumer {
     }
 
     void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
-        TreeMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName, treeMap -> new TreeMap());
+        ConcurrentSkipListMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName,
+                treeMap -> new ConcurrentSkipListMap<>());
         map.put(index, message);
     }
 

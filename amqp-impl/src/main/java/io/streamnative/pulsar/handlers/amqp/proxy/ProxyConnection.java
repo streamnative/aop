@@ -24,6 +24,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
+import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.util.ArrayList;
 import java.util.List;
@@ -225,6 +226,9 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         String virtualHostStr = AMQShortString.toString(virtualHost);
         if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
             virtualHostStr = virtualHostStr.substring(1);
+            if (org.apache.commons.lang.StringUtils.isEmpty(virtualHostStr)){
+                virtualHostStr = AmqpConnection.DEFAULT_NAMESPACE;
+            }
         }
         vhost = virtualHostStr;
 

@@ -72,7 +72,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         OPEN
     }
 
-    private static final String DEFAULT_NAMESPACE = "default";
+    public static final String DEFAULT_NAMESPACE = "default";
 
     private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 

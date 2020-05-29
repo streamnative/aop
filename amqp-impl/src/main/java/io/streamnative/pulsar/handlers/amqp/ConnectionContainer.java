@@ -131,7 +131,8 @@ public class ConnectionContainer {
                 return;
             }
             ExchangeContainer.putExchange(namespaceName, exchangeName,
-                    new PersistentExchange(exchangeName, exchangeType, (PersistentTopic) topic, amqpTopicManager, false));
+                    new PersistentExchange(exchangeName, exchangeType,
+                            (PersistentTopic) topic, amqpTopicManager, false));
         });
     }
 

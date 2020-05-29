@@ -139,7 +139,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                             sendMsgCnt.incrementAndGet();
                         } else if (isBundleUnload.get()) {
                             // send message until consumer get enough messages
-                            // TODO If add send confirm, only send expected messages is enough
+                            // Add send confirm, only send expected messages is enough
                             channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
                             sendMsgCnt.incrementAndGet();
                             Thread.sleep(10);
@@ -174,6 +174,11 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                                            byte[] body) throws IOException {
                     String message = new String(body, "UTF-8");
                     Assert.assertEquals(message, contentMsg);
+                    if (bundleUnloadTest && totalReceiveMsgCnt.get() == expectedMsgCntPerQueue * queueList.size()) {
+                        // If test is bundleUnloadTest, stop totalReceiveMsgCnt
+                        // when totalReceiveMsgCnt reach the expectedCount
+                        return;
+                    }
                     totalReceiveMsgCnt.incrementAndGet();
                     countDownLatch.countDown();
                 }

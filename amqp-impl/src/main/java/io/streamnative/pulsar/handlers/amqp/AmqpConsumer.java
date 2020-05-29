@@ -23,7 +23,8 @@ import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -56,8 +57,16 @@ public class AmqpConsumer extends Consumer {
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
     private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
-    private final AtomicInteger totalPermits = new AtomicInteger(0);
-    private final AtomicInteger permits = new AtomicInteger(0);
+    private static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
+            AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "availablePermits");
+    private volatile int availablePermits;
+
+    private static final AtomicIntegerFieldUpdater<AmqpConsumer> ADD_PERMITS_UPDATER =
+            AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "addPermits");
+    private volatile int addPermits = 0;
+
+    private final int maxPermits = 1000;
+
     public AmqpConsumer(Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
@@ -77,6 +86,7 @@ public class AmqpConsumer extends Consumer {
     @Override
     public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes, int totalMessages,
         long totalBytes, RedeliveryTracker redeliveryTracker) {
+        MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         final AmqpConnection connection = channel.getConnection();
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
@@ -85,7 +95,6 @@ public class AmqpConsumer extends Consumer {
 
             return null;
         }
-        checkPermits();
         connection.ctx.channel().eventLoop().execute(() -> {
             for (int i = 0; i < entries.size(); i++) {
                 Entry index = entries.get(i);
@@ -134,6 +143,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     public void messagesAck(List<Position> position) {
+        incrementPermits(position.size());
         ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
         Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
         getSubscription().acknowledgeMessage(position, PulsarApi.CommandAck.AckType.Individual, Collections.EMPTY_MAP);
@@ -180,7 +190,7 @@ public class AmqpConsumer extends Consumer {
 
     @Override
     public int getAvailablePermits() {
-        return this.channel.hasCredit() ? permits.get() : 0;
+        return this.channel.hasCredit() ? availablePermits : 0;
     }
 
     void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
@@ -194,15 +204,16 @@ public class AmqpConsumer extends Consumer {
     }
 
     public void handleFlow(int permits) {
-        this.totalPermits.getAndAdd(permits);
-        this.permits.getAndAdd(permits);
+        MESSAGE_PERMITS_UPDATER.getAndAdd(this, permits);
         getSubscription().getDispatcher().consumerFlow(this, permits);
     }
 
-    private void checkPermits() {
-        if (permits.get() < totalPermits.get() / 2) {
-            permits.getAndSet(totalPermits.get());
-            getSubscription().getDispatcher().consumerFlow(this, totalPermits.get() / 2);
+    public void incrementPermits(int permits) {
+        int var = ADD_PERMITS_UPDATER.addAndGet(this, permits);
+        if (var > maxPermits / 2) {
+            MESSAGE_PERMITS_UPDATER.addAndGet(this, var);
+            this.getSubscription().consumerFlow(this, availablePermits);
+            ADD_PERMITS_UPDATER.set(this, 0);
         }
     }
 }

@@ -670,7 +670,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 false, PulsarApi.CommandSubscribe.InitialPosition.Latest,
                 null, this, consumerTag, queueName, ack);
             subscription.addConsumer(consumer);
-            consumer.handleFlow(10000);
+            consumer.handleFlow(1000);
             tag2ConsumersMap.put(consumerTag, consumer);
         } catch (Exception e) {
             throw e;
@@ -752,7 +752,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     PulsarApi.CommandSubscribe.InitialPosition.Latest, null, this,
                     "", queueName, noAck);
                 subscription.addConsumer(consumer);
-                consumer.handleFlow(10000);
+                consumer.handleFlow(1000);
                 return consumer;
             } catch (Exception e) {
                 e.printStackTrace();

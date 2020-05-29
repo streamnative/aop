@@ -389,7 +389,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         toServerSender.flush();
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueBindOkBody);
-        BasicConsumeBody basicConsumeBody = methodRegistry.createBasicConsumeBody(0, "exchangName",
+        BasicConsumeBody basicConsumeBody = methodRegistry.createBasicConsumeBody(0, queueName,
             "consumerTag1", false, true, false, false, null);
         basicConsumeBody.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();

@@ -48,7 +48,14 @@ public class AmqpBrokerDecoder extends ServerDecoder {
     public void decodeBuffer(QpidByteBuffer buf) throws AMQFrameDecodingException, AMQProtocolVersionException,
             IOException {
         if (netInputBuffer.remaining() < buf.remaining()) {
+            QpidByteBuffer oldBuffer = netInputBuffer;
             netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize);
+            if (oldBuffer.position() != 0) {
+                oldBuffer.limit(oldBuffer.position());
+                oldBuffer.slice();
+                oldBuffer.flip();
+                netInputBuffer.put(oldBuffer);
+            }
         }
         netInputBuffer.put(buf);
         netInputBuffer.flip();

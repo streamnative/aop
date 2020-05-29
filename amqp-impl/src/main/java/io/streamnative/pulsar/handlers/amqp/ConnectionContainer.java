@@ -59,9 +59,6 @@ public class ConnectionContainer {
                 log.info("ConnectionContainer [unLoad] namespaceBundle: {}", namespaceBundle);
                 NamespaceName namespaceName = namespaceBundle.getNamespaceObject();
 
-                TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                        namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-
                 if (connectionMap.containsKey(namespaceName)) {
                     Set<AmqpConnection> connectionSet = connectionMap.get(namespaceName);
                     for (AmqpConnection connection : connectionSet) {

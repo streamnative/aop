@@ -20,9 +20,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -51,11 +53,19 @@ public class AmqpConsumer extends Consumer {
     private final String consumerTag;
 
     private final String queueName;
-
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
-    private final Map<String, TreeMap<PositionImpl, PositionImpl>> unAckMessages;
+    private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
+    private static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
+            AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "availablePermits");
+    private volatile int availablePermits;
+
+    private static final AtomicIntegerFieldUpdater<AmqpConsumer> ADD_PERMITS_UPDATER =
+            AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "addPermits");
+    private volatile int addPermits = 0;
+
+    private final int maxPermits = 1000;
 
     public AmqpConsumer(Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
@@ -70,12 +80,13 @@ public class AmqpConsumer extends Consumer {
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
         this.queueName = queueName;
-        unAckMessages = new ConcurrentHashMap<>();
+        this.unAckMessages = new ConcurrentHashMap<>();
     }
 
     @Override
     public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes, int totalMessages,
         long totalBytes, RedeliveryTracker redeliveryTracker) {
+        MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         final AmqpConnection connection = channel.getConnection();
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
@@ -84,7 +95,6 @@ public class AmqpConsumer extends Consumer {
 
             return null;
         }
-
         connection.ctx.channel().eventLoop().execute(() -> {
             for (int i = 0; i < entries.size(); i++) {
                 Entry index = entries.get(i);
@@ -115,8 +125,12 @@ public class AmqpConsumer extends Consumer {
                         if (autoAck) {
                             messagesAck(index.getPosition());
                         } else {
-                            channel.getUnacknowledgedMessageMap().add(deliveryTag, index.getPosition(), this);
+                            channel.useCreditForMessage(msg.getLength());
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                index.getPosition(), this, msg.getLength());
                         }
+                    } else {
+                        messagesAck(index.getPosition());
                     }
                     msg.release();
                     index.release();
@@ -129,18 +143,18 @@ public class AmqpConsumer extends Consumer {
     }
 
     public void messagesAck(List<Position> position) {
+        incrementPermits(position.size());
         ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
         Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
         getSubscription().acknowledgeMessage(position, PulsarApi.CommandAck.AckType.Individual, Collections.EMPTY_MAP);
         if (!cursor.getMarkDeletedPosition().equals(previousMarkDeletePosition)) {
             synchronized (this) {
                 PositionImpl newDeletePosition = (PositionImpl) cursor.getMarkDeletedPosition();
-                unAckMessages.entrySet().stream().forEach(entry -> {
-                    SortedMap<PositionImpl, PositionImpl> ackMap = entry.getValue().headMap(newDeletePosition, true);
+                unAckMessages.forEach((key, value) -> {
+                    SortedMap<PositionImpl, PositionImpl> ackMap = value.headMap(newDeletePosition, true);
                     if (ackMap.size() > 0) {
                         PositionImpl lastValue = ackMap.get(ackMap.lastKey());
-                        getQueue().acknowledgeAsync(entry.getKey(), lastValue.getLedgerId(), lastValue.getEntryId());
-
+                        getQueue().acknowledgeAsync(key, lastValue.getLedgerId(), lastValue.getEntryId());
                     }
                     ackMap.clear();
                 });
@@ -161,7 +175,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     public AmqpQueue getQueue() {
-        return QueueContainer.getQueue(queueName);
+        return QueueContainer.getQueue(channel.getConnection().getNamespaceName(), queueName);
     }
 
     @Override
@@ -176,12 +190,30 @@ public class AmqpConsumer extends Consumer {
 
     @Override
     public int getAvailablePermits() {
-        //TODO Temporarily perform this operation here, This method will be overridden later in flow control impl
-        return 1;
+        return this.channel.hasCredit() ? availablePermits : 0;
     }
 
-    private void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
-        TreeMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName, treeMap -> new TreeMap());
+    void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
+        ConcurrentSkipListMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName,
+                treeMap -> new ConcurrentSkipListMap<>());
         map.put(index, message);
+    }
+
+    public String getConsumerTag() {
+        return consumerTag;
+    }
+
+    public void handleFlow(int permits) {
+        MESSAGE_PERMITS_UPDATER.getAndAdd(this, permits);
+        getSubscription().getDispatcher().consumerFlow(this, permits);
+    }
+
+    public void incrementPermits(int permits) {
+        int var = ADD_PERMITS_UPDATER.addAndGet(this, permits);
+        if (var > maxPermits / 2) {
+            MESSAGE_PERMITS_UPDATER.addAndGet(this, var);
+            this.getSubscription().consumerFlow(this, availablePermits);
+            ADD_PERMITS_UPDATER.set(this, 0);
+        }
     }
 }

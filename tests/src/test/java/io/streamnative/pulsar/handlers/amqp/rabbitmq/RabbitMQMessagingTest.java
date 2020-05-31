@@ -17,7 +17,6 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import io.netty.buffer.ByteBuf;
@@ -56,7 +55,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String routingKey = "test.key";
         String queueName = "test-queue";
         @Cleanup
-        Connection conn = getConnection();
+        Connection conn = getConnection("vhost1", false);
         @Cleanup
         Channel channel = conn.createChannel();
 
@@ -65,7 +64,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         channel.queueBind(queueName, exchangeName, routingKey);
 
         List<String> messages = new ArrayList<>();
-        channel.basicConsume(queueName, false, "myConsumerTag",
+        channel.basicConsume(queueName, false,
             new DefaultConsumer(channel) {
                 @Override
                 public void handleDelivery(String consumerTag,
@@ -93,9 +92,8 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String queueName = "test-queue";
         AtomicInteger atomicInteger = new AtomicInteger();
         final Semaphore waitForAtLeastOneDelivery = new Semaphore(0);
-        final Semaphore waitForCancellation = new Semaphore(0);
         @Cleanup
-        Connection conn = getConnection();
+        Connection conn = getConnection("vhost1", false);
         @Cleanup
         Channel channel = conn.createChannel();
 
@@ -103,7 +101,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         channel.queueDeclare(queueName, true, false, false, null);
         channel.queueBind(queueName, exchangeName, routingKey);
 
-        channel.basicConsume(queueName, false, "myConsumerTag",
+        channel.basicConsume(queueName, false,
             new DefaultConsumer(channel) {
                 @Override
                 public void handleDelivery(String consumerTag,
@@ -142,7 +140,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String routingKey = "test.key";
         String queueName = "test-queue1";
         @Cleanup
-        Connection conn = getConnection();
+        Connection conn = getConnection("vhost1", false);
         CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
         @Cleanup
         Channel channel = conn.createChannel();
@@ -178,7 +176,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
     }
 
-    @Test
+    @Test(timeOut = 1000 * 10)
     private void basicPublishTest() throws IOException, TimeoutException {
         final String queueName = "testQueue";
         final String message = "Hello AOP!";
@@ -186,10 +184,10 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
         @Cleanup
         PulsarAdmin pulsarAdmin = PulsarAdmin.builder().serviceHttpUrl("http://127.0.0.1:"
-            + brokerWebservicePort).build();
+            + getBrokerWebservicePortList().get(0)).build();
         log.info("topics: {}", pulsarAdmin.topics());
 
-        try (Connection connection = getConnection();
+        try (Connection connection = getConnection("vhost1", false);
              Channel channel = connection.createChannel()) {
             channel.queueDeclare(queueName, true, false, false, null);
             for (int i = 0; i < messagesNum; i++) {
@@ -200,7 +198,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
         @Cleanup
         PulsarClient pulsarClient = PulsarClient.builder()
-            .serviceUrl("pulsar://localhost:" + brokerPort).build();
+            .serviceUrl("pulsar://localhost:" + getBrokerPortList().get(0)).build();
         @Cleanup
         org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()
             .topic("persistent://public/vhost1/" + AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)
@@ -215,7 +213,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         }
     }
 
-    @Test
+    @Test(timeOut = 1000 * 10)
     private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException {
         final String vhost = "vhost1";
         final String exchangeName = "ex";
@@ -223,7 +221,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         final String queueName2 = "ex-q2";
 
         @Cleanup
-        Connection connection = getConnection();
+        Connection connection = getConnection("vhost1", false);
         @Cleanup
         Channel channel = connection.createChannel();
 
@@ -237,7 +235,8 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
 
         @Cleanup
-        PulsarClient pulsarClient = PulsarClient.builder().serviceUrl("pulsar://localhost:" + brokerPort).build();
+        PulsarClient pulsarClient = PulsarClient.builder().serviceUrl(
+                "pulsar://localhost:" + getBrokerPortList().get(0)).build();
         String exchangeTopic = "persistent://public/vhost1/ex";
         NamespaceName namespaceName = NamespaceName.get("public", vhost);
         String queueIndexTopic1 = PersistentQueue.getIndexTopicName(namespaceName, queueName1);
@@ -292,7 +291,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         final String queueName2 = "ex1-q2";
 
         @Cleanup
-        Connection connection = getConnection();
+        Connection connection = getConnection(vhost, false);
         @Cleanup
         Channel channel = connection.createChannel();
 
@@ -307,31 +306,32 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
         final AtomicInteger count = new AtomicInteger(0);
 
-        @Cleanup
-        Channel channel1 = connection.createChannel();
-        Consumer consumer1 = new DefaultConsumer(channel1) {
-            @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
-                byte[] body) throws IOException {
-                String message = new String(body, "UTF-8");
-                System.out.println(" [x] Received Consumer '" + message + "'");
-                count.incrementAndGet();
-            }
-        };
-        channel1.basicConsume(queueName1, true, consumer1);
+        channel.basicConsume(queueName1, false, "myConsumerTag",
+            new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String consumerTag,
+                    Envelope envelope,
+                    AMQP.BasicProperties properties,
+                    byte[] body) throws IOException {
+                    String message = new String(body, "UTF-8");
+                    System.out.println(" [x] Received Consumer '" + message + "'");
+                    count.incrementAndGet();
+                }
+            });
 
-        @Cleanup
-        Channel channel2 = connection.createChannel();
-        Consumer consumer2 = new DefaultConsumer(channel2) {
-            @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
-                byte[] body) throws IOException {
-                String message = new String(body, "UTF-8");
-                System.out.println(" [x] Received Consumer '" + message + "'");
-                count.incrementAndGet();
-            }
-        };
-        channel2.basicConsume(queueName2, true, consumer2);
+        channel.basicConsume(queueName2, false,
+            new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String consumerTag,
+                    Envelope envelope,
+                    AMQP.BasicProperties properties,
+                    byte[] body) throws IOException {
+                    String message = new String(body, "UTF-8");
+                    System.out.println(" [x] Received Consumer '" + message + "'");
+                    count.incrementAndGet();
+                }
+            });
+
         Thread.sleep(1000);
         Assert.assertTrue(count.get() == 2);
 

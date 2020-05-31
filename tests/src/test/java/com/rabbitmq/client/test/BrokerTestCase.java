@@ -37,7 +37,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import javax.net.ssl.SSLContext;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
@@ -47,7 +46,6 @@ import org.junit.Rule;
 import org.junit.rules.TestRule;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,10 +101,10 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         if (!admin.clusters().getClusters().contains(configClusterName)) {
             // so that clients can test short names
             admin.clusters().createCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + brokerWebservicePort));
+                    new ClusterData("http://127.0.0.1:" + getBrokerWebservicePortList().get(0)));
         } else {
             admin.clusters().updateCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + brokerWebservicePort));
+                    new ClusterData("http://127.0.0.1:" + getBrokerWebServicePortTlsList().get(0)));
         }
         if (!admin.tenants().getTenants().contains("public")) {
             admin.tenants().createTenant("public",
@@ -121,7 +119,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
             admin.namespaces().setRetention("public/vhost1",
                     new RetentionPolicies(60, 1000));
         }
-        Mockito.when(pulsar.getState()).thenReturn(PulsarService.State.Started);
+        checkPulsarServiceState();
         assumeTrue(shouldRun());
         openConnection();
         openChannel();

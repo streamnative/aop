@@ -18,9 +18,13 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
+import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
+import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Optional;
+
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -84,7 +88,24 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public void start(BrokerService service) {
         brokerService = service;
 
-        log.info("Starting AmqpProtocolHandler, aop version is: '{}'", AopVersion.getVersion());
+        ConnectionContainer.init(brokerService.getPulsar());
+
+        if (amqpConfig.isUseProxy()) {
+            ProxyConfiguration proxyConfig = new ProxyConfiguration();
+            proxyConfig.setProxyPort(Optional.of(amqpConfig.getAmqpProxyPort()));
+            proxyConfig.setBrokerServiceURL("pulsar://" + amqpConfig.getAdvertisedAddress() + ":"
+                    + amqpConfig.getBrokerServicePort().get());
+            ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
+            try {
+                proxyService.start();
+                log.info("Start amqp proxy service at port: {}", proxyConfig.getProxyPort().get());
+            } catch (Exception e) {
+                log.error("Failed to start amqp proxy service.");
+            }
+        }
+
+        log.info("Starting AmqpProtocolHandler, listener: {}, aop version is: '{}'",
+                amqpConfig.getAmqpListeners(), AopVersion.getVersion());
         log.info("Git Revision {}", AopVersion.getGitSha());
         log.info("Built by {} on {} at {}",
             AopVersion.getBuildUser(),

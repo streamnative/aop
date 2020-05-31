@@ -14,32 +14,49 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.common.naming.NamespaceName;
 
 /**
  * Container for all queues in the broker.
  */
 public class QueueContainer {
 
-    private static Map<String, AmqpQueue> queueMap = new ConcurrentHashMap<>();
+    @Getter
+    private static Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
 
-    public static void putQueue(String queueName, AmqpQueue amqpQueue) {
-        queueMap.computeIfAbsent(queueName, name -> amqpQueue);
+    public static void putQueue(NamespaceName namespaceName, String queueName, AmqpQueue amqpQueue) {
+        queueMap.compute(namespaceName, (ns, map) -> {
+            Map<String, AmqpQueue> amqpQueueMap = map;
+            if (amqpQueueMap == null) {
+                amqpQueueMap = Maps.newConcurrentMap();
+            }
+            amqpQueueMap.put(queueName, amqpQueue);
+            return amqpQueueMap;
+        });
     }
 
-    public static AmqpQueue getQueue(String queueName) {
-        if (StringUtils.isEmpty(queueName)) {
+    public static AmqpQueue getQueue(NamespaceName namespaceName, String queueName) {
+        if (namespaceName == null || StringUtils.isEmpty(queueName)) {
             return null;
         }
-        return queueMap.getOrDefault(queueName, null);
+        Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
+        if (map == null) {
+            return null;
+        }
+        return map.getOrDefault(queueName, null);
     }
 
-    public static void deleteQueue(String exchangeName) {
-        if (StringUtils.isEmpty(exchangeName)) {
+    public static void deleteQueue(NamespaceName namespaceName, String queueName) {
+        if (StringUtils.isEmpty(queueName)) {
             return;
         }
-        queueMap.remove(exchangeName);
+        if (queueMap.containsKey(namespaceName)) {
+            queueMap.get(namespaceName).remove(queueName);
+        }
     }
 }

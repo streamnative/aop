@@ -11,8 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.test.frame;
+package io.streamnative.pulsar.handlers.amqp;
 
+import java.nio.ByteBuffer;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
@@ -45,13 +46,11 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueuePurgeOkBody;
 
-import java.nio.ByteBuffer;
-
 /**
  * Client decoder for client-server interaction tests.
  * Copied from Qpid tests lib.
  */
-public class ClientDecoder extends AMQDecoder<ClientMethodProcessor<? extends ClientChannelMethodProcessor>>
+public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extends ClientChannelMethodProcessor>>
 {
     private QpidByteBuffer _incompleteBuffer;
 
@@ -60,7 +59,7 @@ public class ClientDecoder extends AMQDecoder<ClientMethodProcessor<? extends Cl
      *
      * @param methodProcessor          method processor
      */
-    public ClientDecoder(final ClientMethodProcessor<? extends ClientChannelMethodProcessor> methodProcessor)
+    public AmqpClientDecoder(final ClientMethodProcessor<? extends ClientChannelMethodProcessor> methodProcessor)
     {
         super(false, methodProcessor);
     }

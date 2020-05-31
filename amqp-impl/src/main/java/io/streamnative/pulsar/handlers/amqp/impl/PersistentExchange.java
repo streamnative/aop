@@ -72,6 +72,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         Map<String, Object> properties = MessageConvertUtils.getHeaders(message);
         publishFuture.whenComplete((position, throwable) -> {
             if (throwable != null) {
+                log.error("Exchange persistent topic: {} failed.", persistentTopic.getName(), throwable);
                 publishFuture.completeExceptionally(throwable);
             } else {
                 for (AmqpQueue queue : queues) {
@@ -100,7 +101,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         // TODO Temporarily put the creation operation here, and later put the operation in router
         ManagedCursor cursor = getTopicCursorManager().getOrCreateCursor(queueName);
         if (cursor == null) {
-            future.complete(null);
+            future.completeExceptionally(new ManagedLedgerException("cursor is null"));
             return future;
         }
         ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();

@@ -219,106 +219,106 @@ currently this repo disabled fork, developer all work on this repo.
 
 1. clone this project from GitHub to your local.
 
-```bash
-git clone https://github.com/streamnative/aop.git
-cd aop
-```
+    ```bash
+    git clone https://github.com/streamnative/aop.git
+    cd aop
+    ```
 
 2. build the project.
 
-```bash
-mvn clean install -DskipTests
-```
+    ```bash
+    mvn clean install -DskipTests
+    ```
 
 3. copy the nar package to pulsar protocols directory.
 
-```bash
-cp ./amqp-impl/target/pulsar-protocol-handler-amqp-${version}.nar $PULSAR_HOME/protocols/pulsar-protocol-handler-amqp-${version}.nar
-```
+    ```bash
+    cp ./amqp-impl/target/pulsar-protocol-handler-amqp-${version}.nar $PULSAR_HOME/protocols/pulsar-protocol-handler-amqp-${version}.nar
+    ```
 
 4. modify pulsar standalone conf
 
-```
-# conf file: $PULSAR_HOME/conf/standalone.conf
-
-# modify the default number of namespace bundles to 1
-defaultNumberOfNamespaceBundles=1
-
-# add amqp configs
-messagingProtocols=amqp
-protocolHandlerDirectory=./protocols
-
-amqpListeners=amqp://127.0.0.1:5672
-advertisedAddress=127.0.0.1
-```
+    ```
+    # conf file: $PULSAR_HOME/conf/standalone.conf
+    
+    # modify the default number of namespace bundles to 1
+    defaultNumberOfNamespaceBundles=1
+    
+    # add amqp configs
+    messagingProtocols=amqp
+    protocolHandlerDirectory=./protocols
+    
+    amqpListeners=amqp://127.0.0.1:5672
+    advertisedAddress=127.0.0.1
+    ```
 
 5. start pulsar use standalone mode
 
-```
-$PULSAR_HOME/bin/pulsar standalone
-```
+    ```
+    $PULSAR_HOME/bin/pulsar standalone
+    ```
 
 6. add namespace for vhost
 
-```
-# for example, the vhost name is `vhost`
-bin/pulsar-admin namespaces create public/vhost1
-# set retention for the namespace
-bin/pulsar-admin namespaces set-retention -s 100M -t 2d public/vhost1
-```
+    ```
+    # for example, the vhost name is `vhost`
+    bin/pulsar-admin namespaces create public/vhost1
+    # set retention for the namespace
+    bin/pulsar-admin namespaces set-retention -s 100M -t 2d public/vhost1
+    ```
 
 7. use RabbitMQ client test
 
-```
-# add RabbitMQ client dependency in your project
-<dependency>
-  <groupId>com.rabbitmq</groupId>
-  <artifactId>amqp-client</artifactId>
-  <version>5.8.0</version>
-</dependency>
-```
+    ```
+    # add RabbitMQ client dependency in your project
+    <dependency>
+      <groupId>com.rabbitmq</groupId>
+      <artifactId>amqp-client</artifactId>
+      <version>5.8.0</version>
+    </dependency>
+    ```
 
-```
-// Java Code
-
-// create connection
-ConnectionFactory connectionFactory = new ConnectionFactory();
-connectionFactory.setVirtualHost("vhost1");
-connectionFactory.setHost("127.0.0.1");
-connectionFactory.setPort(5672);
-Connection connection = connectionFactory.newConnection();
-Channel channel = connection.createChannel();
-
-String exchange = "ex";
-String queue = "qu";
-
-// exchage declare
-channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true, false, false, null);
-
-// queue declare and bind
-channel.queueDeclare(queue, true, false, false, null);
-channel.queueBind(queue, exchange, "");
-
-// publish some messages
-for (int i = 0; i < 100; i++) {
-    channel.basicPublish(exchange, "", null, ("hello - " + i).getBytes());
-}
-
-// consume messages
-CountDownLatch countDownLatch = new CountDownLatch(100);
-channel.basicConsume(queue, true, new DefaultConsumer(channel) {
-    @Override
-    public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
-        System.out.println("receive msg: " + new String(body));
-        countDownLatch.countDown();
+    ```
+    // Java Code
+    
+    // create connection
+    ConnectionFactory connectionFactory = new ConnectionFactory();
+    connectionFactory.setVirtualHost("vhost1");
+    connectionFactory.setHost("127.0.0.1");
+    connectionFactory.setPort(5672);
+    Connection connection = connectionFactory.newConnection();
+    Channel channel = connection.createChannel();
+    
+    String exchange = "ex";
+    String queue = "qu";
+    
+    // exchage declare
+    channel.exchangeDeclare(exchange, BuiltinExchangeType.FANOUT, true, false, false, null);
+    
+    // queue declare and bind
+    channel.queueDeclare(queue, true, false, false, null);
+    channel.queueBind(queue, exchange, "");
+    
+    // publish some messages
+    for (int i = 0; i < 100; i++) {
+        channel.basicPublish(exchange, "", null, ("hello - " + i).getBytes());
     }
-});
-countDownLatch.await();
-
-// release resource
-channel.close();
-connection.close();
-```
+    
+    // consume messages
+    CountDownLatch countDownLatch = new CountDownLatch(100);
+    channel.basicConsume(queue, true, new DefaultConsumer(channel) {
+        @Override
+        public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            System.out.println("receive msg: " + new String(body));
+            countDownLatch.countDown();
+        }
+    });
+    countDownLatch.await();
+    
+    // release resource
+    channel.close();
+    connection.close();
+    ```
 
 ### Proxy Usage
 
@@ -334,50 +334,50 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
 
 5. start broker
 
-broker config
+    broker config
 
-```yaml
-defaultNumberOfNamespaceBundles=1
-
-messagingProtocols=amqpn
-protocolHandlerDirectory=./protocols
-brokerServicePort=6651
-amqpListeners=amqp://127.0.0.1:5672
-
-useProxy=true
-amqpProxyPort=5682
-```
+    ```yaml
+    defaultNumberOfNamespaceBundles=1
+    
+    messagingProtocols=amqpn
+    protocolHandlerDirectory=./protocols
+    brokerServicePort=6651
+    amqpListeners=amqp://127.0.0.1:5672
+    
+    useProxy=true
+    amqpProxyPort=5682
+    ```
 
 6. reset the number of the namespace public/default to 1
 
-```shell script
-$PULSAR_HOME/bin/pulsar-admin namespaces delete public/default
-$PULSAR_HOME/bin/pulsar-admin namespaces create -b 1 public/default
-$PULSAR_HOME/bin/pulsar-admin namespaces set-retention -s 100M -t 3d public/default
-``` 
+    ```shell script
+    $PULSAR_HOME/bin/pulsar-admin namespaces delete public/default
+    $PULSAR_HOME/bin/pulsar-admin namespaces create -b 1 public/default
+    $PULSAR_HOME/bin/pulsar-admin namespaces set-retention -s 100M -t 3d public/default
+    ``` 
 
 7. prepare exchange and qu for test
 
-```
-ConnectionFactory connectionFactory = new ConnectionFactory();
-connectionFactory.setVirtualHost("default");
-connectionFactory.setHost("127.0.0.1");
-connectionFactory.setPort(5681);
-Connection connection = connectionFactory.newConnection();
-Channel channel = connection.createChannel();
-String ex = "ex-perf";
-String qu = "qu-perf";
-channel.exchangeDeclare(ex, BuiltinExchangeType.DIRECT, true);
-channel.queueDeclare(qu, true, false, false, null);
-channel.queueBind(qu, ex, qu);
-channel.close();
-connection.close();
-```
+    ```
+    ConnectionFactory connectionFactory = new ConnectionFactory();
+    connectionFactory.setVirtualHost("default");
+    connectionFactory.setHost("127.0.0.1");
+    connectionFactory.setPort(5681);
+    Connection connection = connectionFactory.newConnection();
+    Channel channel = connection.createChannel();
+    String ex = "ex-perf";
+    String qu = "qu-perf";
+    channel.exchangeDeclare(ex, BuiltinExchangeType.DIRECT, true);
+    channel.queueDeclare(qu, true, false, false, null);
+    channel.queueBind(qu, ex, qu);
+    channel.close();
+    connection.close();
+    ```
 
 7. download RabbitMQ perf tool and test 
 
-(https://bintray.com/rabbitmq/java-tools/download_file?file_path=perf-test%2F2.11.0%2Frabbitmq-perf-test-2.11.0-bin.tar.gz)
+    (https://bintray.com/rabbitmq/java-tools/download_file?file_path=perf-test%2F2.11.0%2Frabbitmq-perf-test-2.11.0-bin.tar.gz)
 
-```shell script
-$RABBITMQ_PERF_TOOL_HOME/bin/runjava com.rabbitmq.perf.PerfTest -e ex-perf -u qu-perf -r 1000 -h amqp://127.0.0.1:5681 -p
-```
+    ```shell script
+    $RABBITMQ_PERF_TOOL_HOME/bin/runjava com.rabbitmq.perf.PerfTest -e ex-perf -u qu-perf -r 1000 -h amqp://127.0.0.1:5681 -p
+    ```

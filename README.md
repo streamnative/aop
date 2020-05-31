@@ -64,6 +64,18 @@ mvn clean install -DskipTests
 ./amqp-impl/target/pulsar-protocol-handler-amqp-${version}.nar
 ```
 
+### Configuration
+
+--|--|--
+config|default|desc
+amqpTenant|public|amqp on pulsar broker tenant
+amqpListeners|amqp://127.0.0.1:5672|amqp service port
+maxNoOfChannels|64|the maximum number of channels which can exist concurrently on a connection.
+maxFrameSize|4MB|the maximum frame size on a connection.
+heartBeat|60s|the default heartbeat timeout on broker
+amqpProxyPort|5682|the amqp proxy service port
+useProxy|false|whether to start proxy service
+
 ### Config Pulsar broker to run AoP protocol handler as PluginF
 
 As mentioned above, AoP module is loaded along with Pulsar broker. You need to add configs in Pulsar's config file, such as `broker.conf` or `standalone.conf`.
@@ -213,16 +225,19 @@ cd aop
 ```
 
 2. build the project.
+
 ```bash
 mvn clean install -DskipTests
 ```
 
 3. copy the nar package to pulsar protocols directory.
+
 ```bash
 cp ./amqp-impl/target/pulsar-protocol-handler-amqp-${version}.nar $PULSAR_HOME/protocols/pulsar-protocol-handler-amqp-${version}.nar
 ```
 
 4. modify pulsar standalone conf
+
 ```
 # conf file: $PULSAR_HOME/conf/standalone.conf
 
@@ -238,11 +253,13 @@ advertisedAddress=127.0.0.1
 ```
 
 5. start pulsar use standalone mode
+
 ```
 $PULSAR_HOME/bin/pulsar standalone
 ```
 
 6. add namespace for vhost
+
 ```
 # for example, the vhost name is `vhost`
 bin/pulsar-admin namespaces create public/vhost1
@@ -301,4 +318,66 @@ countDownLatch.await();
 // release resource
 channel.close();
 connection.close();
+```
+
+### Proxy Usage
+
+Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/deploy-bare-metal/)
+
+1. Prepare zookeeper cluster (refer to cluster deploy doc)
+
+2. Initialize cluster metadata (refer to cluster deploy doc)
+
+3. Prepare bookkeeper cluster (refer to cluster deploy doc)
+
+4. copy the `pulsar-protocol-handler-amqp-${version}.nar` to the `$PULSAR_HOME/protocols` directory
+
+5. start broker
+
+broker config
+
+```yaml
+defaultNumberOfNamespaceBundles=1
+
+messagingProtocols=amqpn
+protocolHandlerDirectory=./protocols
+brokerServicePort=6651
+amqpListeners=amqp://127.0.0.1:5672
+
+useProxy=true
+amqpProxyPort=5682
+```
+
+6. reset the number of the namespace public/default to 1
+
+```shell script
+$PULSAR_HOME/bin/pulsar-admin namespaces delete public/default
+$PULSAR_HOME/bin/pulsar-admin namespaces create -b 1 public/default
+$PULSAR_HOME/bin/pulsar-admin namespaces set-retention -s 100M -t 3d public/default
+``` 
+
+7. prepare exchange and qu for test
+
+```
+ConnectionFactory connectionFactory = new ConnectionFactory();
+connectionFactory.setVirtualHost("default");
+connectionFactory.setHost("127.0.0.1");
+connectionFactory.setPort(5681);
+Connection connection = connectionFactory.newConnection();
+Channel channel = connection.createChannel();
+String ex = "ex-perf";
+String qu = "qu-perf";
+channel.exchangeDeclare(ex, BuiltinExchangeType.DIRECT, true);
+channel.queueDeclare(qu, true, false, false, null);
+channel.queueBind(qu, ex, qu);
+channel.close();
+connection.close();
+```
+
+7. download RabbitMQ perf tool and test 
+
+(https://bintray.com/rabbitmq/java-tools/download_file?file_path=perf-test%2F2.11.0%2Frabbitmq-perf-test-2.11.0-bin.tar.gz)
+
+```shell script
+$RABBITMQ_PERF_TOOL_HOME/bin/runjava com.rabbitmq.perf.PerfTest -e ex-perf -u qu-perf -r 1000 -h amqp://127.0.0.1:5681 -p
 ```

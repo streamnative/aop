@@ -66,8 +66,8 @@ mvn clean install -DskipTests
 
 ### Configuration
 
---|--|--
 config|default|desc
+--|--|--
 amqpTenant|public|amqp on pulsar broker tenant
 amqpListeners|amqp://127.0.0.1:5672|amqp service port
 maxNoOfChannels|64|the maximum number of channels which can exist concurrently on a connection.

@@ -453,25 +453,23 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         checkExclusiveQueue(amqpQueue);
         AmqpExchange amqpExchange = ExchangeContainer.
                 getExchange(connection.getNamespaceName(), exchange.toString());
-
-        AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
-        if (messageRouter == null) {
-            connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
-            return;
-        }
-
-        // in-memory integration
-        if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-            amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
-            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
-            connection.writeFrame(responseBody.generateFrame(channelId));
-            return;
-        }
-
-        Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
-        if (null == topic) {
+        if (null == amqpExchange) {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {
+            AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
+            if (messageRouter == null) {
+                connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
+                return;
+            }
+
+            // in-memory integration
+            if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
+                amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
+                AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
+                connection.writeFrame(responseBody.generateFrame(channelId));
+                return;
+            }
+
             try {
                 amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
                 MethodRegistry methodRegistry = connection.getMethodRegistry();

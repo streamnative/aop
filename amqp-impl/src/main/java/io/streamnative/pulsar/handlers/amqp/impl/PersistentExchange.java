@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicCursorManager;
@@ -65,6 +66,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         AmqpTopicManager amqpTopicManager, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
+        topicNameValidate();
         this.amqpTopicManager = amqpTopicManager;
         updateExchangeProperties();
     }
@@ -227,6 +229,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static String getExchangeTopicName(NamespaceName namespaceName, String exchangeName) {
         return TopicName.get(TopicDomain.persistent.value(),
                 namespaceName, TOPIC_PREFIX + exchangeName).toString();
+    }
+
+    public void topicNameValidate() {
+        Preconditions.checkArgument(this.persistentTopic.getName().equals(TOPIC_PREFIX + exchangeName),
+                "The exchange topic name does not conform to the rules(__amqp_exchange__exchangeName).");
     }
 
 }

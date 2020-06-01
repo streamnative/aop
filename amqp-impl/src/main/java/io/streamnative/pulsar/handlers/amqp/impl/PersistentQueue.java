@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
@@ -56,6 +57,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                            boolean exclusive, boolean autoDelete) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
+        topicNameValidate();
     }
 
     @Override
@@ -126,5 +128,11 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return propertiesList;
     }
 
+
+    public void topicNameValidate() {
+        Preconditions.checkArgument(this.indexTopic.getName().equals(TOPIC_PREFIX + queueName),
+                "The queue topic name does not conform to the rules(%s%s).",
+                TOPIC_PREFIX, "exchangeName");
+    }
 
 }

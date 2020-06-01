@@ -13,9 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicCursorManager;
@@ -232,7 +233,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     public void topicNameValidate() {
-        Preconditions.checkArgument(this.persistentTopic.getName().equals(TOPIC_PREFIX + exchangeName),
+        String[] nameArr = this.persistentTopic.getName().split("/");
+        checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + exchangeName),
                 "The exchange topic name does not conform to the rules(__amqp_exchange__exchangeName).");
     }
 

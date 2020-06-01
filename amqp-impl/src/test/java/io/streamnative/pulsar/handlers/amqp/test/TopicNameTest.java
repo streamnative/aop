@@ -17,6 +17,7 @@ import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.junit.Assert;
 import org.mockito.Mockito;
@@ -32,9 +33,11 @@ public class TopicNameTest {
     public void exchangeTopicNameValidate() {
         String exchangeName = "ex-test";
         AbstractAmqpExchange.Type exchangeType = AbstractAmqpExchange.Type.Direct;
+        ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
 
         PersistentTopic exchangeTopic1 = Mockito.mock(PersistentTopic.class);
         Mockito.when(exchangeTopic1.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + exchangeName);
+        Mockito.when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic1, null, false);
@@ -44,6 +47,7 @@ public class TopicNameTest {
 
         PersistentTopic exchangeTopic2 = Mockito.mock(PersistentTopic.class);
         Mockito.when(exchangeTopic2.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + "_" + exchangeName);
+        Mockito.when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic2, null, false);
@@ -56,10 +60,11 @@ public class TopicNameTest {
     @Test
     public void queueTopicNameValidate() {
         String queueName = "ex-test";
-        AbstractAmqpExchange.Type exchangeType = AbstractAmqpExchange.Type.Direct;
+        ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
 
         PersistentTopic queueTopic1 = Mockito.mock(PersistentTopic.class);
         Mockito.when(queueTopic1.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + queueName);
+        Mockito.when(queueTopic1.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentQueue(
                     queueName, queueTopic1, 0, false, false);
@@ -69,6 +74,7 @@ public class TopicNameTest {
 
         PersistentTopic queueTopic2 = Mockito.mock(PersistentTopic.class);
         Mockito.when(queueTopic2.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + "_" + queueName);
+        Mockito.when(queueTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentQueue(
                     queueName, queueTopic2, 0, false, false);

@@ -436,8 +436,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
         Map<String, Object> arguments = FieldTable.convertToMap(argumentsTable);
-        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                connection.getNamespaceName(), exchange.toString());
+        String topicName = PersistentExchange.getExchangeTopicName(connection.getNamespaceName(), exchange.toString());
 
         AmqpQueue amqpQueue;
         if (queue == null) {
@@ -468,7 +467,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             return;
         }
 
-        Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
+        Topic topic = amqpTopicManager.getOrCreateTopic(topicName, false);
         if (null == topic) {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {

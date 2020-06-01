@@ -26,8 +26,8 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     protected Set<AmqpQueue> queues;
     protected boolean durable;
     protected boolean autoDelete;
-    public static final String DEFAULT_EXCHANGE = "__default_ex__";
-    public static final String DEFAULT_EXCHANGE_DURABLE = "__default_ex_durable__";
+    public static final String DEFAULT_EXCHANGE = "aop.direct.memory";
+    public static final String DEFAULT_EXCHANGE_DURABLE = "aop.direct.durable";
 
     protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType,
                                    Set<AmqpQueue> queues, boolean durable, boolean autoDelete) {

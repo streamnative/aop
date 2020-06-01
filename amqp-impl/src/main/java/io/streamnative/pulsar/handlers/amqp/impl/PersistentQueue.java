@@ -45,6 +45,7 @@ import org.apache.pulsar.common.util.ObjectMapperFactory;
 public class PersistentQueue extends AbstractAmqpQueue {
     public static final String QUEUE = "QUEUE";
     public static final String ROUTERS = "ROUTERS";
+    public static final String TOPIC_PREFIX = "__amqp_queue__";
 
     @Getter
     private PersistentTopic indexTopic;
@@ -105,9 +106,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
         PulsarTopicMetadataUtils.updateMetaData(this.indexTopic, properties, queueName);
     }
 
-    public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {
+    public static String getQueueTopicName(NamespaceName namespaceName, String queueName) {
         return TopicName.get(TopicDomain.persistent.value(),
-                namespaceName, "__index__" + queueName).toString();
+                namespaceName, TOPIC_PREFIX + queueName).toString();
     }
 
     private List<AmqpQueueProperties> getQueueProperties(Map<String, AmqpMessageRouter> routers) {

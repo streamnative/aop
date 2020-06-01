@@ -261,11 +261,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             return;
                         }
 
-                        TopicName topicName = TopicName.get(
-                                TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
+                        String exchangeTopicName = PersistentExchange.getExchangeTopicName(
+                                connection.getNamespaceName(), exchangeName);
                         try {
                             PersistentTopic persistentTopic = (PersistentTopic) amqpTopicManager.getOrCreateTopic(
-                                    topicName.toString(), true);
+                                    exchangeTopicName, true);
                             if (persistentTopic == null) {
                                 connection.sendConnectionClose(INTERNAL_ERROR,
                                         "AOP Create Exchange failed.", channelId);
@@ -405,10 +405,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 amqpQueue = new InMemoryQueue(queue.toString(), connection.getConnectionId(), exclusive, autoDelete);
             } else {
                 try {
-                    String indexTopicName = PersistentQueue.getIndexTopicName(
+                    String queueTopicName = PersistentQueue.getQueueTopicName(
                             connection.getNamespaceName(), queue.toString());
                     PersistentTopic indexTopic = (PersistentTopic) amqpTopicManager
-                            .getOrCreateTopic(indexTopicName, true);
+                            .getOrCreateTopic(queueTopicName, true);
                     amqpQueue = new PersistentQueue(queue.toString(), indexTopic, connection.getConnectionId(),
                             exclusive, autoDelete);
                 } catch (Exception e) {

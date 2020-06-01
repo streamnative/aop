@@ -239,8 +239,8 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
                 "pulsar://localhost:" + getBrokerPortList().get(0)).build();
         String exchangeTopic = "persistent://public/vhost1/ex";
         NamespaceName namespaceName = NamespaceName.get("public", vhost);
-        String queueIndexTopic1 = PersistentQueue.getIndexTopicName(namespaceName, queueName1);
-        String queueIndexTopic2 = PersistentQueue.getIndexTopicName(namespaceName, queueName2);
+        String queueIndexTopic1 = PersistentQueue.getQueueTopicName(namespaceName, queueName1);
+        String queueIndexTopic2 = PersistentQueue.getQueueTopicName(namespaceName, queueName2);
 
         @Cleanup
         org.apache.pulsar.client.api.Consumer<byte[]> exchangeConsumer =

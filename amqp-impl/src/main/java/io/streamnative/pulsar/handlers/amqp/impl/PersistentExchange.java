@@ -40,6 +40,9 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 
@@ -51,6 +54,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
+    public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
     private final AmqpTopicManager amqpTopicManager;
@@ -219,4 +223,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
         }
         return queueNames;
     }
+
+    public static String getExchangeTopicName(NamespaceName namespaceName, String exchangeName) {
+        return TopicName.get(TopicDomain.persistent.value(),
+                namespaceName, TOPIC_PREFIX + exchangeName).toString();
+    }
+
 }

@@ -436,8 +436,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
         Map<String, Object> arguments = FieldTable.convertToMap(argumentsTable);
-        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                connection.getNamespaceName(), exchange.toString());
 
         AmqpQueue amqpQueue;
         if (queue == null) {

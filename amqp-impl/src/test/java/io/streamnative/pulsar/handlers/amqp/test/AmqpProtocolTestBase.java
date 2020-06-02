@@ -56,6 +56,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 
@@ -128,21 +130,24 @@ public abstract class AmqpProtocolTestBase {
             Mockito.when(getPulsarService().getOrderedExecutor()).thenReturn(
                     OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
 
-            PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
-            CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
-            Subscription subscription = Mockito.mock(Subscription.class);
-            subFuture.complete(subscription);
-            Mockito.when(persistentTopic.createSubscription(anyString(), any(), anyBoolean())).thenReturn(subFuture);
-            Mockito.when(subscription.getDispatcher()).thenReturn(Mockito.mock(MockDispatcher.class));
-            Mockito.when(persistentTopic.getName()).thenReturn("persistent://public/default/mock");
-            Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
 
             AmqpTopicManager amqpTopicManager = Mockito.mock(AmqpTopicManager.class);
-            CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
-            completableFuture.complete(persistentTopic);
-            Mockito.when(amqpTopicManager.getTopic(anyString(), anyBoolean())).thenReturn(completableFuture);
-            Mockito.when(amqpTopicManager.getOrCreateTopic(anyString(), anyBoolean())).thenReturn(persistentTopic);
-            Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
+            Mockito.when(amqpTopicManager.getTopic(anyString(), anyBoolean())).then(new Answer<Object>() {
+                @Override
+                public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                    Object[] args = invocationOnMock.getArguments();
+                    CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
+                    completableFuture.complete(getMockPersistentTopic(args[0].toString()));
+                    return completableFuture;
+                }
+            });
+            Mockito.when(amqpTopicManager.getOrCreateTopic(anyString(), anyBoolean())).then(new Answer<Object>() {
+                @Override
+                public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                    Object[] args = invocationOnMock.getArguments();
+                    return getMockPersistentTopic(args[0].toString());
+                }
+            });
             super.setAmqpTopicManager(amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
@@ -159,6 +164,19 @@ public abstract class AmqpProtocolTestBase {
             frame.writePayload(getBufferSender());
             getBufferSender().flush();
         }
+    }
+
+    private PersistentTopic getMockPersistentTopic(String topicName) {
+        PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
+        CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
+        Subscription subscription = Mockito.mock(Subscription.class);
+        subFuture.complete(subscription);
+        Mockito.when(persistentTopic.createSubscription(anyString(), any(), anyBoolean())).thenReturn(subFuture);
+        Mockito.when(subscription.getDispatcher()).thenReturn(Mockito.mock(MockDispatcher.class));
+        Mockito.when(persistentTopic.getName()).thenReturn(topicName);
+        Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
+        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
+        return persistentTopic;
     }
 
     /**

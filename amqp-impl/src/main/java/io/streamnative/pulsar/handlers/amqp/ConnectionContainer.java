@@ -39,14 +39,11 @@ public class ConnectionContainer {
 
     public static PulsarService pulsarService;
     public static ZooKeeper zooKeeper;
-    private static AmqpTopicManager amqpTopicManager;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     public static void init(PulsarService pulsarService) {
         ConnectionContainer.pulsarService = pulsarService;
         ConnectionContainer.zooKeeper = pulsarService.getLocalZkCache().getZooKeeper();
-        ConnectionContainer.amqpTopicManager = new AmqpTopicManager(pulsarService);
-
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
@@ -122,14 +119,14 @@ public class ConnectionContainer {
     private static void addBuildInExchanges(NamespaceName namespaceName,
                                             String exchangeName, AmqpExchange.Type exchangeType) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(), namespaceName, exchangeName);
-        amqpTopicManager.getTopic(topicName.toString(), true).whenComplete((topic, throwable) -> {
+        AmqpTopicManager.getTopic(topicName.toString(), true).whenComplete((topic, throwable) -> {
             if (throwable != null) {
                 log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
                 return;
             }
             ExchangeContainer.putExchange(namespaceName, exchangeName,
                     new PersistentExchange(exchangeName, exchangeType,
-                            (PersistentTopic) topic, amqpTopicManager, false));
+                            (PersistentTopic) topic, false));
         });
     }
 

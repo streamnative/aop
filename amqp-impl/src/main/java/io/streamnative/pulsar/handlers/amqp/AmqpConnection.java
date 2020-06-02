@@ -95,8 +95,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private NamespaceName namespaceName;
     private final Object channelAddRemoveLock = new Object();
     private AtomicBoolean blocked = new AtomicBoolean();
-    @Getter
-    private AmqpTopicManager amqpTopicManager;
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
 
@@ -111,24 +109,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxChannels = amqpConfig.getMaxNoOfChannels();
         this.maxFrameSize = amqpConfig.getMaxFrameSize();
         this.heartBeat = amqpConfig.getHeartBeat();
-        this.amqpTopicManager = new AmqpTopicManager(getPulsarService());
         this.amqpOutputConverter = new AmqpOutputConverter(this);
-    }
-
-    @VisibleForTesting
-    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-        AmqpTopicManager amqpTopicManager) {
-        super(pulsarService, amqpConfig);
-        this.connectionId = ID_GENERATOR.incrementAndGet();
-        this.channels = new ConcurrentLongHashMap<>();
-        this.protocolVersion = ProtocolVersion.v0_91;
-        this.methodRegistry = new MethodRegistry(this.protocolVersion);
-        this.bufferSender = new AmqpByteBufferSenderImpl(this);
-        this.amqpConfig = amqpConfig;
-        this.maxChannels = amqpConfig.getMaxNoOfChannels();
-        this.maxFrameSize = amqpConfig.getMaxFrameSize();
-        this.heartBeat = amqpConfig.getHeartBeat();
-        this.amqpTopicManager = amqpTopicManager;
     }
 
     @Override
@@ -630,15 +611,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public int getHeartBeat() {
         return heartBeat;
-    }
-
-    public AmqpTopicManager getAmqpTopicManager() {
-        return amqpTopicManager;
-    }
-
-    @VisibleForTesting
-    public void setAmqpTopicManager(AmqpTopicManager amqpTopicManager) {
-        this.amqpTopicManager = amqpTopicManager;
     }
 
     public NamespaceName getNamespaceName() {

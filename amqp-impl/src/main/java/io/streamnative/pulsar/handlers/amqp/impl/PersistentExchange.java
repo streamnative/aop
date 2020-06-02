@@ -53,15 +53,12 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String TYPE = "TYPE";
 
     private PersistentTopic persistentTopic;
-    private final AmqpTopicManager amqpTopicManager;
     private AmqpTopicCursorManager cursorManager;
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
-        AmqpTopicManager amqpTopicManager, boolean autoDelete) {
+    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
-        this.amqpTopicManager = amqpTopicManager;
         updateExchangeProperties();
     }
 
@@ -172,7 +169,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public AmqpTopicCursorManager getTopicCursorManager() {
         if (cursorManager == null) {
             try {
-                cursorManager = amqpTopicManager.getTopicCursorManager(persistentTopic.getName()).get();
+                cursorManager = AmqpTopicManager.getTopicCursorManager(persistentTopic.getName()).get();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {

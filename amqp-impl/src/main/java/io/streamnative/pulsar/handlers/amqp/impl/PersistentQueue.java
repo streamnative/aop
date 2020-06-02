@@ -125,7 +125,4 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return propertiesList;
     }
 
-    public PersistentTopic getIndexTopic() {
-        return indexTopic;
-    }
 }

@@ -17,9 +17,9 @@ import static com.google.common.base.Preconditions.checkState;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.TopicName;
@@ -30,29 +30,30 @@ import org.apache.pulsar.common.naming.TopicName;
 @Slf4j
 public class AmqpTopicManager {
 
-    private PulsarService pulsarService;
-
-    private BrokerService brokerService;
+    @Getter
+    @Setter
+    private static PulsarService pulsarService;
 
     @Getter
-    private final ConcurrentHashMap<String, CompletableFuture<AmqpTopicCursorManager>> topicCursorManagers;
+    private static final ConcurrentHashMap<String, CompletableFuture<AmqpTopicCursorManager>> topicCursorManagers =
+            new ConcurrentHashMap<>();
 
-    public AmqpTopicManager(PulsarService pulsarService) {
-        this.pulsarService = pulsarService;
-        this.brokerService = pulsarService.getBrokerService();
-        topicCursorManagers = new ConcurrentHashMap<>();
-    }
 
-    public Topic getOrCreateTopic(String topicName, boolean createIfMissing) {
+    public static Topic getOrCreateTopic(String topicName, boolean createIfMissing) {
         return getTopic(topicName, createIfMissing).join();
     }
 
-    public CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing) {
+    public static CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing) {
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
+        if (null == pulsarService) {
+            log.error("PulsarService is not set.");
+            topicCompletableFuture.completeExceptionally(new Exception("PulsarService is not set."));
+            return topicCompletableFuture;
+        }
         // setup ownership of service unit to this broker
         pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), true).
                 whenComplete((addr, th) -> {
-                    log.info("Find getBrokerServiceUrl {}, return null Topic.: {}", addr, topicName);
+                    log.info("Find getBrokerServiceUrl {}, return Topic: {}", addr, topicName);
                     if (th != null || addr == null || addr.get() == null) {
                         log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", topicName, th);
                         topicCompletableFuture.complete(null);
@@ -62,7 +63,7 @@ public class AmqpTopicManager {
                         log.debug("getBrokerServiceUrl for {} in ExchangeTopicManager. brokerAddress: {}",
                                 topicName, addr.get().getLookupData().getBrokerUrl());
                     }
-                    brokerService.getTopic(topicName, createIfMissing)
+                    pulsarService.getBrokerService().getTopic(topicName, createIfMissing)
                             .whenComplete((topicOptional, throwable) -> {
                                 if (throwable != null) {
                                     log.error("Failed to getTopic {}. exception: {}", topicName, throwable);
@@ -87,26 +88,26 @@ public class AmqpTopicManager {
         return topicCompletableFuture;
     }
 
-    public CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(String topicName) {
+    public static CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(String topicName) {
         return topicCursorManagers.computeIfAbsent(
-            topicName,
-            t -> {
-                CompletableFuture<Topic> topic = getTopic(t, true);
-                checkState(topic != null);
+                topicName,
+                t -> {
+                    CompletableFuture<Topic> topic = getTopic(t, true);
+                    checkState(topic != null);
 
-                return topic.thenApply(t2 -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug(" Call getTopicCursorManager for {}, and create TCM for {}.",
-                            topicName, t2);
-                    }
+                    return topic.thenApply(t2 -> {
+                        if (log.isDebugEnabled()) {
+                            log.debug(" Call getTopicCursorManager for {}, and create TCM for {}.",
+                                    topicName, t2);
+                        }
 
-                    if (t2 == null) {
-                        return null;
-                    }
-                    // return consumer manager
-                    return new AmqpTopicCursorManager((PersistentTopic) t2);
-                });
-            }
+                        if (t2 == null) {
+                            return null;
+                        }
+                        // return consumer manager
+                        return new AmqpTopicCursorManager((PersistentTopic) t2);
+                    });
+                }
         );
     }
 }

@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
@@ -45,6 +47,7 @@ import org.apache.pulsar.common.util.ObjectMapperFactory;
 public class PersistentQueue extends AbstractAmqpQueue {
     public static final String QUEUE = "QUEUE";
     public static final String ROUTERS = "ROUTERS";
+    public static final String TOPIC_PREFIX = "__amqp_queue__";
 
     @Getter
     private PersistentTopic indexTopic;
@@ -55,6 +58,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                            boolean exclusive, boolean autoDelete) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
+        topicNameValidate();
     }
 
     @Override
@@ -105,9 +109,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
         PulsarTopicMetadataUtils.updateMetaData(this.indexTopic, properties, queueName);
     }
 
-    public static String getIndexTopicName(NamespaceName namespaceName, String queueName) {
+    public static String getQueueTopicName(NamespaceName namespaceName, String queueName) {
         return TopicName.get(TopicDomain.persistent.value(),
-                namespaceName, "__index__" + queueName).toString();
+                namespaceName, TOPIC_PREFIX + queueName).toString();
     }
 
     private List<AmqpQueueProperties> getQueueProperties(Map<String, AmqpMessageRouter> routers) {
@@ -123,6 +127,14 @@ public class PersistentQueue extends AbstractAmqpQueue {
             propertiesList.add(amqpQueueProperties);
         }
         return propertiesList;
+    }
+
+
+    public void topicNameValidate() {
+        String[] nameArr = this.indexTopic.getName().split("/");
+        checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + queueName),
+                "The queue topic name does not conform to the rules(%s%s).",
+                TOPIC_PREFIX, "exchangeName");
     }
 
 }

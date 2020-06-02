@@ -118,8 +118,8 @@ public class ConnectionContainer {
 
     private static void addBuildInExchanges(NamespaceName namespaceName,
                                             String exchangeName, AmqpExchange.Type exchangeType) {
-        TopicName topicName = TopicName.get(TopicDomain.persistent.value(), namespaceName, exchangeName);
-        AmqpTopicManager.getTopic(topicName.toString(), true).whenComplete((topic, throwable) -> {
+        String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
+        AmqpTopicManager.getTopic(topicName, true).whenComplete((topic, throwable) -> {
             if (throwable != null) {
                 log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
                 return;

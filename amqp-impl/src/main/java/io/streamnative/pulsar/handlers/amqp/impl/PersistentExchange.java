@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
@@ -40,6 +42,9 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 
@@ -51,6 +56,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
+    public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
     private final AmqpTopicManager amqpTopicManager;
@@ -61,6 +67,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         AmqpTopicManager amqpTopicManager, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
+        topicNameValidate();
         this.amqpTopicManager = amqpTopicManager;
         updateExchangeProperties();
     }
@@ -219,4 +226,16 @@ public class PersistentExchange extends AbstractAmqpExchange {
         }
         return queueNames;
     }
+
+    public static String getExchangeTopicName(NamespaceName namespaceName, String exchangeName) {
+        return TopicName.get(TopicDomain.persistent.value(),
+                namespaceName, TOPIC_PREFIX + exchangeName).toString();
+    }
+
+    public void topicNameValidate() {
+        String[] nameArr = this.persistentTopic.getName().split("/");
+        checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + exchangeName),
+                "The exchange topic name does not conform to the rules(__amqp_exchange__exchangeName).");
+    }
+
 }

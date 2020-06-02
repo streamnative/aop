@@ -22,6 +22,7 @@ import com.rabbitmq.client.Envelope;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -196,12 +197,15 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
             }
         }
 
+        String exchangeTopicName = PersistentExchange.getExchangeTopicName(
+                NamespaceName.get("public", "vhost1"),
+                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
         @Cleanup
         PulsarClient pulsarClient = PulsarClient.builder()
             .serviceUrl("pulsar://localhost:" + getBrokerPortList().get(0)).build();
         @Cleanup
         org.apache.pulsar.client.api.Consumer<byte[]> consumer = pulsarClient.newConsumer()
-            .topic("persistent://public/vhost1/" + AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)
+            .topic(exchangeTopicName)
             .subscriptionName("test")
             .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
             .subscribe();
@@ -237,10 +241,10 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         @Cleanup
         PulsarClient pulsarClient = PulsarClient.builder().serviceUrl(
                 "pulsar://localhost:" + getBrokerPortList().get(0)).build();
-        String exchangeTopic = "persistent://public/vhost1/ex";
         NamespaceName namespaceName = NamespaceName.get("public", vhost);
-        String queueIndexTopic1 = PersistentQueue.getIndexTopicName(namespaceName, queueName1);
-        String queueIndexTopic2 = PersistentQueue.getIndexTopicName(namespaceName, queueName2);
+        String exchangeTopic = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
+        String queueIndexTopic1 = PersistentQueue.getQueueTopicName(namespaceName, queueName1);
+        String queueIndexTopic2 = PersistentQueue.getQueueTopicName(namespaceName, queueName2);
 
         @Cleanup
         org.apache.pulsar.client.api.Consumer<byte[]> exchangeConsumer =

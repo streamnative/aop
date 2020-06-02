@@ -176,7 +176,9 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public AmqpTopicCursorManager getTopicCursorManager() {
         if (cursorManager == null) {
             try {
-                cursorManager = AmqpTopicManager.getTopicCursorManager(persistentTopic.getName()).get();
+                cursorManager =
+                        AmqpTopicManager.getTopicCursorManager(persistentTopic.getBrokerService().getPulsar(),
+                                persistentTopic.getName()).get();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (ExecutionException e) {

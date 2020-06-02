@@ -35,7 +35,7 @@ import org.apache.zookeeper.ZooKeeper;
 @Slf4j
 public class ConnectionContainer {
 
-    public static PulsarService pulsarService;
+    private static PulsarService pulsarService;
     public static ZooKeeper zooKeeper;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
@@ -117,7 +117,7 @@ public class ConnectionContainer {
     private static void addBuildInExchanges(NamespaceName namespaceName,
                                             String exchangeName, AmqpExchange.Type exchangeType) {
         String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-        AmqpTopicManager.getTopic(topicName, true).whenComplete((topic, throwable) -> {
+        AmqpTopicManager.getTopic(pulsarService, topicName, true).whenComplete((topic, throwable) -> {
             if (throwable != null) {
                 log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
                 return;

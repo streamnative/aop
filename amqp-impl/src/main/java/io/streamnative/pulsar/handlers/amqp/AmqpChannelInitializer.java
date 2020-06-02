@@ -34,7 +34,6 @@ public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
         super();
         this.pulsarService = pulsarService;
         this.amqpConfig = amqpConfig;
-        AmqpTopicManager.setPulsarService(pulsarService);
     }
 
     @Override

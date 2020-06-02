@@ -17,7 +17,6 @@ import static com.google.common.base.Preconditions.checkState;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
@@ -31,19 +30,16 @@ import org.apache.pulsar.common.naming.TopicName;
 public class AmqpTopicManager {
 
     @Getter
-    @Setter
-    private static PulsarService pulsarService;
-
-    @Getter
     private static final ConcurrentHashMap<String, CompletableFuture<AmqpTopicCursorManager>> topicCursorManagers =
             new ConcurrentHashMap<>();
 
 
-    public static Topic getOrCreateTopic(String topicName, boolean createIfMissing) {
-        return getTopic(topicName, createIfMissing).join();
+    public static Topic getOrCreateTopic(PulsarService pulsarService, String topicName, boolean createIfMissing) {
+        return getTopic(pulsarService, topicName, createIfMissing).join();
     }
 
-    public static CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing) {
+    public static CompletableFuture<Topic> getTopic(PulsarService pulsarService, String topicName,
+                                                    boolean createIfMissing) {
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
         if (null == pulsarService) {
             log.error("PulsarService is not set.");
@@ -88,11 +84,12 @@ public class AmqpTopicManager {
         return topicCompletableFuture;
     }
 
-    public static CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(String topicName) {
+    public static CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(PulsarService pulsarService,
+                                                                                  String topicName) {
         return topicCursorManagers.computeIfAbsent(
                 topicName,
                 t -> {
-                    CompletableFuture<Topic> topic = getTopic(t, true);
+                    CompletableFuture<Topic> topic = getTopic(pulsarService, t, true);
                     checkState(topic != null);
 
                     return topic.thenApply(t2 -> {

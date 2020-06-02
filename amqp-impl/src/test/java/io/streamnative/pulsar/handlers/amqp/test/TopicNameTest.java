@@ -40,7 +40,7 @@ public class TopicNameTest {
         Mockito.when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
-                    exchangeName, exchangeType, exchangeTopic1, null, false);
+                    exchangeName, exchangeType, exchangeTopic1, false);
         } catch (IllegalArgumentException e) {
             Assert.fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
@@ -50,7 +50,7 @@ public class TopicNameTest {
         Mockito.when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
-                    exchangeName, exchangeType, exchangeTopic2, null, false);
+                    exchangeName, exchangeType, exchangeTopic2, false);
         } catch (IllegalArgumentException e) {
             Assert.assertNotNull(e);
             log.info("This is expected behavior.");

@@ -119,7 +119,6 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(persistentTopic.createSubscription(Mockito.anyString(),
                 Mockito.any(), Mockito.anyBoolean())).thenReturn(subFuture);
         Mockito.when(subscription.getDispatcher()).thenReturn(Mockito.mock(MockDispatcher.class));
-        Mockito.when(persistentTopic.getName()).thenReturn("persistent://public/default/mock");
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
         Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
 
@@ -131,7 +130,11 @@ public abstract class AmqpProtocolTestBase {
         lookupCompletableFuture.complete(Optional.of(lookupResult));
         Mockito.when(connection.getPulsarService().getNamespaceService()).thenReturn(namespaceService);
         Mockito.when(namespaceService.getBrokerServiceUrlAsync(Mockito.any(TopicName.class),
-                Mockito.anyBoolean())).thenReturn(lookupCompletableFuture);
+                Mockito.anyBoolean())).then(invocationOnMock -> {
+            Object[] args = invocationOnMock.getArguments();
+            Mockito.when(persistentTopic.getName()).thenReturn(args[0].toString());
+            return lookupCompletableFuture;
+        });
 
         LookupData lookupData = Mockito.mock(LookupData.class);
         Mockito.when(lookupResult.getLookupData()).thenReturn(lookupData);

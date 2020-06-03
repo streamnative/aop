@@ -110,7 +110,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      */
     private IncomingMessage currentMessage;
 
-    private AmqpTopicManager amqpTopicManager;
     private final String defaultSubscription = "defaultSubscription";
     public static final AMQShortString EMPTY_STRING = AMQShortString.createAMQShortString((String) null);
     /**
@@ -128,7 +127,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
         this.connection = connection;
-        this.amqpTopicManager = connection.getAmqpTopicManager();
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
     }
 
@@ -191,7 +189,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     if (durable) {
                         TopicName topicName = TopicName.get(
                             TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
-                        CompletableFuture<Topic> tf = amqpTopicManager.getTopic(topicName.toString(), false);
+                        CompletableFuture<Topic> tf = AmqpTopicManager.getTopic(connection.getPulsarService(),
+                                topicName.toString(),
+                                false);
                         tf.whenComplete((t, e) -> {
                             if (e != null) {
                                 closeChannel(INTERNAL_ERROR, e.getMessage());
@@ -204,7 +204,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             ExchangeContainer.
                                 putExchange(connection.getNamespaceName(), exchangeName,
                                     new PersistentExchange(exchangeName, AmqpExchange.Type.value(
-                                        type.toString()), (PersistentTopic) t, amqpTopicManager, autoDelete));
+                                        type.toString()), (PersistentTopic) t, autoDelete));
                             if (!nowait) {
                                 sync();
                                 connection.writeFrame(declareOkBody.generateFrame(channelId));
@@ -264,7 +264,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         String exchangeTopicName = PersistentExchange.getExchangeTopicName(
                                 connection.getNamespaceName(), exchangeName);
                         try {
-                            PersistentTopic persistentTopic = (PersistentTopic) amqpTopicManager.getOrCreateTopic(
+                            PersistentTopic persistentTopic =
+                                    (PersistentTopic) AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(),
                                     exchangeTopicName, true);
                             if (persistentTopic == null) {
                                 connection.sendConnectionClose(INTERNAL_ERROR,
@@ -274,7 +275,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             ExchangeContainer.
                                     putExchange(connection.getNamespaceName(), exchangeName,
                                             new PersistentExchange(exchangeName, AmqpExchange.Type.value(
-                                                    type.toString()), persistentTopic, amqpTopicManager, autoDelete));
+                                                    type.toString()), persistentTopic, autoDelete));
                             if (!nowait) {
                                 sync();
                                 connection.writeFrame(declareOkBody.generateFrame(channelId));
@@ -313,7 +314,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                     } else {
                         try {
-                            amqpTopicManager.deleteTopic(exchangeName);
                             ExchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
                             topic.delete().get();
                             ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().
@@ -329,7 +329,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     if (amqpExchange.getQueueSize() > 0) {
                         closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                     }
-                    amqpTopicManager.deleteTopic(exchangeName);
                     ExchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
                     ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
                     connection.writeFrame(responseBody.generateFrame(channelId));
@@ -349,7 +348,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
-        Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
+        Topic topic = AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(), topicName.toString(), false);
         if (null == topic) {
             replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
             replyText = replyText.insert(0, "Exchange '").append(exchange).append("' not found");
@@ -407,8 +406,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 try {
                     String queueTopicName = PersistentQueue.getQueueTopicName(
                             connection.getNamespaceName(), queue.toString());
-                    PersistentTopic indexTopic = (PersistentTopic) amqpTopicManager
-                            .getOrCreateTopic(queueTopicName, true);
+                    PersistentTopic indexTopic = (PersistentTopic) AmqpTopicManager
+                            .getOrCreateTopic(connection.getPulsarService(), queueTopicName, true);
                     amqpQueue = new PersistentQueue(queue.toString(), indexTopic, connection.getConnectionId(),
                             exclusive, autoDelete);
                 } catch (Exception e) {
@@ -528,7 +527,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
-        Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
+        Topic topic = AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(), topicName.toString(), false);
         if (null == topic) {
             connection.sendConnectionClose(INTERNAL_ERROR, "exchange not found.", channelId);
         } else {

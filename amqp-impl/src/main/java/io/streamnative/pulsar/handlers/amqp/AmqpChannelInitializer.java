@@ -24,16 +24,13 @@ import org.apache.pulsar.broker.PulsarService;
  */
 public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
-    public static final int MAX_FRAME_LENGTH = 100 * 1024 * 1024; // 100MB
-
     @Getter
     private final PulsarService pulsarService;
     @Getter
     private final AmqpServiceConfiguration amqpConfig;
 
     public AmqpChannelInitializer(PulsarService pulsarService,
-                                   AmqpServiceConfiguration amqpConfig)
-            throws Exception {
+                                   AmqpServiceConfiguration amqpConfig) {
         super();
         this.pulsarService = pulsarService;
         this.amqpConfig = amqpConfig;

@@ -17,17 +17,15 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
-
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.zookeeper.ZooKeeper;
 
@@ -37,16 +35,13 @@ import org.apache.zookeeper.ZooKeeper;
 @Slf4j
 public class ConnectionContainer {
 
-    public static PulsarService pulsarService;
+    private static PulsarService pulsarService;
     public static ZooKeeper zooKeeper;
-    private static AmqpTopicManager amqpTopicManager;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     public static void init(PulsarService pulsarService) {
         ConnectionContainer.pulsarService = pulsarService;
         ConnectionContainer.zooKeeper = pulsarService.getLocalZkCache().getZooKeeper();
-        ConnectionContainer.amqpTopicManager = new AmqpTopicManager(pulsarService);
-
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
@@ -59,17 +54,12 @@ public class ConnectionContainer {
                 log.info("ConnectionContainer [unLoad] namespaceBundle: {}", namespaceBundle);
                 NamespaceName namespaceName = namespaceBundle.getNamespaceObject();
 
-                TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                        namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-                amqpTopicManager.deleteTopic(topicName.toString());
-
                 if (connectionMap.containsKey(namespaceName)) {
                     Set<AmqpConnection> connectionSet = connectionMap.get(namespaceName);
                     for (AmqpConnection connection : connectionSet) {
                         log.info("close connection: {}", connection);
                         if (connection.getOrderlyClose().compareAndSet(false, true)) {
                             connection.completeAndCloseAllChannels();
-                            connection.getAmqpTopicManager().getExchangeTopics().clear();
                             connection.close();
                         }
                     }
@@ -127,13 +117,14 @@ public class ConnectionContainer {
     private static void addBuildInExchanges(NamespaceName namespaceName,
                                             String exchangeName, AmqpExchange.Type exchangeType) {
         String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-        amqpTopicManager.getTopic(topicName).whenComplete((topic, throwable) -> {
+        AmqpTopicManager.getTopic(pulsarService, topicName, true).whenComplete((topic, throwable) -> {
             if (throwable != null) {
                 log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
                 return;
             }
             ExchangeContainer.putExchange(namespaceName, exchangeName,
-                    new PersistentExchange(exchangeName, exchangeType, topic, amqpTopicManager, false));
+                    new PersistentExchange(exchangeName, exchangeType,
+                            (PersistentTopic) topic, false));
         });
     }
 

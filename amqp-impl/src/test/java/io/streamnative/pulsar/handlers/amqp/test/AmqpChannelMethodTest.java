@@ -60,12 +60,25 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindOkBody;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 /**
  * Unit tests for AMQP channel level methods.
  */
 public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
+
+    @DataProvider(name = "exchangeAndQueueIsDurableBuilder")
+    public Object[][] exchangeAndQueueIsDurableBuilderProvider() {
+        return new Object[][]{
+                {true, true},
+                {true, false},
+                {false, false},
+                {false, true}
+        };
+    }
+
+    private static int count = 0;
 
     @Test
     public void testBasicGet() {
@@ -227,21 +240,21 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     }
 
     @SneakyThrows
-    @Test
-    public void testQueueBind() {
+    @Test(dataProvider = "exchangeAndQueueIsDurableBuilder")
+    public void testQueueBind(boolean exchangeIsDurable, boolean queueIsDurable) {
         String tenant = "public";
         String namespace = "ns";
-        String exchange = "test";
-        String queue = "queue";
+        String exchange = "test" + count;
+        String queue = "queue" + count;
         List<String> subs = new ArrayList<>();
         subs.add(exchange);
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
-        exchangeDeclare(exchange, true);
+        exchangeDeclare(exchange, exchangeIsDurable);
 
-        queueDeclare(queue, true);
+        queueDeclare(queue, queueIsDurable);
 
         QueueBindBody cmd = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
             false, null);
@@ -256,6 +269,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueBindOkBody);
+        count++;
     }
 
     @Test

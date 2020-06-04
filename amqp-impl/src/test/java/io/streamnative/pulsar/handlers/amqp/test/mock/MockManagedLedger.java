@@ -16,6 +16,8 @@ package io.streamnative.pulsar.handlers.amqp.test.mock;
 
 import io.netty.buffer.ByteBuf;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
@@ -150,11 +152,6 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public void checkBackloggedCursors() {
-
-    }
-
-    @Override
     public void asyncTerminate(AsyncCallbacks.TerminateCallback terminateCallback, Object o) {
 
     }
@@ -242,6 +239,11 @@ public class MockManagedLedger implements ManagedLedger {
     @Override
     public void asyncSetProperties(Map<String, String> map,
                                    AsyncCallbacks.SetPropertiesCallback setPropertiesCallback, Object o) {
+
+    }
+
+    @Override
+    public void trimConsumedLedgersInBackground(CompletableFuture<?> completableFuture) {
 
     }
 }

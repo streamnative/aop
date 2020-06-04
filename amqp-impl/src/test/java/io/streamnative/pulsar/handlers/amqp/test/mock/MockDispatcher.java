@@ -14,13 +14,16 @@
 package io.streamnative.pulsar.handlers.amqp.test.mock;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Dispatcher;
 import org.apache.pulsar.broker.service.RedeliveryTracker;
+import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
 import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.policies.data.Policies;
 
 /**
  * Dispatcher mock test.
@@ -58,7 +61,17 @@ public class MockDispatcher implements Dispatcher {
         return false;
     }
 
+    @Override
+    public CompletableFuture<Void> disconnectActiveConsumers(boolean b) {
+        return null;
+    }
+
     @Override public CompletableFuture<Void> disconnectAllConsumers(boolean isResetCursor) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> disconnectAllConsumers() {
         return null;
     }
 
@@ -88,5 +101,30 @@ public class MockDispatcher implements Dispatcher {
 
     @Override public RedeliveryTracker getRedeliveryTracker() {
         return null;
+    }
+
+    @Override
+    public Optional<DispatchRateLimiter> getRateLimiter() {
+        return Optional.empty();
+    }
+
+    @Override
+    public void initializeDispatchRateLimiterIfNeeded(Optional<Policies> policies) {
+
+    }
+
+    @Override
+    public boolean trackDelayedDelivery(long ledgerId, long entryId, PulsarApi.MessageMetadata msgMetadata) {
+        return false;
+    }
+
+    @Override
+    public long getNumberOfDelayedMessages() {
+        return 0;
+    }
+
+    @Override
+    public void cursorIsReset() {
+
     }
 }

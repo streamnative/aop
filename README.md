@@ -339,7 +339,7 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     ```yaml
     defaultNumberOfNamespaceBundles=1
     
-    messagingProtocols=amqpn
+    messagingProtocols=amqp
     protocolHandlerDirectory=./protocols
     brokerServicePort=6651
     amqpListeners=amqp://127.0.0.1:5672
@@ -356,13 +356,13 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     $PULSAR_HOME/bin/pulsar-admin namespaces set-retention -s 100M -t 3d public/default
     ``` 
 
-7. prepare exchange and qu for test
+7. prepare exchange and queue for test
 
     ```
     ConnectionFactory connectionFactory = new ConnectionFactory();
-    connectionFactory.setVirtualHost("default");
+    connectionFactory.setVirtualHost("/");
     connectionFactory.setHost("127.0.0.1");
-    connectionFactory.setPort(5681);
+    connectionFactory.setPort(5682);
     Connection connection = connectionFactory.newConnection();
     Channel channel = connection.createChannel();
     String ex = "ex-perf";
@@ -379,5 +379,5 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     (https://bintray.com/rabbitmq/java-tools/download_file?file_path=perf-test%2F2.11.0%2Frabbitmq-perf-test-2.11.0-bin.tar.gz)
 
     ```shell script
-    $RABBITMQ_PERF_TOOL_HOME/bin/runjava com.rabbitmq.perf.PerfTest -e ex-perf -u qu-perf -r 1000 -h amqp://127.0.0.1:5681 -p
+    $RABBITMQ_PERF_TOOL_HOME/bin/runjava com.rabbitmq.perf.PerfTest -e ex-perf -u qu-perf -r 1000 -h amqp://127.0.0.1:5682 -p
     ```

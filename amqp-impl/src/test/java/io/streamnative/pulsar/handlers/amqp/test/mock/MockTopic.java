@@ -138,6 +138,11 @@ public class MockTopic implements Topic {
     }
 
     @Override
+    public void checkBackloggedCursors() {
+
+    }
+
+    @Override
     public void checkMessageExpiry() {
 
     }
@@ -170,6 +175,26 @@ public class MockTopic implements Topic {
     @Override
     public boolean isPublishRateExceeded() {
         return false;
+    }
+
+    @Override
+    public boolean isTopicPublishRateExceeded(int i, int i1) {
+        return false;
+    }
+
+    @Override
+    public boolean isBrokerPublishRateExceeded() {
+        return false;
+    }
+
+    @Override
+    public void disableCnxAutoRead() {
+
+    }
+
+    @Override
+    public void enableCnxAutoRead() {
+
     }
 
     @Override

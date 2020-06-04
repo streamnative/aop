@@ -32,6 +32,7 @@ import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
+import org.apache.pulsar.broker.service.EntryBatchIndexesAcks;
 import org.apache.pulsar.broker.service.EntryBatchSizes;
 import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.ServerCnx;
@@ -83,9 +84,14 @@ public class AmqpConsumer extends Consumer {
         this.unAckMessages = new ConcurrentHashMap<>();
     }
 
-    @Override
-    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes, int totalMessages,
-        long totalBytes, RedeliveryTracker redeliveryTracker) {
+    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,  int totalMessages,
+                                       long totalBytes, RedeliveryTracker redeliveryTracker) {
+        return sendMessages(entries, batchSizes, null, totalMessages, totalBytes, 0, redeliveryTracker);
+    }
+
+    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
+           EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
+           RedeliveryTracker redeliveryTracker) {
         MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         final AmqpConnection connection = channel.getConnection();
         if (entries.isEmpty() || totalMessages == 0) {

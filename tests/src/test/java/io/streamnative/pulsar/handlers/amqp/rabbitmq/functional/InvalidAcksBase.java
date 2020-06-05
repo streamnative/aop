@@ -19,6 +19,7 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
+import org.junit.Test;
 
 /**
  * See bug 21846.
@@ -31,24 +32,25 @@ public abstract class InvalidAcksBase extends BrokerTestCase {
 
     protected abstract void commit() throws IOException;
 
-    //@Test
+    @Test
     public void doubleAck()
-            throws IOException {
+        throws IOException {
         select();
-        String q = channel.queueDeclare().getQueue();
-        basicPublishVolatile(q);
+        String queue = generateQueueName();
+        String exchange = generateExchangeName();
+        publish(queue, exchange, 1);
         commit();
 
-        long tag = channel.basicGet(q, false).getEnvelope().getDeliveryTag();
+        long tag = channel.basicGet(queue, false).getEnvelope().getDeliveryTag();
         channel.basicAck(tag, false);
         channel.basicAck(tag, false);
 
         expectError(AMQP.PRECONDITION_FAILED);
     }
 
-    //@Test
+    @Test
     public void crazyAck()
-            throws IOException {
+        throws IOException {
         select();
         channel.basicAck(123456, false);
         expectError(AMQP.PRECONDITION_FAILED);

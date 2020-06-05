@@ -24,7 +24,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -89,11 +88,10 @@ public class AmqpConsumer extends Consumer {
         return sendMessages(entries, batchSizes, null, totalMessages, totalBytes, 0, redeliveryTracker);
     }
 
+    @Override
     public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
            EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
            RedeliveryTracker redeliveryTracker) {
-        MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
-        final AmqpConnection connection = channel.getConnection();
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
                 log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}");
@@ -101,6 +99,14 @@ public class AmqpConsumer extends Consumer {
 
             return null;
         }
+        if (!autoAck) {
+            channel.getCreditManager().useCreditForMessages(totalMessages, 0);
+            if (!channel.getCreditManager().hasCredit()) {
+                channel.setBlockedOnCredit();
+            }
+        }
+        final AmqpConnection connection = channel.getConnection();
+        MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         connection.ctx.channel().eventLoop().execute(() -> {
             for (int i = 0; i < entries.size(); i++) {
                 Entry index = entries.get(i);
@@ -131,7 +137,6 @@ public class AmqpConsumer extends Consumer {
                         if (autoAck) {
                             messagesAck(index.getPosition());
                         } else {
-                            channel.useCreditForMessage(msg.getLength());
                             channel.getUnacknowledgedMessageMap().add(deliveryTag,
                                 index.getPosition(), this, msg.getLength());
                         }
@@ -196,7 +201,11 @@ public class AmqpConsumer extends Consumer {
 
     @Override
     public int getAvailablePermits() {
-        return this.channel.hasCredit() ? availablePermits : 0;
+        if (autoAck || channel.getCreditManager().isNoCreditLimit()) {
+            return availablePermits;
+        }
+        return this.channel.getCreditManager().hasCredit()
+            ? (int) this.channel.getCreditManager().getMessageCredit() : 0;
     }
 
     void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {

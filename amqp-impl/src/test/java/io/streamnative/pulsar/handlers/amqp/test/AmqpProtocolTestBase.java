@@ -33,6 +33,8 @@ import java.util.concurrent.CompletableFuture;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
+import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
+import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -145,9 +147,9 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean())).
                 thenReturn(topicCompletableFuture);
 
-        ManagedLedger managedLedger = Mockito.mock(ManagedLedger.class);
+        ManagedLedger managedLedger = Mockito.mock(ManagedLedgerImpl.class);
         Mockito.when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
-
+        Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
     }
 
     /**

@@ -21,25 +21,27 @@ import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.QueueingConsumer;
 import com.rabbitmq.client.test.QueueingConsumer.Delivery;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
+import org.junit.Test;
 
 /**
  * PerConsumerPrefetch.
  */
 public class PerConsumerPrefetch extends BrokerTestCase {
-    private String q;
+    private String q = generateQueueName();
+    private String x = generateExchangeName();
+    private String r = "key-1";
 
     @Override
     protected void createResources() throws IOException {
-        q = channel.queueDeclare().getQueue();
+        declareExchangeAndQueueToBind(q, x, r);
     }
 
     private interface Closure {
         void makeMore(List<Delivery> deliveries) throws IOException;
     }
 
-    //@Test
+    @Test
     public void singleAck() throws IOException {
         testPrefetch(new Closure() {
             public void makeMore(List<Delivery> deliveries) throws IOException {
@@ -50,7 +52,7 @@ public class PerConsumerPrefetch extends BrokerTestCase {
         });
     }
 
-    //@Test
+    @Test
     public void multiAck() throws IOException {
         testPrefetch(new Closure() {
             public void makeMore(List<Delivery> deliveries) throws IOException {
@@ -59,31 +61,29 @@ public class PerConsumerPrefetch extends BrokerTestCase {
         });
     }
 
-    //@Test
+    @Test
     public void singleNack() throws IOException {
-        for (final boolean requeue : Arrays.asList(false, true)) {
-            testPrefetch(new Closure() {
-                public void makeMore(List<Delivery> deliveries) throws IOException {
-                    for (Delivery del : deliveries) {
-                        nack(del, false, requeue);
-                    }
+        testPrefetch(new Closure() {
+            public void makeMore(List<Delivery> deliveries) throws IOException {
+                for (Delivery del : deliveries) {
+                    nack(del, false, false);
                 }
-            });
-        }
+            }
+        });
+
     }
 
-    //@Test
+    @Test
     public void multiNack() throws IOException {
-        for (final boolean requeue : Arrays.asList(false, true)) {
-            testPrefetch(new Closure() {
-                public void makeMore(List<Delivery> deliveries) throws IOException {
-                    nack(deliveries.get(deliveries.size() - 1), true, requeue);
-                }
-            });
-        }
+        testPrefetch(new Closure() {
+            public void makeMore(List<Delivery> deliveries) throws IOException {
+                nack(deliveries.get(deliveries.size() - 1), true, true);
+            }
+        });
+
     }
 
-    //@Test
+    @Test
     public void recover() throws IOException {
         testPrefetch(new Closure() {
             public void makeMore(List<Delivery> deliveries) throws IOException {
@@ -98,7 +98,7 @@ public class PerConsumerPrefetch extends BrokerTestCase {
         consume(c, 5, false);
         List<Delivery> deliveries = drain(c, 5);
 
-        ack(channel.basicGet(q, false), false);
+        //ack(channel.basicGet(q, false), false);
         drain(c, 0);
 
         closure.makeMore(deliveries);
@@ -133,7 +133,7 @@ public class PerConsumerPrefetch extends BrokerTestCase {
 
     private void publish(String q, int n) throws IOException {
         for (int i = 0; i < n; i++) {
-            channel.basicPublish("", q, null, "".getBytes());
+            channel.basicPublish(x, r, null, "1".getBytes());
         }
     }
 

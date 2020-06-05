@@ -70,6 +70,12 @@ public final class MessageFetchContext {
 
     // handle request
     public void handleFetch(boolean autoAck) {
+        if (!autoAck && !channel.getCreditManager().hasCredit()) {
+            MethodRegistry methodRegistry = channel.getConnection().getMethodRegistry();
+            BasicGetEmptyBody responseBody = methodRegistry.createBasicGetEmptyBody(null);
+            channel.getConnection().writeFrame(responseBody.generateFrame(channel.getChannelId()));
+            return;
+        }
         ManagedCursor cursor = ((PersistentSubscription) consumer.getSubscription()).getCursor();
         CompletableFuture<Pair<Position, AmqpMessageData>> message = new CompletableFuture<>();
         message.whenComplete((pair, throwable) -> {
@@ -81,6 +87,7 @@ public final class MessageFetchContext {
                     consumer.messagesAck(pair.getLeft());
                 } else {
                     channel.getUnacknowledgedMessageMap().add(deliveryTag, pair.getLeft(), consumer, 0);
+                    channel.getCreditManager().useCreditForMessages(1, 0);
                 }
             } else {
                 if (pair != null && pair.getLeft() != null) {

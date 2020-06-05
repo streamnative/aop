@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.flow;
 
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.qpid.server.flow.FlowCreditManager;
 
 /**
@@ -25,70 +26,103 @@ public class AmqpFlowCreditManager implements FlowCreditManager {
 
     private volatile long bytesCredit;
     private volatile long messageCredit;
+    private final ReentrantReadWriteLock rwLock;
 
     public AmqpFlowCreditManager(long bytesCreditLimit, long messageCreditLimit) {
         this.bytesCreditLimit = bytesCreditLimit;
         this.messageCreditLimit = messageCreditLimit;
+        this.rwLock = new ReentrantReadWriteLock();
     }
 
     public void setCreditLimits(final long bytesCreditLimit, final long messageCreditLimit) {
-        long bytesCreditChange = bytesCreditLimit - this.bytesCreditLimit;
-        long messageCreditChange = messageCreditLimit - this.messageCreditLimit;
+        rwLock.writeLock().lock();
+        try {
+            long bytesCreditChange = bytesCreditLimit - this.bytesCreditLimit;
+            long messageCreditChange = messageCreditLimit - this.messageCreditLimit;
 
-        if (bytesCreditChange != 0L) {
-            bytesCredit += bytesCreditChange;
+            if (bytesCreditChange != 0L) {
+                bytesCredit += bytesCreditChange;
+            }
+
+            if (messageCreditChange != 0L) {
+                messageCredit += messageCreditChange;
+            }
+
+            this.bytesCreditLimit = bytesCreditLimit;
+            this.messageCreditLimit = messageCreditLimit;
+        } finally {
+            rwLock.writeLock().unlock();
         }
-
-        if (messageCreditChange != 0L) {
-            messageCredit += messageCreditChange;
-        }
-
-        this.bytesCreditLimit = bytesCreditLimit;
-        this.messageCreditLimit = messageCreditLimit;
     }
 
     @Override
     public void restoreCredit(final long messageCredit, final long bytesCredit) {
-        this.messageCredit += messageCredit;
-        if (this.messageCredit > messageCreditLimit) {
-            throw new IllegalStateException(String.format("Consumer credit accounting "
-                + "error. Restored more credit than we ever had: messageCredit=%d  "
-                + "messageCreditLimit=%d", this.messageCredit, messageCreditLimit));
-        }
+        rwLock.writeLock().lock();
+        try {
+            if (messageCreditLimit != 0) {
+                this.messageCredit += messageCredit;
+                if (this.messageCredit > messageCreditLimit) {
+                    throw new IllegalStateException(String.format("Consumer credit accounting "
+                        + "error. Restored more credit than we ever had: messageCredit=%d  "
+                        + "messageCreditLimit=%d", this.messageCredit, messageCreditLimit));
+                }
+            }
 
-        this.bytesCredit += bytesCredit;
-        if (this.bytesCredit > bytesCreditLimit) {
-            throw new IllegalStateException(String.format("Consumer credit accounting error. Restored more credit "
-                    + "than we ever had: bytesCredit=%d bytesCreditLimit=%d", this.bytesCredit,
-                bytesCreditLimit));
+            if (bytesCreditLimit != 0) {
+                this.bytesCredit += bytesCredit;
+                if (this.bytesCredit > bytesCreditLimit) {
+                    throw new IllegalStateException(String.format("Consumer credit accounting error.Restored more "
+                            + "credit than we ever had: bytesCredit=%d bytesCreditLimit=%d",
+                        this.bytesCredit, bytesCreditLimit));
+                }
+            }
+        } finally {
+            rwLock.writeLock().unlock();
         }
     }
 
     @Override
     public boolean hasCredit() {
-        return (bytesCreditLimit == 0L || bytesCredit > 0)
-            && (messageCreditLimit == 0L || messageCredit > 0);
+        rwLock.readLock().lock();
+        try {
+            return (bytesCreditLimit == 0L || bytesCredit > 0)
+                && (messageCreditLimit == 0L || messageCredit > 0);
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
-    @Override
-    public boolean useCreditForMessage(final long msgSize) {
-        if (messageCreditLimit != 0) {
-            if (messageCredit <= 0) {
-                return false;
+    public boolean useCreditForMessages(final long messageCredit, final long msgSize) {
+        rwLock.writeLock().lock();
+        try {
+            if (messageCreditLimit != 0) {
+                if (messageCredit <= 0) {
+                    return false;
+                }
             }
-        }
-        if (bytesCreditLimit != 0) {
-            if ((bytesCredit < msgSize) && (bytesCredit != bytesCreditLimit)) {
-                return false;
+            if (bytesCreditLimit != 0) {
+                if ((bytesCredit < msgSize) && (bytesCredit != bytesCreditLimit)) {
+                    return false;
+                }
             }
-        }
 
-        messageCredit -= messageCredit;
-        bytesCredit -= msgSize;
-        return true;
+            this.messageCredit -= messageCredit;
+            this.bytesCredit -= msgSize;
+            return true;
+        } finally {
+            rwLock.writeLock().unlock();
+        }
+    }
+
+    @Override public boolean useCreditForMessage(long l) {
+        return false;
     }
 
     public long getMessageCredit() {
         return messageCredit;
+    }
+
+    public boolean isNoCreditLimit(){
+        return bytesCreditLimit == 0L && messageCreditLimit == 0L;
     }
 }

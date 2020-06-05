@@ -29,6 +29,7 @@ import com.rabbitmq.client.test.QueueingConsumer;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
+import org.junit.Test;
 
 /**
  * Test Requeue of messages on different types of close.
@@ -36,8 +37,10 @@ import java.util.concurrent.TimeoutException;
  */
 public abstract class RequeueOnClose
         extends BrokerTestCase {
-    private static final String Q = "RequeueOnClose";
-    private static final int MESSAGE_COUNT = 2000;
+    private final String q = generateQueueName();
+    private final String x = generateExchangeName();
+    private final String r = "key-1";
+    private final int messageCount = 2;
 
     protected abstract void open() throws IOException, TimeoutException;
 
@@ -46,32 +49,33 @@ public abstract class RequeueOnClose
     public void setUp()
             throws IOException {
         // Override to disable the default behaviour from BrokerTestCase.
+
     }
 
     public void tearDown()
             throws IOException {
         // Override to disable the default behaviour from BrokerTestCase.
+
     }
 
     private void injectMessage()
             throws IOException {
-        channel.queueDeclare(Q, false, false, false, null);
-        channel.queueDelete(Q);
-        channel.queueDeclare(Q, false, false, false, null);
-        channel.basicPublish("", Q, null, "RequeueOnClose message".getBytes());
+        channel.basicPublish(x, r, null, "RequeueOnClose message".getBytes());
     }
 
     private GetResponse getMessage()
             throws IOException {
-        return channel.basicGet(Q, false);
+        return channel.basicGet(q, false);
     }
 
     private void publishAndGet(int count, boolean doAck)
             throws IOException, InterruptedException, TimeoutException {
         openConnection();
+        declareExchangeAndQueueToBind(q, x, r);
         for (int repeat = 0; repeat < count; repeat++) {
             open();
             injectMessage();
+            Thread.sleep(200);
             GetResponse r1 = getMessage();
             if (doAck) {
                 channel.basicAck(r1.getEnvelope().getDeliveryTag(), false);
@@ -93,7 +97,7 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void normal() throws Exception {
         publishAndGet(3, true);
     }
@@ -103,7 +107,7 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueing() throws Exception {
         publishAndGet(3, false);
     }
@@ -113,13 +117,14 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueingConsumer() throws Exception {
         openConnection();
         open();
+        declareExchangeAndQueueToBind(q, x, r);
         injectMessage();
         QueueingConsumer c = new QueueingConsumer(channel);
-        channel.basicConsume(Q, c);
+        channel.basicConsume(q, c);
         c.nextDelivery();
         close();
         open();
@@ -132,23 +137,21 @@ public abstract class RequeueOnClose
             throws IOException, InterruptedException, ShutdownSignalException, TimeoutException {
         openConnection();
         open();
-        channel.queueDeclare(Q, false, false, false, null);
-        channel.queueDelete(Q);
-        channel.queueDeclare(Q, false, false, false, null);
-        for (int i = 0; i < MESSAGE_COUNT; i++) {
-            channel.basicPublish("", Q, null, "in flight message".getBytes());
+        declareExchangeAndQueueToBind(q, x, r);
+        for (int i = 0; i < messageCount; i++) {
+            channel.basicPublish(x, r, null, "in flight message".getBytes());
         }
         QueueingConsumer c = new QueueingConsumer(channel);
-        channel.basicConsume(Q, c);
+        channel.basicConsume(q, c);
         c.nextDelivery();
         close();
         open();
-        for (int i = 0; i < MESSAGE_COUNT; i++) {
-            assertNotNull("only got " + i + " out of " + MESSAGE_COUNT
-                    + " messages", channel.basicGet(Q, true));
+        for (int i = 0; i < messageCount; i++) {
+            assertNotNull("only got " + i + " out of " + messageCount
+                    + " messages", channel.basicGet(q, true));
         }
-        assertNull("got more messages than " + MESSAGE_COUNT + " expected", channel.basicGet(Q, true));
-        channel.queueDelete(Q);
+        assertNull("got more messages than " + messageCount + " expected", channel.basicGet(q, true));
+        channel.queueDelete(q);
         close();
         closeConnection();
     }
@@ -158,7 +161,7 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueInFlight() throws Exception {
         for (int i = 0; i < 5; i++) {
             publishLotsAndGet();
@@ -170,7 +173,7 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueInFlightConsumerNoAck() throws Exception {
         for (int i = 0; i < 5; i++) {
             publishLotsAndConsumeSome(false, true);
@@ -182,7 +185,7 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueInFlightConsumerAck() throws Exception {
         for (int i = 0; i < 5; i++) {
             publishLotsAndConsumeSome(true, true);
@@ -194,7 +197,7 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueInFlightConsumerNoAckNoCancel() throws Exception {
         for (int i = 0; i < 5; i++) {
             publishLotsAndConsumeSome(false, false);
@@ -206,45 +209,43 @@ public abstract class RequeueOnClose
      *
      * @throws Exception untested
      */
-    ////@Test
+    @Test
     public void requeueInFlightConsumerAckNoCancel() throws Exception {
         for (int i = 0; i < 5; i++) {
             publishLotsAndConsumeSome(true, false);
         }
     }
 
-    private static final int MESSAGES_TO_CONSUME = 20;
+    private static final int MESSAGES_TO_CONSUME = 2;
 
     private void publishLotsAndConsumeSome(boolean ack, boolean cancelBeforeFinish)
             throws IOException, InterruptedException, ShutdownSignalException, TimeoutException {
         openConnection();
         open();
-        channel.queueDeclare(Q, false, false, false, null);
-        channel.queueDelete(Q);
-        channel.queueDeclare(Q, false, false, false, null);
-        for (int i = 0; i < MESSAGE_COUNT; i++) {
-            channel.basicPublish("", Q, null, "in flight message".getBytes());
+        declareExchangeAndQueueToBind(q, x, r);
+        for (int i = 0; i < messageCount; i++) {
+            channel.basicPublish(x, r, null, "in flight message".getBytes());
         }
 
         CountDownLatch latch = new CountDownLatch(1);
         PartialConsumer c = new PartialConsumer(channel, MESSAGES_TO_CONSUME, ack, latch, cancelBeforeFinish);
-        channel.basicConsume(Q, c);
+        channel.basicConsume(q, c);
         latch.await();  // wait for consumer
 
         close();
         open();
-        int requeuedMsgCount = (ack) ? MESSAGE_COUNT - MESSAGES_TO_CONSUME : MESSAGE_COUNT;
+        int requeuedMsgCount = (ack) ? messageCount - MESSAGES_TO_CONSUME : messageCount;
         for (int i = 0; i < requeuedMsgCount; i++) {
             assertNotNull("only got " + i + " out of " + requeuedMsgCount + " messages",
-                    channel.basicGet(Q, true));
+                    channel.basicGet(q, true));
         }
         int countMoreMsgs = 0;
-        while (null != channel.basicGet(Q, true)) {
+        while (null != channel.basicGet(q, true)) {
             countMoreMsgs++;
         }
         assertTrue("got " + countMoreMsgs + " more messages than "
                 + requeuedMsgCount + " expected", 0 == countMoreMsgs);
-        channel.queueDelete(Q);
+        channel.queueDelete(q);
         close();
         closeConnection();
     }

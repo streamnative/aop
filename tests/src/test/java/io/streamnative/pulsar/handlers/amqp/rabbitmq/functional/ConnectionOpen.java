@@ -24,22 +24,24 @@ import com.rabbitmq.client.MalformedFrameException;
 import com.rabbitmq.client.Method;
 import com.rabbitmq.client.impl.AMQCommand;
 import com.rabbitmq.client.impl.SocketFrameHandler;
+import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.TestUtils;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.concurrent.TimeoutException;
 import javax.net.SocketFactory;
-
+import org.junit.Test;
 
 /**
  * Check that protocol negotiation works.
  */
-public class ConnectionOpen {
-    //@Test
+public class ConnectionOpen extends BrokerTestCase {
+
+    @Test
     public void correctProtocolHeader() throws IOException {
         SocketFrameHandler fh = new SocketFrameHandler(SocketFactory.getDefault().
-                createSocket("localhost", AMQP.PROTOCOL.PORT));
+            createSocket("localhost", getAmqpBrokerPortList().get(0)));
         fh.sendHeader();
         AMQCommand command = new AMQCommand();
         while (!command.handleFrame(fh.readFrame())) {
@@ -47,19 +49,19 @@ public class ConnectionOpen {
         Method m = command.getMethod();
 
         assertTrue("First command must be Connection.start",
-                m instanceof AMQP.Connection.Start);
+            m instanceof AMQP.Connection.Start);
         AMQP.Connection.Start start = (AMQP.Connection.Start) m;
         assertTrue("Version in Connection.start is <= what we sent",
-                start.getVersionMajor() < AMQP.PROTOCOL.MAJOR
-                        || (start.getVersionMajor() == AMQP.PROTOCOL.MAJOR
-                        && start.getVersionMinor() <= AMQP.PROTOCOL.MINOR));
+            start.getVersionMajor() < AMQP.PROTOCOL.MAJOR
+                || (start.getVersionMajor() == AMQP.PROTOCOL.MAJOR
+                && start.getVersionMinor() <= AMQP.PROTOCOL.MINOR));
     }
 
-    //@Test
+    @Test
     public void crazyProtocolHeader() throws IOException {
         ConnectionFactory factory = TestUtils.connectionFactory();
         // keep the frame handler's socket
-        Socket fhSocket = SocketFactory.getDefault().createSocket("localhost", AMQP.PROTOCOL.PORT);
+        Socket fhSocket = SocketFactory.getDefault().createSocket("localhost", getAmqpBrokerPortList().get(0));
         SocketFrameHandler fh = new SocketFrameHandler(fhSocket);
         fh.sendHeader(100, 3); // major, minor
         DataInputStream in = fh.getInputStream();
@@ -88,7 +90,7 @@ public class ConnectionOpen {
         }
     }
 
-    //@Test
+    @Test
     public void frameMaxLessThanFrameMinSize() throws IOException, TimeoutException {
         ConnectionFactory factory = TestUtils.connectionFactory();
         factory.setRequestedFrameMax(100);

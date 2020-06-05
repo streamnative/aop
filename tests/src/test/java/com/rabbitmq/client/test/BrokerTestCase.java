@@ -191,6 +191,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     public void openConnection()
             throws IOException, TimeoutException {
         if (connection == null) {
+            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
             connection = connectionFactory.newConnection();
         }
     }
@@ -308,6 +309,11 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         channel.queueBind(q, x, r);
     }
 
+    protected void declareExchangeAndQueueToBind(String q, String x, String r) throws IOException {
+        declareDurableDirectExchange(x);
+        declareAndBindDurableQueue(q, x, r);
+    }
+
     protected void declareDurableDirectExchange(String x) throws IOException {
         channel.exchangeDeclare(x, "direct", true);
     }
@@ -340,7 +346,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         channel.exchangeDelete(x);
     }
 
-    protected void deleteExchanges(String [] exchanges) throws IOException {
+    protected void deleteExchanges(String[] exchanges) throws IOException {
         if (exchanges != null) {
             for (String exchange : exchanges) {
                 deleteExchange(exchange);
@@ -352,7 +358,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         channel.queueDelete(q);
     }
 
-    protected void deleteQueues(String [] queues) throws IOException {
+    protected void deleteQueues(String[] queues) throws IOException {
         if (queues != null) {
             for (String queue : queues) {
                 deleteQueue(queue);
@@ -393,6 +399,17 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 
     protected SSLContext getSSLContext() throws NoSuchAlgorithmException {
         return TestUtils.getSSLContext();
+    }
+
+    public void publish(int messageCount) throws IOException {
+        publish(generateQueueName(), generateExchangeName(), messageCount);
+    }
+
+    public void publish(String q, String x, int messageCount) throws IOException {
+        declareExchangeAndQueueToBind(q, x, "key1");
+        for (int i = 0; i < messageCount; i++) {
+            channel.basicPublish(x, "key1", MessageProperties.PERSISTENT_TEXT_PLAIN, "1".getBytes());
+        }
     }
 
 }

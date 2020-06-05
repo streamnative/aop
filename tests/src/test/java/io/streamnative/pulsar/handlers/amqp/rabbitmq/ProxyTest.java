@@ -31,7 +31,7 @@ public class ProxyTest extends RabbitMQTestBase {
         super.setup();
     }
 
-    @Test
+    //@Test
     public void proxyBasicTest() throws Exception {
 
         basicFanoutTest("test1", "vhost1", false, 2);

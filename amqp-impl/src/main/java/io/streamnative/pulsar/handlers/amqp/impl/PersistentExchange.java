@@ -22,7 +22,6 @@ import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicCursorManager;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
-import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,7 +44,6 @@ import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 
 /**
@@ -72,24 +70,6 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey) {
         CompletableFuture<Position> publishFuture = new CompletableFuture<>();
-        List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
-        Map<String, Object> properties = MessageConvertUtils.getHeaders(message);
-        publishFuture.whenComplete((position, throwable) -> {
-            if (throwable != null) {
-                log.error("Exchange persistent topic: {} failed.", persistentTopic.getName(), throwable);
-                publishFuture.completeExceptionally(throwable);
-            } else {
-                for (AmqpQueue queue : queues) {
-                    routeFutures.add(
-                            queue.getRouter(getName()).routingMessage(
-                                    ((PositionImpl) position).getLedgerId(),
-                                    ((PositionImpl) position).getEntryId(),
-                                    routingKey, properties)
-                    );
-                }
-            }
-        });
-        FutureUtil.waitForAll(routeFutures);
         MessagePublishContext.publishMessages(message, persistentTopic, publishFuture);
         return publishFuture;
     }

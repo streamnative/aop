@@ -14,10 +14,11 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import org.apache.qpid.server.exchange.topic.TopicMatcherResult;
 import org.apache.qpid.server.exchange.topic.TopicParser;
 
@@ -26,18 +27,8 @@ import org.apache.qpid.server.exchange.topic.TopicParser;
  */
 public class TopicMessageRouter extends AbstractAmqpMessageRouter {
 
-    public TopicMessageRouter() {
-        super(Type.Topic);
-    }
-
-    @Override
-    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
-                                                  Map<String, Object> properties) {
-        if (isMatch(routingKey)) {
-            return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
-        } else {
-            return CompletableFuture.completedFuture(null);
-        }
+    public TopicMessageRouter(ScheduledExecutorService scheduledExecutorService) {
+        super(Type.Topic, scheduledExecutorService);
     }
 
     /**
@@ -59,4 +50,17 @@ public class TopicMessageRouter extends AbstractAmqpMessageRouter {
             return false;
         }
     }
+
+    /**
+     * Use Qpid.
+     *
+     * @param properties
+     * @return
+     */
+    @Override
+    public boolean isMatch(Map<String, Object> properties) {
+        String routingKey = properties.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
+        return isMatch(routingKey);
+    }
+
 }

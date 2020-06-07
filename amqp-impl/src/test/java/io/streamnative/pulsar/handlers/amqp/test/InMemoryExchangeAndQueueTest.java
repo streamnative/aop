@@ -52,7 +52,7 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName = "test";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
         AmqpQueue queue = new InMemoryQueue("test", 0);
-        queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
+        queue.bindExchange(exchange, new FanoutMessageRouter(null), "", null);
         Assert.assertNotNull(queue.getRouter(exchangeName));
         Assert.assertEquals(queue.getRouter(exchangeName).getExchange(), exchange);
         Assert.assertEquals(queue.getRouter(exchangeName).getType(), AmqpMessageRouter.Type.Fanout);
@@ -65,7 +65,7 @@ public class InMemoryExchangeAndQueueTest {
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
         AmqpQueue queue = new InMemoryQueue(queueName, 0);
-        queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
+        queue.bindExchange(exchange, new FanoutMessageRouter(null), "", null);
 
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         Message<byte[]> message = generateMessage(exchangeName, singleContent);
@@ -92,7 +92,7 @@ public class InMemoryExchangeAndQueueTest {
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
         AmqpQueue queue = new InMemoryQueue(queueName, 0);
-        queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
+        queue.bindExchange(exchange, new FanoutMessageRouter(null), "", null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positions = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
@@ -120,7 +120,7 @@ public class InMemoryExchangeAndQueueTest {
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
         AmqpQueue queue = new InMemoryQueue(queueName, 0);
-        queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
+        queue.bindExchange(exchange, new FanoutMessageRouter(null), "", null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positions = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
@@ -165,10 +165,10 @@ public class InMemoryExchangeAndQueueTest {
         AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct, false);
         AmqpQueue queue1 = new InMemoryQueue(queueName1, 0);
         AmqpQueue queue2 = new InMemoryQueue(queueName2, 0);
-        queue1.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
-        queue1.bindExchange(exchange2, new FanoutMessageRouter(), "", null);
-        queue2.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
-        queue2.bindExchange(exchange2, new FanoutMessageRouter(), "", null);
+        queue1.bindExchange(exchange1, new FanoutMessageRouter(null), "", null);
+        queue1.bindExchange(exchange2, new FanoutMessageRouter(null), "", null);
+        queue2.bindExchange(exchange1, new FanoutMessageRouter(null), "", null);
+        queue2.bindExchange(exchange2, new FanoutMessageRouter(null), "", null);
         Assert.assertNotNull(queue1.getRouter(exchangeName1));
         Assert.assertNotNull(queue1.getRouter(exchangeName2));
         Assert.assertNotNull(queue2.getRouter(exchangeName1));
@@ -198,10 +198,10 @@ public class InMemoryExchangeAndQueueTest {
         AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct, false);
         AmqpQueue queue1 = new InMemoryQueue(queueName1, 0);
         AmqpQueue queue2 = new InMemoryQueue(queueName2, 0);
-        queue1.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
-        queue1.bindExchange(exchange2, new FanoutMessageRouter(), "", null);
-        queue2.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
-        queue2.bindExchange(exchange2, new FanoutMessageRouter(), "", null);
+        queue1.bindExchange(exchange1, new FanoutMessageRouter(null), "", null);
+        queue1.bindExchange(exchange2, new FanoutMessageRouter(null), "", null);
+        queue2.bindExchange(exchange1, new FanoutMessageRouter(null), "", null);
+        queue2.bindExchange(exchange2, new FanoutMessageRouter(null), "", null);
 
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
         List<Position> positionsForExchange1 = new ArrayList<>(10);

@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 public class AmqpHeadersMessageRouterTest {
     @Test
     public void testAllMatchWithNoEmptyValue(){
-        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
+        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter(null);
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "pdf");
         arguments.put("type", "report");
@@ -46,7 +46,7 @@ public class AmqpHeadersMessageRouterTest {
 
     @Test
     public void testAllMatchWithEmptyValue(){
-        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
+        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter(null);
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "");
         arguments.put("type", "report");
@@ -66,7 +66,7 @@ public class AmqpHeadersMessageRouterTest {
 
     @Test
     public void testAnyMatchWithNoEmptyValue(){
-        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
+        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter(null);
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "pdf");
         arguments.put("type", "report");
@@ -85,7 +85,7 @@ public class AmqpHeadersMessageRouterTest {
 
     @Test
     public void testAnyMatchWithEmptyValue(){
-        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter();
+        HeadersMessageRouter headersMessageRouter = new HeadersMessageRouter(null);
         Map<String, Object> arguments = new HashMap<>();
         arguments.put("format", "");
         arguments.put("type", "report");

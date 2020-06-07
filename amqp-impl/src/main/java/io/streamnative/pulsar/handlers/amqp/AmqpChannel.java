@@ -453,7 +453,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (null == amqpExchange) {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
         } else {
-            AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
+            AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType(),
+                    connection.getPulsarService().getBrokerService().executor());
             if (messageRouter == null) {
                 connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
                 return;
@@ -473,6 +474,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                 connection.writeFrame(responseBody.generateFrame(channelId));
             } catch (Exception e) {
+                log.warn("Failed to bind queue[{}] with exchange[{}].", queue, exchange, e);
                 connection.sendConnectionClose(INTERNAL_ERROR,
                         "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
             }

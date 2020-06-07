@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -32,20 +32,11 @@ public class HeadersMessageRouter extends AbstractAmqpMessageRouter {
     private final Set<String> required = new HashSet<>();
     private final Map<String, Object> matches = new HashMap<>();
 
-    public HeadersMessageRouter() {
-        super(Type.Headers);
+    public HeadersMessageRouter(ScheduledExecutorService scheduledExecutorService) {
+        super(Type.Headers, scheduledExecutorService);
     }
 
     @Override
-    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
-                                                  Map<String, Object> properties) {
-        if (isMatch(properties)) {
-            return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
-        } else {
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
     public boolean isMatch(Map<String, Object> headers) {
         initMappings();
         if (headers == null) {

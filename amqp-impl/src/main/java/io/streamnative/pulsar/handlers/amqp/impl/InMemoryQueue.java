@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.service.Topic;
 
 /**
  * In memory implementation for AMQP queue.
@@ -63,5 +64,10 @@ public class InMemoryQueue extends AbstractAmqpQueue {
                     markDeletePosition.getLedgerId(), markDeletePosition.getEntryId() - 1);
         }
         return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public Topic getTopic() {
+        return null;
     }
 }

@@ -142,12 +142,6 @@
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
-      <artifactId>testmocks</artifactId>
-      <version>${pulsar.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-zookeeper-utils</artifactId>
       <version>${pulsar.version}</version>
     </dependency>

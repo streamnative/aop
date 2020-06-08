@@ -21,24 +21,25 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.Test;
 
 /**
  * Testcase.
  */
 public class BasicConsume extends BrokerTestCase {
 
-    //@Test
+    @Test
     public void basicConsumeOk() throws IOException, InterruptedException {
-        String q = channel.queueDeclare().getQueue();
-        basicPublishPersistent("msg".getBytes(StandardCharsets.UTF_8), q);
-        basicPublishPersistent("msg".getBytes(StandardCharsets.UTF_8), q);
-
+        String exchange = "ex-1";
+        String queue = "qu-1";
+        String routingKey = "key-1";
+        declareExchangeAndQueueToBind(queue, exchange, routingKey);
+        basicPublishPersistent("msg".getBytes(), exchange, routingKey);
+        basicPublishPersistent("msg".getBytes(), exchange, routingKey);
         CountDownLatch latch = new CountDownLatch(2);
-        channel.basicConsume(q, new CountDownLatchConsumer(channel, latch));
-
+        channel.basicConsume(queue, new CountDownLatchConsumer(channel, latch));
         boolean nbOfExpectedMessagesHasBeenConsumed = latch.await(1, TimeUnit.SECONDS);
         assertTrue("Not all the messages have been received", nbOfExpectedMessagesHasBeenConsumed);
     }
@@ -54,8 +55,8 @@ public class BasicConsume extends BrokerTestCase {
 
         @Override
         public void handleDelivery(String consumerTag, Envelope envelope,
-                                   AMQP.BasicProperties properties,
-                                   byte[] body) throws IOException {
+            AMQP.BasicProperties properties,
+            byte[] body) throws IOException {
             latch.countDown();
         }
     }

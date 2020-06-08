@@ -24,7 +24,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
-
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,10 +39,10 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
-import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.ProtocolVersion;
+import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQDataBlock;
@@ -54,6 +56,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.HeartbeatBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodDispatcher;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 
@@ -217,7 +220,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 "Attempt to set max frame size to " + frameMax
                     + " greater than the broker will allow: "
                     + brokerFrameMax, 0);
-        } else if (frameMax > 0 && frameMax < AMQFrame.getFrameOverhead()) {
+        } else if (frameMax > 0 && frameMax <  AMQDecoder.FRAME_MIN_SIZE) {
             sendConnectionClose(ErrorCodes.SYNTAX_ERROR,
                 "Attempt to set max frame size to " + frameMax
                     + " which is smaller than the specification defined minimum: "
@@ -380,8 +383,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
             state = ConnectionState.AWAIT_START_OK;
-        } catch (QpidException e) {
+        } catch (Exception e) {
             log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
+            writeFrame(new ProtocolInitiation(ProtocolVersion.v0_91));
+            throw new RuntimeException(e);
         }
     }
 
@@ -392,7 +397,28 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
-        return this.channels.get(channelId);
+        assertState(ConnectionState.OPEN);
+        ServerChannelMethodProcessor channelMethodProcessor = getChannel(channelId);
+        if (channelMethodProcessor == null) {
+            channelMethodProcessor =
+                (ServerChannelMethodProcessor) Proxy.newProxyInstance(ServerMethodDispatcher.class.getClassLoader(),
+                new Class[] {ServerChannelMethodProcessor.class}, new InvocationHandler() {
+                    @Override
+                    public Object invoke(final Object proxy, final Method method, final Object[] args)
+                        throws Throwable {
+                        if (method.getName().equals("receiveChannelCloseOk") && channelAwaitingClosure(channelId)) {
+                            closeChannelOk(channelId);
+                        } else if (method.getName().startsWith("receive")) {
+                            sendConnectionClose(ErrorCodes.CHANNEL_ERROR,
+                                "Unknown channel id: " + channelId, channelId);
+                        } else if (method.getName().equals("ignoreAllButCloseOk")) {
+                            return channelAwaitingClosure(channelId);
+                        }
+                        return null;
+                    }
+                });
+        }
+        return channelMethodProcessor;
     }
 
     @Override
@@ -408,6 +434,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             throw new RuntimeException(replyText);
         }
     }
+
 
     public boolean channelAwaitingClosure(int channelId) {
         return ignoreAllButCloseOk() || (!closingChannelsList.isEmpty()

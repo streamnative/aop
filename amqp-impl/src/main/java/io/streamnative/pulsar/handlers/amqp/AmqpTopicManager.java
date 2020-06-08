@@ -13,14 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import static com.google.common.base.Preconditions.checkState;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
-import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.TopicName;
 
 /**
@@ -28,10 +24,6 @@ import org.apache.pulsar.common.naming.TopicName;
  */
 @Slf4j
 public class AmqpTopicManager {
-
-    @Getter
-    private static final ConcurrentHashMap<String, CompletableFuture<AmqpTopicCursorManager>> topicCursorManagers =
-            new ConcurrentHashMap<>();
 
 
     public static Topic getOrCreateTopic(PulsarService pulsarService, String topicName, boolean createIfMissing) {
@@ -84,27 +76,4 @@ public class AmqpTopicManager {
         return topicCompletableFuture;
     }
 
-    public static CompletableFuture<AmqpTopicCursorManager> getTopicCursorManager(PulsarService pulsarService,
-                                                                                  String topicName) {
-        return topicCursorManagers.computeIfAbsent(
-                topicName,
-                t -> {
-                    CompletableFuture<Topic> topic = getTopic(pulsarService, t, true);
-                    checkState(topic != null);
-
-                    return topic.thenApply(t2 -> {
-                        if (log.isDebugEnabled()) {
-                            log.debug(" Call getTopicCursorManager for {}, and create TCM for {}.",
-                                    topicName, t2);
-                        }
-
-                        if (t2 == null) {
-                            return null;
-                        }
-                        // return consumer manager
-                        return new AmqpTopicCursorManager((PersistentTopic) t2);
-                    });
-                }
-        );
-    }
 }

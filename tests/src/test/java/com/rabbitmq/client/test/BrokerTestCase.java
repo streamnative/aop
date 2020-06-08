@@ -115,7 +115,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         }
 
         if (!admin.namespaces().getNamespaces("public").contains("public/vhost1")) {
-            admin.namespaces().createNamespace("public/vhost1");
+            admin.namespaces().createNamespace("public/vhost1", 1);
             admin.namespaces().setRetention("public/vhost1",
                     new RetentionPolicies(60, 1000));
         }

@@ -17,6 +17,7 @@ import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.junit.Assert;
@@ -38,6 +39,7 @@ public class TopicNameTest {
         PersistentTopic exchangeTopic1 = Mockito.mock(PersistentTopic.class);
         Mockito.when(exchangeTopic1.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + exchangeName);
         Mockito.when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);
+        Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic1, false);

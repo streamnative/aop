@@ -21,32 +21,36 @@ import static org.junit.Assert.assertNull;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.QueueingConsumer;
 import java.io.IOException;
+import org.junit.Test;
+
+
 
 /**
  * Reject.
  */
 public class Reject extends AbstractRejectTest {
-    ////@Test
-    public void reject()
-            throws IOException, InterruptedException {
-        String q = channel.queueDeclare("", false, true,
-                false, null).getQueue();
 
+    @Test
+    public void reject()
+        throws IOException, InterruptedException {
+        String exchange = generateExchangeName();
+        String queue = generateQueueName();
+        String routingKey = "key-1";
+        declareExchangeAndQueueToBind(queue, exchange, routingKey);
         byte[] m1 = "1".getBytes();
         byte[] m2 = "2".getBytes();
+        basicPublishPersistent(m1, exchange, routingKey);
+        basicPublishPersistent(m2, exchange, routingKey);
 
-        basicPublishVolatile(m1, q);
-        basicPublishVolatile(m2, q);
-
-        long tag1 = checkDelivery(channel.basicGet(q, false), m1, false);
-        long tag2 = checkDelivery(channel.basicGet(q, false), m2, false);
+        long tag1 = checkDelivery(channel.basicGet(queue, false), m1, false);
+        long tag2 = checkDelivery(channel.basicGet(queue, false), m2, false);
         QueueingConsumer c = new QueueingConsumer(secondaryChannel);
-        String consumerTag = secondaryChannel.basicConsume(q, false, c);
+        String consumerTag = secondaryChannel.basicConsume(queue, false, c);
         channel.basicReject(tag2, true);
         long tag3 = checkDelivery(c.nextDelivery(), m2, true);
         secondaryChannel.basicCancel(consumerTag);
         secondaryChannel.basicReject(tag3, false);
-        assertNull(channel.basicGet(q, false));
+        assertNull(channel.basicGet(queue, false));
         channel.basicAck(tag1, false);
         channel.basicReject(tag3, false);
         expectError(AMQP.PRECONDITION_FAILED);

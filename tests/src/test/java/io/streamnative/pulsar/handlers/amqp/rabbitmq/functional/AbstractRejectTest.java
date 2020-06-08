@@ -13,34 +13,41 @@
  */
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.AssertJUnit.assertTrue;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.GetResponse;
 import com.rabbitmq.client.test.BrokerTestCase;
 import com.rabbitmq.client.test.QueueingConsumer;
 import java.util.Arrays;
+import org.junit.After;
+import org.junit.Before;
+
+
+
 /**
  * Testcase.
  */
-abstract class AbstractRejectTest extends BrokerTestCase {
+
+public abstract class AbstractRejectTest extends BrokerTestCase {
 
     protected Channel secondaryChannel;
 
     @Override
+    @Before
     public void setUp()
-            throws Exception {
+        throws Exception {
         super.setUp();
         secondaryChannel = connection.createChannel();
 
     }
 
     @Override
+    @After
     public void cleanup()
-            throws Exception {
+        throws Exception {
         if (secondaryChannel != null) {
             secondaryChannel.abort();
             secondaryChannel = null;
@@ -49,7 +56,7 @@ abstract class AbstractRejectTest extends BrokerTestCase {
     }
 
     protected long checkDelivery(QueueingConsumer.Delivery d,
-                                 byte[] msg, boolean redelivered) {
+        byte[] msg, boolean redelivered) {
         assertNotNull(d);
         return checkDelivery(d.getEnvelope(), d.getBody(), msg, redelivered);
     }
@@ -60,7 +67,7 @@ abstract class AbstractRejectTest extends BrokerTestCase {
     }
 
     protected long checkDelivery(Envelope e, byte[] m,
-                                 byte[] msg, boolean redelivered) {
+        byte[] msg, boolean redelivered) {
         assertNotNull(e);
         assertTrue(Arrays.equals(m, msg));
         assertEquals(e.isRedeliver(), redelivered);

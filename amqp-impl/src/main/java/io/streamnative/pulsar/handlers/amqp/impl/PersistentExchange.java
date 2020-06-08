@@ -12,15 +12,11 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
-
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
-import io.streamnative.pulsar.handlers.amqp.AmqpTopicCursorManager;
-import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
@@ -29,7 +25,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
@@ -45,6 +40,9 @@ import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
+import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
+
+
 
 /**
  * Persistent Exchange.
@@ -57,14 +55,19 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
-    private AmqpTopicCursorManager cursorManager;
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
-
+    private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
         updateExchangeProperties();
+        cursors = new ConcurrentOpenHashMap<>(16, 1);
+        for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {
+            cursors.put(cursor.getName(), cursor);
+            log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());
+            cursor.setInactive();
+        }
     }
 
     @Override
@@ -83,7 +86,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
         CompletableFuture<Entry> future = new CompletableFuture();
         // TODO Temporarily put the creation operation here, and later put the operation in router
-        ManagedCursor cursor = getTopicCursorManager().getOrCreateCursor(queueName);
+        ManagedCursor cursor = cursors.get(queueName);
         if (cursor == null) {
             future.completeExceptionally(new ManagedLedgerException("cursor is null"));
             return future;
@@ -113,7 +116,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public CompletableFuture<Void> markDeleteAsync(String queueName, Position position) {
         CompletableFuture<Void> future = new CompletableFuture();
-        ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
+        ManagedCursor cursor = cursors.get(queueName);
         if (cursor == null) {
             future.complete(null);
             return future;
@@ -144,7 +147,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
         CompletableFuture<Position> future = new CompletableFuture();
-        ManagedCursor cursor = getTopicCursorManager().getCursor(queueName);
+        ManagedCursor cursor = cursors.get(queueName);
         if (cursor == null) {
             future.complete(null);
             return future;
@@ -153,31 +156,20 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return future;
     }
 
-    public AmqpTopicCursorManager getTopicCursorManager() {
-        if (cursorManager == null) {
-            try {
-                cursorManager =
-                        AmqpTopicManager.getTopicCursorManager(persistentTopic.getBrokerService().getPulsar(),
-                                persistentTopic.getName()).get();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
-        }
-        return cursorManager;
-    }
 
     @Override
     public void addQueue(AmqpQueue queue) {
         queues.add(queue);
         updateExchangeProperties();
+        createCursorIfNotExists(queue.getName());
+
     }
 
     @Override
     public void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
         updateExchangeProperties();
+        deleteCursor(queue.getName());
     }
 
     @Override
@@ -204,6 +196,48 @@ public class PersistentExchange extends AbstractAmqpExchange {
             queueNames.add(queue.getName());
         }
         return queueNames;
+    }
+
+    private ManagedCursor createCursorIfNotExists(String name) {
+        return cursors.computeIfAbsent(name, cusrsor -> {
+            ManagedLedgerImpl ledger = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
+            if (log.isDebugEnabled()) {
+                log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());
+            }
+            ManagedCursor newCursor;
+            try {
+                //newCursor = ledger.openCursor(name, PulsarApi.CommandSubscribe.InitialPosition.Latest);
+                newCursor = ledger.newNonDurableCursor(ledger.getLastConfirmedEntry(), name);
+            } catch (ManagedLedgerException e) {
+                log.error("Error new cursor for topic {} - {}. will cause fetch data error.",
+                    persistentTopic.getName(), e);
+                return null;
+            }
+            return newCursor;
+        });
+    }
+
+    public void deleteCursor(String name) {
+        ManagedCursor cursor = cursors.remove(name);
+        if (cursor != null) {
+            persistentTopic.getManagedLedger().asyncDeleteCursor(cursor.getName(),
+                new AsyncCallbacks.DeleteCursorCallback() {
+                @Override
+                public void deleteCursorComplete(Object ctx) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Cursor {} for topic {} deleted successfully .",
+                            cursor.getName(), persistentTopic.getName());
+                    }
+                }
+
+                @Override
+                public void deleteCursorFailed(ManagedLedgerException exception, Object ctx) {
+                    log.error("[{}] Error deleting cursor {} for topic {} for reason: {}.",
+                        cursor.getName(), persistentTopic.getName(), exception);
+                }
+            }, null);
+        }
+
     }
 
     public static String getExchangeTopicName(NamespaceName namespaceName, String exchangeName) {

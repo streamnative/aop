@@ -122,12 +122,15 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      * value of this represents the <b>last</b> tag sent out.
      */
     private volatile long deliveryTag = 0;
-    private AmqpFlowCreditManager creditManager;
+    private final AmqpFlowCreditManager creditManager;
+    private final AtomicBoolean blockedOnCredit = new AtomicBoolean(false);
+    public static final int DEFAULT_CONSUMER_PERMIT = 1000;
 
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
         this.connection = connection;
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
+        this.creditManager = new AmqpFlowCreditManager(0, 0);
     }
 
     @Override
@@ -447,38 +450,43 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         } else {
             amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), queue.toString());
         }
-        checkExclusiveQueue(amqpQueue);
-        AmqpExchange amqpExchange = ExchangeContainer.
-                getExchange(connection.getNamespaceName(), exchange.toString());
-        if (null == amqpExchange) {
-            closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
-        } else {
-            AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType(),
-                    connection.getPulsarService().getBrokerService().executor());
-            if (messageRouter == null) {
-                connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
-                return;
-            }
-
-            // in-memory integration
-            if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
-                amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
-                AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
-                connection.writeFrame(responseBody.generateFrame(channelId));
-                return;
-            }
-
-            try {
-                amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
-                MethodRegistry methodRegistry = connection.getMethodRegistry();
-                AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
-                connection.writeFrame(responseBody.generateFrame(channelId));
-            } catch (Exception e) {
-                log.warn("Failed to bind queue[{}] with exchange[{}].", queue, exchange, e);
-                connection.sendConnectionClose(INTERNAL_ERROR,
-                        "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
-            }
+        if (amqpQueue == null) {
+            closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
+            return;
         }
+        checkExclusiveQueue(amqpQueue);
+
+        AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchange.toString());
+        if (amqpExchange == null) {
+            closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
+            return;
+        }
+
+        AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType(), connection.getPulsarService().getBrokerService().executor());
+        if (messageRouter == null) {
+            connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
+            return;
+        }
+
+        // in-memory integration
+        if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {
+            amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
+            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueBindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+            return;
+        }
+
+        try {
+            amqpQueue.bindExchange(amqpExchange, messageRouter, AMQShortString.toString(bindingKey), arguments);
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        } catch (Exception e) {
+            log.warn("Failed to bind queue[{}] with exchange[{}].", queue, exchange, e);
+            connection.sendConnectionClose(INTERNAL_ERROR,
+                "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
+        }
+
     }
 
     @Override
@@ -543,10 +551,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
     }
 
-    @Override
-    public void receiveBasicRecover(boolean requeue, boolean sync) {
 
-    }
 
     @Override
     public void receiveBasicQos(long prefetchSize, int prefetchCount, boolean global) {
@@ -554,9 +559,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] BasicQos[prefetchSize: {} prefetchCount: {} global: {}]",
                 channelId, prefetchSize, prefetchCount, global);
         }
-
-        setCredit(prefetchSize, prefetchCount);
-
+        if (prefetchSize > 0) {
+            closeChannel(ErrorCodes.NOT_IMPLEMENTED, "prefetchSize not supported ");
+        }
+        creditManager.setCreditLimits(0, prefetchCount);
+        if (creditManager.hasCredit() && isBlockedOnCredit()) {
+            unBlockedOnCredit();
+        }
         MethodRegistry methodRegistry = connection.getMethodRegistry();
         AMQMethodBody responseBody = methodRegistry.createBasicQosOkBody();
         connection.writeFrame(responseBody.generateFrame(getChannelId()));
@@ -667,7 +676,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 false, PulsarApi.CommandSubscribe.InitialPosition.Latest,
                 null, this, consumerTag, queueName, ack);
             subscription.addConsumer(consumer);
-            consumer.handleFlow(1000);
+            consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
             tag2ConsumersMap.put(consumerTag, consumer);
         } catch (Exception e) {
             throw e;
@@ -749,7 +758,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     PulsarApi.CommandSubscribe.InitialPosition.Latest, null, this,
                     "", queueName, noAck);
                 subscription.addConsumer(consumer);
-                consumer.handleFlow(1000);
+                consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
                 return consumer;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -889,11 +898,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
             amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
+            if (amqpExchange == null) {
+                log.error("publish message error amqpExchange is null.");
+                return;
+            }
             connection.getPulsarService().getOrderedExecutor().executeOrdered(amqpExchange, SafeRunnable.safeRun(() -> {
-                if (amqpExchange == null) {
-                    log.error("publish message error amqpExchange is null.");
-                    return;
-                }
                 CompletableFuture<Position> position = amqpExchange.writeMessageAsync(message, routingKey);
                 position.whenComplete((position1, throwable) -> {
                     if (throwable == null) {
@@ -964,26 +973,55 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicNack(long deliveryTag, boolean multiple, boolean requeue) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[ {} ] BasicNAck[deliveryTag: {} multiple: {} requeue: {}]",
-                    channelId, deliveryTag, multiple, requeue);
+                channelId, deliveryTag, multiple, requeue);
         }
         messageNAck(deliveryTag, multiple, requeue);
     }
 
     public void messageNAck(long deliveryTag, boolean multiple, boolean requeue) {
         Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
-                unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
-        if (!ackedMessages.isEmpty() && requeue) {
-            Map<AmqpConsumer, List<PositionImpl>> positionMap = new HashMap<>();
-            ackedMessages.stream().forEach(association -> {
-                AmqpConsumer consumer = association.getConsumer();
-                List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
-                        list -> new ArrayList<>());
-                positions.add((PositionImpl) association.getPosition());
-            });
-            positionMap.entrySet().stream().forEach(entry -> {
-                entry.getKey().redeliverAmqpMessages(entry.getValue());
-            });
+            unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
+        if (!ackedMessages.isEmpty()) {
+            if (requeue) {
+                requeue(ackedMessages);
+            }
+        } else {
+            closeChannel(ErrorCodes.IN_USE, "deliveryTag not found");
         }
+        if (creditManager.hasCredit() && isBlockedOnCredit()) {
+            unBlockedOnCredit();
+        }
+    }
+
+    @Override
+    public void receiveBasicRecover(boolean requeue, boolean sync) {
+        Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
+            unacknowledgedMessageMap.acknowledgeAll();
+        if (!ackedMessages.isEmpty()) {
+            requeue(ackedMessages);
+        }
+        if (creditManager.hasCredit() && isBlockedOnCredit()) {
+            unBlockedOnCredit();
+        }
+        if (sync) {
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            AMQMethodBody recoverOk = methodRegistry.createBasicRecoverSyncOkBody();
+            sync();
+            connection.writeFrame(recoverOk.generateFrame(getChannelId()));
+        }
+    }
+
+    private void requeue(Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> messages) {
+        Map<AmqpConsumer, List<PositionImpl>> positionMap = new HashMap<>();
+        messages.stream().forEach(association -> {
+            AmqpConsumer consumer = association.getConsumer();
+            List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
+                list -> new ArrayList<>());
+            positions.add((PositionImpl) association.getPosition());
+        });
+        positionMap.entrySet().stream().forEach(entry -> {
+            entry.getKey().redeliverAmqpMessages(entry.getValue());
+        });
     }
 
     @Override
@@ -996,18 +1034,23 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     public void messageAck(long deliveryTag, boolean multiple) {
         Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
-                unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
+            unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
             ackedMessages.stream().forEach(entry -> {
                 entry.getConsumer().messagesAck(entry.getPosition());
             });
+        } else {
+            closeChannel(ErrorCodes.IN_USE, "deliveryTag not found");
+        }
+        if (creditManager.hasCredit() && isBlockedOnCredit()) {
+            unBlockedOnCredit();
         }
 
     }
 
     @Override
     public void receiveBasicReject(long deliveryTag, boolean requeue) {
-
+        messageNAck(deliveryTag, false, requeue);
     }
 
     @Override
@@ -1103,8 +1146,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         Consumer consumer = tag2ConsumersMap.remove(consumerTag);
         if (consumer != null) {
-            consumer.getSubscription().doUnsubscribe(consumer);
-            return true;
+            try {
+                consumer.close();
+                return true;
+            } catch (BrokerServiceException e) {
+                log.error(e.getMessage());
+            }
+
         } else {
             log.warn("Attempt to unsubscribe consumer with tag  {} which is not registered.", consumerTag);
         }
@@ -1120,23 +1168,22 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             }
         }
         try {
-            tag2ConsumersMap.entrySet().stream().forEach(entry -> {
-                Consumer consumer = entry.getValue();
+            tag2ConsumersMap.forEach((key, value) -> {
                 try {
-                    consumer.close();
+                    value.close();
                 } catch (BrokerServiceException e) {
                     log.error(e.getMessage());
                 }
 
             });
             tag2ConsumersMap.clear();
-            fetchConsumerMap.entrySet().stream().forEach(entry -> {
-                Consumer consumer = entry.getValue();
+            fetchConsumerMap.forEach((key, value) -> {
                 try {
-                    consumer.close();
+                    value.close();
                 } catch (BrokerServiceException e) {
                     log.error(e.getMessage());
                 }
+
             });
             fetchConsumerMap.clear();
         } catch (Exception e) {
@@ -1153,11 +1200,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return defaultQueue;
     }
 
-    private void checkExclusiveQueue(AmqpQueue amqpQueue){
+    private void checkExclusiveQueue(AmqpQueue amqpQueue) {
         if (amqpQueue != null && amqpQueue.isExclusive()
-                && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
+            && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
             closeChannel(ErrorCodes.ALREADY_EXISTS,
-                    "Exclusive queue can not be used form other connection, queueName: '" + amqpQueue.getName() + "'");
+                "Exclusive queue can not be used form other connection, queueName: '" + amqpQueue.getName() + "'");
         }
     }
 
@@ -1167,30 +1214,31 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     public void restoreCredit(final int count, final long size) {
-        if (creditManager == null) {
-            return;
-        }
         creditManager.restoreCredit(count, size);
     }
 
-    public void useCreditForMessage(final long msgSize) {
-        if (creditManager == null) {
-            return;
-        }
-        creditManager.useCreditForMessage(msgSize);
+    public boolean setBlockedOnCredit() {
+        return this.blockedOnCredit.compareAndSet(false, true);
     }
 
-    private void setCredit(final long prefetchSize, final int prefetchCount) {
-        if (creditManager == null) {
-            creditManager = new AmqpFlowCreditManager(0, 0);
-        }
-        creditManager.setCreditLimits(prefetchSize, prefetchCount);
+    public boolean isBlockedOnCredit() {
+        log.info("isBlockedOnCredit {}", blockedOnCredit.get());
+        return this.blockedOnCredit.get();
     }
 
-    public boolean hasCredit() {
-        if (creditManager == null) {
-            return true;
+    public void unBlockedOnCredit() {
+        if (this.blockedOnCredit.compareAndSet(true, false)) {
+            notifyAllConsumers();
         }
-        return creditManager.hasCredit();
+    }
+
+    private void notifyAllConsumers() {
+        tag2ConsumersMap.values().stream().forEach(consumer -> {
+            ((AmqpConsumer) consumer).handleFlow(1);
+        });
+    }
+
+    public AmqpFlowCreditManager getCreditManager() {
+        return creditManager;
     }
 }

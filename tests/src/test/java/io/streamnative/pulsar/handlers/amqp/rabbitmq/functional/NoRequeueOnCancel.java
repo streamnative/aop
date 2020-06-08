@@ -28,6 +28,9 @@ import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.Test;
+
+
 
 /**
  * NoRequeueOnCancel.
@@ -43,24 +46,28 @@ public class NoRequeueOnCancel extends BrokerTestCase {
         channel.queueDelete(queue);
     }
 
-    //@Test
+    @Test
     public void noRequeueOnCancel()
-            throws IOException, InterruptedException {
-        channel.basicPublish("", queue, null, "1".getBytes());
-
+        throws IOException, InterruptedException {
+        String exchange = generateExchangeName();
+        String queue = generateQueueName();
+        String routingKey = "key-1";
+        declareExchangeAndQueueToBind(queue, exchange, routingKey);
+        byte[] m1 = "1".getBytes();
+        basicPublishPersistent(m1, exchange, routingKey);
         final CountDownLatch latch = new CountDownLatch(1);
         Consumer c = new DefaultConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope,
-                                       AMQP.BasicProperties properties, byte[] body)
-                    throws IOException {
+                AMQP.BasicProperties properties, byte[] body)
+                throws IOException {
                 latch.countDown();
             }
         };
         String consumerTag = channel.basicConsume(queue, false, c);
         assertTrue(latch.await(5, TimeUnit.SECONDS));
 
-        channel.basicCancel(consumerTag);
+        //channel.basicCancel(consumerTag);
 
         assertNull(channel.basicGet(queue, true));
 

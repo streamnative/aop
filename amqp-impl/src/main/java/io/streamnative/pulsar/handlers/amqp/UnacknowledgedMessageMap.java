@@ -17,7 +17,9 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Position;
 
@@ -73,12 +75,19 @@ public class UnacknowledgedMessageMap {
             remove(acks.keySet());
             return acks.values();
         } else {
-            MessageConsumerAssociation association = map.remove(deliveryTag);
+            MessageConsumerAssociation association = remove(deliveryTag);
             if (association != null) {
                 return Collections.singleton(association);
             }
         }
         return Collections.emptySet();
+    }
+
+    public Collection<MessageConsumerAssociation> acknowledgeAll() {
+        Set<MessageConsumerAssociation> associations = new HashSet<>();
+        associations.addAll(map.values());
+        remove(map.keySet());
+        return associations;
     }
 
     public void add(long deliveryTag, Position position, AmqpConsumer consumer, int size) {
@@ -94,6 +103,14 @@ public class UnacknowledgedMessageMap {
                 channel.restoreCredit(1, entry.getSize());
             }
         });
+    }
+
+    public MessageConsumerAssociation remove(long deliveryTag) {
+        MessageConsumerAssociation entry = map.remove(deliveryTag);
+        if (entry != null) {
+            channel.restoreCredit(1, entry.getSize());
+        }
+        return entry;
     }
 
     public int size() {

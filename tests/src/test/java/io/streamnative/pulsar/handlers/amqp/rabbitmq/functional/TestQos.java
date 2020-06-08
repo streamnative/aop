@@ -13,12 +13,12 @@
  */
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
-
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.GetResponse;
@@ -33,7 +33,10 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+
+
 
 /**
  * QosTests.
@@ -41,31 +44,30 @@ import java.util.concurrent.TimeoutException;
 public class TestQos extends BrokerTestCase {
 
     public void setUp()
-            throws IOException, TimeoutException {
+        throws IOException, TimeoutException {
         openConnection();
         openChannel();
     }
 
     public void tearDown()
-            throws IOException {
+        throws IOException {
         closeChannel();
         closeConnection();
     }
 
     public void fill(int n)
-            throws IOException {
+        throws IOException {
         for (int i = 0; i < n; i++) {
             channel.basicPublish("amq.fanout", "", null,
-                    Integer.toString(i).getBytes());
+                Integer.toString(i).getBytes());
         }
     }
 
     /**
      * receive n messages - check that we receive no fewer and cannot receive more.
-     *
      **/
     public static List<Delivery> drain(QueueingConsumer c, int n)
-            throws IOException {
+        throws IOException {
         List<Delivery> res = new LinkedList<Delivery>();
         try {
             long start = System.currentTimeMillis();
@@ -85,7 +87,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void messageLimitPrefetchSizeFails()
-            throws IOException {
+        throws IOException {
         try {
             channel.basicQos(1000, 0, false);
             fail("basic.qos{pretfetch_size=NonZero} should not be supported");
@@ -96,7 +98,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void messageLimitUnlimited()
-            throws IOException {
+        throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         configure(c, 0, 1, 2);
         drain(c, 2);
@@ -104,23 +106,25 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void noAckNoAlterLimit()
-            throws IOException {
+        throws IOException, InterruptedException {
         QueueingConsumer c = new QueueingConsumer(channel);
         declareBindConsume(channel, c, true);
         channel.basicQos(1, true);
         fill(2);
+        Thread.sleep(200);
         drain(c, 2);
     }
 
     //@Test
     public void noAckObeysLimit()
-            throws IOException {
+        throws IOException, InterruptedException {
         channel.basicQos(1, true);
         QueueingConsumer c1 = new QueueingConsumer(channel);
         declareBindConsume(channel, c1, false);
         fill(1);
         QueueingConsumer c2 = new QueueingConsumer(channel);
-        declareBindConsume(channel, c2, true);
+        //true or false
+        declareBindConsume(channel, c2, false);
         fill(1);
         try {
             Delivery d = c2.nextDelivery(1000);
@@ -137,7 +141,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void permutations()
-            throws IOException {
+        throws IOException {
         closeChannel();
         for (int limit : Arrays.asList(1, 2)) {
             for (boolean multiAck : Arrays.asList(false, true)) {
@@ -154,13 +158,13 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void fairness()
-            throws IOException {
+        throws IOException, InterruptedException {
         QueueingConsumer c = new QueueingConsumer(channel);
-        final int queueCount = 3;
+        final int queueCount = 1;
         final int messageCount = 100;
         List<String> queues = configure(c, 1, queueCount, messageCount);
 
-        for (int i = 0; i < messageCount - 1; i++) {
+        for (int i = 0; i < messageCount; i++) {
             List<Delivery> d = drain(c, 1);
             ack(d, false);
         }
@@ -183,28 +187,29 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void singleChannelAndQueueFairness()
-            throws IOException {
+        throws IOException {
         //check that when we have multiple consumers on the same
         //channel & queue, and a prefetch limit set, that all
         //consumers get a fair share of the messages.
 
         channel.basicQos(1, true);
-        String q = channel.queueDeclare().getQueue();
+        String q = channel.queueDeclare(UUID.randomUUID().toString(), true, false,
+            false, null).getQueue();
         channel.queueBind(q, "amq.fanout", "");
 
         final Map<String, Integer> counts =
-                Collections.synchronizedMap(new HashMap<String, Integer>());
+            Collections.synchronizedMap(new HashMap<String, Integer>());
 
         QueueingConsumer c = new QueueingConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag,
-                                       Envelope envelope,
-                                       AMQP.BasicProperties properties,
-                                       byte[] body)
-                    throws IOException {
+                Envelope envelope,
+                AMQP.BasicProperties properties,
+                byte[] body)
+                throws IOException {
                 counts.put(consumerTag, counts.get(consumerTag) + 1);
                 super.handleDelivery(consumerTag, envelope,
-                        properties, body);
+                    properties, body);
             }
         };
 
@@ -233,11 +238,11 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void consumerLifecycle()
-            throws IOException {
+        throws IOException, InterruptedException {
         channel.basicQos(1, true);
         QueueingConsumer c = new QueueingConsumer(channel);
-        String queue = "qosTest";
-        channel.queueDeclare(queue, false, false, false, null);
+        String queue = generateQueueName();
+        channel.queueDeclare(queue, true, false, false, null);
         channel.queueBind(queue, "amq.fanout", "");
         fill(3);
         String tag;
@@ -254,7 +259,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void setLimitAfterConsume()
-            throws IOException {
+        throws IOException, InterruptedException {
         QueueingConsumer c = new QueueingConsumer(channel);
         declareBindConsume(c);
         channel.basicQos(1, true);
@@ -262,6 +267,7 @@ public class TestQos extends BrokerTestCase {
         //We actually only guarantee that the limit takes effect
         //*eventually*, so this can in fact fail. It's pretty unlikely
         //though.
+        Thread.sleep(200);
         List<Delivery> d = drain(c, 1);
         ack(d, true);
         drain(c, 1);
@@ -269,7 +275,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void limitIncrease()
-            throws IOException {
+        throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         configure(c, 1, 3);
         channel.basicQos(2, true);
@@ -278,7 +284,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void limitDecrease()
-            throws IOException {
+        throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         List<Delivery> d = configure(c, 2, 4);
         channel.basicQos(1, true);
@@ -289,7 +295,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void limitedToUnlimited()
-            throws IOException {
+        throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         configure(c, 1, 3);
         channel.basicQos(0, true);
@@ -298,7 +304,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void limitingMultipleChannels()
-            throws IOException {
+        throws IOException {
         Channel ch1 = connection.createChannel();
         Channel ch2 = connection.createChannel();
         QueueingConsumer c1 = new QueueingConsumer(ch1);
@@ -322,7 +328,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void limitInheritsUnackedCount()
-            throws IOException {
+        throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         declareBindConsume(c);
         fill(1);
@@ -344,10 +350,10 @@ public class TestQos extends BrokerTestCase {
     }
 
     protected void runLimitTests(int limit,
-                                 boolean multiAck,
-                                 boolean txMode,
-                                 int queueCount)
-            throws IOException {
+        boolean multiAck,
+        boolean txMode,
+        int queueCount)
+        throws IOException {
 
         QueueingConsumer c = new QueueingConsumer(channel);
 
@@ -355,7 +361,7 @@ public class TestQos extends BrokerTestCase {
         // basic.get per queue, and need one message to spare
         //-> 2*limit + 1*queueCount + 1
         List<String> queues = configure(c, limit, queueCount,
-                2 * limit + 1 * queueCount + 1);
+            2 * limit + 1 * queueCount + 1);
 
         if (txMode) {
             channel.txSelect();
@@ -395,7 +401,7 @@ public class TestQos extends BrokerTestCase {
     }
 
     protected Delivery ack(List<Delivery> d, boolean multiAck)
-            throws IOException {
+        throws IOException {
         Delivery last = null;
 
         for (Delivery tmp : d) {
@@ -412,10 +418,10 @@ public class TestQos extends BrokerTestCase {
     }
 
     protected List<String> configure(QueueingConsumer c,
-                                     int limit,
-                                     int queueCount,
-                                     int messages)
-            throws IOException {
+        int limit,
+        int queueCount,
+        int messages)
+        throws IOException {
         channel.basicQos(limit, true);
 
         //declare/bind/consume-from queues
@@ -431,9 +437,9 @@ public class TestQos extends BrokerTestCase {
     }
 
     protected List<Delivery> configure(QueueingConsumer c,
-                                       int limit,
-                                       int messages)
-            throws IOException {
+        int limit,
+        int messages)
+        throws IOException {
         channel.basicQos(limit, true);
         declareBindConsume(c);
         fill(messages);
@@ -441,33 +447,35 @@ public class TestQos extends BrokerTestCase {
     }
 
     protected String declareBindConsume(QueueingConsumer c)
-            throws IOException {
+        throws IOException {
         return declareBindConsume(channel, c, false);
     }
 
     protected String declareBindConsume(Channel ch,
-                                        QueueingConsumer c,
-                                        boolean noAck)
-            throws IOException {
+        QueueingConsumer c,
+        boolean noAck)
+        throws IOException {
         String queue = declareBind(ch);
         ch.basicConsume(queue, noAck, c);
         return queue;
     }
 
     protected String declareBind(Channel ch) throws IOException {
-        AMQP.Queue.DeclareOk ok = ch.queueDeclare();
-        String queue = ok.getQueue();
-        ch.queueBind(queue, "amq.fanout", "");
+        String queue = generateQueueName();
+        String exchangeName = "amq.fanout";
+        ch.queueDeclare(queue, true, false, false, null).getQueue();
+        ch.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+        ch.queueBind(queue, exchangeName, "");
         return queue;
     }
 
     protected void ackDelivery(Delivery d, boolean multiple)
-            throws IOException {
+        throws IOException {
         ackDelivery(channel, d, multiple);
     }
 
     protected void ackDelivery(Channel ch, Delivery d, boolean multiple)
-            throws IOException {
+        throws IOException {
         ch.basicAck(d.getEnvelope().getDeliveryTag(), multiple);
     }
 

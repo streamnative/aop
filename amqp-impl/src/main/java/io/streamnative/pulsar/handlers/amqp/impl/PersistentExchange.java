@@ -12,19 +12,25 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
+
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReader;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
@@ -36,13 +42,14 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.impl.MessageImpl;
+import org.apache.pulsar.common.api.proto.PulsarApi;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.common.util.ObjectMapperFactory;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
-
-
 
 /**
  * Persistent Exchange.
@@ -57,6 +64,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private PersistentTopic persistentTopic;
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
     private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
+    private AmqpExchangeReader messageDuplicator;
+
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
@@ -67,6 +76,33 @@ public class PersistentExchange extends AbstractAmqpExchange {
             cursors.put(cursor.getName(), cursor);
             log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());
             cursor.setInactive();
+        }
+
+        if (messageDuplicator == null) {
+            messageDuplicator = new AmqpExchangeReader(this) {
+                @Override
+                public CompletableFuture<Void> readProcess(Entry entry) {
+                    Map<String, Object> props;
+                    try {
+                        MessageImpl<byte[]> message = MessageImpl.deserialize(entry.getDataBuffer());
+                        props = message.getMessageBuilder().getPropertiesList().stream()
+                                .collect(Collectors.toMap(PulsarApi.KeyValue::getKey, PulsarApi.KeyValue::getValue));
+                    } catch (IOException e) {
+                        log.error("Deserialize entry dataBuffer failed. exchangeName: {}", exchangeName, e);
+                        return FutureUtil.failedFuture(e);
+                    }
+                    List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
+                    for (AmqpQueue queue : queues) {
+                        CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
+                                entry.getLedgerId(), entry.getEntryId(),
+                                props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                                props);
+                        routeFutureList.add(routeFuture);
+                    }
+                    return FutureUtil.waitForAll(routeFutureList);
+                }
+            };
+            messageDuplicator.startReader();
         }
     }
 

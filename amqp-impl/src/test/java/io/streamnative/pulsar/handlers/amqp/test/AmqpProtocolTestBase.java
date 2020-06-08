@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.util.concurrent.DefaultEventExecutor;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
@@ -110,6 +111,9 @@ public abstract class AmqpProtocolTestBase {
     }
 
     private void initMockAmqpTopicManager(){
+        BrokerService brokerService = Mockito.mock(BrokerService.class);
+        Mockito.when(brokerService.executor()).thenReturn(new DefaultEventExecutor());
+
         CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
         PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
 
@@ -121,6 +125,7 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(subscription.getDispatcher()).thenReturn(Mockito.mock(MockDispatcher.class));
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
         Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
+        Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
 
         completableFuture.complete(persistentTopic);
         NamespaceService namespaceService = Mockito.mock(NamespaceService.class);
@@ -142,7 +147,6 @@ public abstract class AmqpProtocolTestBase {
         CompletableFuture<Optional<Topic>> topicCompletableFuture = new CompletableFuture<>();
         topicCompletableFuture.complete(Optional.of(persistentTopic));
 
-        BrokerService brokerService = Mockito.mock(BrokerService.class);
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(brokerService);
         Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean())).
                 thenReturn(topicCompletableFuture);

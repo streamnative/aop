@@ -13,12 +13,14 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import io.netty.util.concurrent.DefaultEventExecutor;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
+import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.junit.Assert;
 import org.mockito.Mockito;
@@ -36,9 +38,13 @@ public class TopicNameTest {
         AbstractAmqpExchange.Type exchangeType = AbstractAmqpExchange.Type.Direct;
         ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
 
+        BrokerService brokerService = Mockito.mock(BrokerService.class);
+        Mockito.when(brokerService.executor()).thenReturn(new DefaultEventExecutor());
+
         PersistentTopic exchangeTopic1 = Mockito.mock(PersistentTopic.class);
         Mockito.when(exchangeTopic1.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + exchangeName);
         Mockito.when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);
+        Mockito.when(exchangeTopic1.getBrokerService()).thenReturn(brokerService);
         Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
         try {
             new PersistentExchange(

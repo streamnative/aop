@@ -15,15 +15,14 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Fanout message router.
  */
 public class FanoutMessageRouter extends AbstractAmqpMessageRouter {
 
-    public FanoutMessageRouter(ScheduledExecutorService scheduledExecutorService) {
-        super(Type.Fanout, scheduledExecutorService);
+    public FanoutMessageRouter() {
+        super(Type.Fanout);
     }
 
     @Override

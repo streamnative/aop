@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -32,8 +31,8 @@ public class HeadersMessageRouter extends AbstractAmqpMessageRouter {
     private final Set<String> required = new HashSet<>();
     private final Map<String, Object> matches = new HashMap<>();
 
-    public HeadersMessageRouter(ScheduledExecutorService scheduledExecutorService) {
-        super(Type.Headers, scheduledExecutorService);
+    public HeadersMessageRouter() {
+        super(Type.Headers);
     }
 
     @Override

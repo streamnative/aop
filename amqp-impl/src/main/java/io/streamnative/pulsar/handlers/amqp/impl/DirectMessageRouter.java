@@ -16,15 +16,14 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Direct message router.
  */
 public class DirectMessageRouter extends AbstractAmqpMessageRouter {
 
-    public DirectMessageRouter(ScheduledExecutorService scheduledExecutorService) {
-        super(Type.Direct, scheduledExecutorService);
+    public DirectMessageRouter() {
+        super(Type.Direct);
     }
 
     @Override

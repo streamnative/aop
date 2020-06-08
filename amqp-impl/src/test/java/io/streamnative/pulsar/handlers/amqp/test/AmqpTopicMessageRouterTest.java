@@ -28,7 +28,7 @@ public class AmqpTopicMessageRouterTest {
         String bindingKey1 = "*.b.*";
         String bindingKey2 = "a.*.*";
         String bindingKey3 = "#.c";
-        TopicMessageRouter router = new TopicMessageRouter(null);
+        TopicMessageRouter router = new TopicMessageRouter();
         router.addBindingKey(bindingKey1);
         router.addBindingKey(bindingKey2);
         router.addBindingKey(bindingKey3);

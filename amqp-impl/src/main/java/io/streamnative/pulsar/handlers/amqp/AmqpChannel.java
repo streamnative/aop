@@ -462,7 +462,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             return;
         }
 
-        AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType(), connection.getPulsarService().getBrokerService().executor());
+        AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
         if (messageRouter == null) {
             connection.sendConnectionClose(INTERNAL_ERROR, "Unsupported router type!", channelId);
             return;

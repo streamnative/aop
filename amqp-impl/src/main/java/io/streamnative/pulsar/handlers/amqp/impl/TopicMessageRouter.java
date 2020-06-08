@@ -18,7 +18,6 @@ import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ScheduledExecutorService;
 import org.apache.qpid.server.exchange.topic.TopicMatcherResult;
 import org.apache.qpid.server.exchange.topic.TopicParser;
 
@@ -27,8 +26,8 @@ import org.apache.qpid.server.exchange.topic.TopicParser;
  */
 public class TopicMessageRouter extends AbstractAmqpMessageRouter {
 
-    public TopicMessageRouter(ScheduledExecutorService scheduledExecutorService) {
-        super(Type.Topic, scheduledExecutorService);
+    public TopicMessageRouter() {
+        super(Type.Topic);
     }
 
     /**

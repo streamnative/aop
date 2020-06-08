@@ -17,7 +17,6 @@ import static org.apache.curator.shaded.com.google.common.base.Preconditions.che
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
@@ -91,7 +90,6 @@ public class PersistentQueue extends AbstractAmqpQueue {
                              Map<String, Object> arguments) {
         super.bindExchange(exchange, router, bindingKey, arguments);
         updateQueueProperties();
-        ((AbstractAmqpMessageRouter) routers.get(exchange.getName())).startRouter();
     }
 
     @Override

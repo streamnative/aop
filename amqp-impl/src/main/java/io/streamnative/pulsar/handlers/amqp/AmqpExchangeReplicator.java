@@ -155,8 +155,8 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             if (HAVE_PENDING_READ_UPDATER.compareAndSet(this, FALSE, TRUE)) {
                 if (log.isDebugEnabled()) {
                     log.debug("{} Schedule read of {} messages.", name, availablePermits);
-                    cursor.asyncReadEntriesOrWait(availablePermits, defaultReadMaxSizeBytes, this, null);
                 }
+                cursor.asyncReadEntriesOrWait(availablePermits, defaultReadMaxSizeBytes, this, null);
             } else {
                 if (log.isDebugEnabled()) {
                     log.debug("{} Not schedule read due to pending read. Messages to read {}.",

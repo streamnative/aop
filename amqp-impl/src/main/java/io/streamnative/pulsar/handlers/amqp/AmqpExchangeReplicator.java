@@ -35,7 +35,8 @@ import org.apache.pulsar.common.api.proto.PulsarApi;
  * Amqp exchange replicator, read entries from BookKeeper and process entries.
  */
 @Slf4j
-public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntriesCallback, AsyncCallbacks.DeleteCallback {
+public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntriesCallback,
+        AsyncCallbacks.DeleteCallback {
 
     private PersistentExchange persistentExchange;
     private final String cursorNamePre = "__amqp_replicator__";
@@ -220,7 +221,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
 
     @Override
     public void readEntriesFailed(ManagedLedgerException exception, Object o) {
-        if(exception instanceof ManagedLedgerException.CursorAlreadyClosedException) {
+        if (exception instanceof ManagedLedgerException.CursorAlreadyClosedException) {
             log.error("[{}] Error reading entries because cursor is already closed.", name, exception);
             cursor.setInactive();
             cursor = null;

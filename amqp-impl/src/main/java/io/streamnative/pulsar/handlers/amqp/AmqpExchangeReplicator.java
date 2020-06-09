@@ -261,9 +261,9 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             return;
         }
 
-        cursor.setInactive();
         if (cursor != null && (STATE_UPDATER.compareAndSet(this, State.Starting, State.Stopping)
                 || STATE_UPDATER.compareAndSet(this, State.Started, State.Stopping))) {
+            cursor.setInactive();
             cursor.asyncClose(new AsyncCallbacks.CloseCallback() {
                 @Override
                 public void closeComplete(Object o) {

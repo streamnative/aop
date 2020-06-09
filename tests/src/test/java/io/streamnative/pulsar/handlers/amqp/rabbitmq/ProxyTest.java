@@ -74,3 +74,4 @@ public class ProxyTest extends RabbitMQTestBase {
     }
 
 }
+

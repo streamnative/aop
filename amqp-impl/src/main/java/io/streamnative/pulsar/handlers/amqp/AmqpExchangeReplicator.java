@@ -141,15 +141,20 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         cursor.rewind();
         cursor.cancelPendingReadRequest();
 
-        log.info("{} Replicator is started.", name);
         backOff.reset();
         // activate cursor: so, entries can be cached
         cursor.setActive();
+
+        STATE_UPDATER.set(this, State.Started);
+        log.info("{} Replicator is started.", name);
+
         readMoreEntries();
     }
 
     private void readMoreEntries() {
-        log.info("[readMoreEntries]");
+        if (log.isDebugEnabled()) {
+            log.debug("{} Read more entries.", name);
+        }
         int availablePermits = getAvailablePermits();
         if (availablePermits > 0) {
             if (HAVE_PENDING_READ_UPDATER.compareAndSet(this, FALSE, TRUE)) {
@@ -183,7 +188,9 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
 
     @Override
     public void readEntriesComplete(List<Entry> list, Object o) {
-        log.info("[readEntriesComplete] listSize: {}", list.size());
+        if (log.isDebugEnabled()) {
+            log.debug("{} Read entries complete. Entries size: {}", name, list.size());
+        }
         for (Entry entry : list) {
             try {
                 PENDING_SIZE_UPDATER.incrementAndGet(this);

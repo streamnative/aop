@@ -360,7 +360,9 @@ public abstract class AmqpProtocolHandlerTestBase {
         }
 
         @Override
-        public BookKeeper create(ServiceConfiguration serviceConfiguration, ZooKeeper zooKeeper, Optional<Class<? extends EnsemblePlacementPolicy>> optional, Map<String, Object> map, StatsLogger statsLogger) throws IOException {
+        public BookKeeper create(ServiceConfiguration serviceConfiguration, ZooKeeper zooKeeper,
+                                 Optional<Class<? extends EnsemblePlacementPolicy>> optional,
+                                 Map<String, Object> map, StatsLogger statsLogger) throws IOException {
             return mockBookKeeper;
         }
     };

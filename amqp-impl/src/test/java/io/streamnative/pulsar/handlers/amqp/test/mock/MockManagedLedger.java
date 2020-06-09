@@ -246,4 +246,9 @@ public class MockManagedLedger implements ManagedLedger {
     public void trimConsumedLedgersInBackground(CompletableFuture<?> completableFuture) {
 
     }
+
+    @Override
+    public void rollCurrentLedgerIfFull() {
+
+    }
 }

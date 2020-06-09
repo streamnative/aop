@@ -18,7 +18,7 @@ import static org.apache.curator.shaded.com.google.common.base.Preconditions.che
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
-import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReader;
+import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -64,7 +64,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private PersistentTopic persistentTopic;
     private ObjectMapper jsonMapper = ObjectMapperFactory.create();
     private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
-    private AmqpExchangeReader messageDuplicator;
+    private AmqpExchangeReplicator messageReplicator;
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
@@ -78,8 +78,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
             cursor.setInactive();
         }
 
-        if (messageDuplicator == null) {
-            messageDuplicator = new AmqpExchangeReader(this) {
+        if (messageReplicator == null) {
+            messageReplicator = new AmqpExchangeReplicator(this) {
                 @Override
                 public CompletableFuture<Void> readProcess(Entry entry) {
                     Map<String, Object> props;
@@ -102,7 +102,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                     return FutureUtil.waitForAll(routeFutureList);
                 }
             };
-            messageDuplicator.startReader();
+            messageReplicator.startReplicate();
         }
     }
 

@@ -12,12 +12,15 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp.test;
+
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
+
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +35,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.EnsemblePlacementPolicy;
 import org.apache.bookkeeper.client.PulsarMockBookKeeper;
+import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.pulsar.broker.BookKeeperClientFactory;
 import org.apache.pulsar.broker.PulsarService;
@@ -45,10 +49,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.MockZooKeeper;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
-
-
-
-
 
 /**
  * Unit test to test Aop handler.
@@ -231,6 +231,11 @@ public abstract class AopProtocolHandlerTestBase {
         @Override
         public void close() {
             // no-op
+        }
+
+        @Override
+        public BookKeeper create(ServiceConfiguration serviceConfiguration, ZooKeeper zooKeeper, Optional<Class<? extends EnsemblePlacementPolicy>> optional, Map<String, Object> map, StatsLogger statsLogger) throws IOException {
+            return mockBookKeeper;
         }
     };
 

@@ -96,5 +96,5 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
             required = false,
             doc = "Whether start amqp protocol handler with proxy"
     )
-    private boolean useProxy;
+    private boolean amqpProxyEnable = false;
 }

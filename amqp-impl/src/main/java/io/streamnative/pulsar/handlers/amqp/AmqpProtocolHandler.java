@@ -90,7 +90,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
         ConnectionContainer.init(brokerService.getPulsar());
 
-        if (amqpConfig.isUseProxy()) {
+        if (amqpConfig.isAmqpProxyEnable()) {
             ProxyConfiguration proxyConfig = new ProxyConfiguration();
             proxyConfig.setProxyPort(Optional.of(amqpConfig.getAmqpProxyPort()));
             proxyConfig.setBrokerServiceURL("pulsar://" + amqpConfig.getAdvertisedAddress() + ":"

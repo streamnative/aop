@@ -29,7 +29,7 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     @Category
     private static final String CATEGORY_AMQP = "AMQP on Pulsar";
     @Category
-    public static final String CATEGORY_AMQP_PROXY = "AMQP Proxy";
+    private static final String CATEGORY_AMQP_PROXY = "AMQP Proxy";
 
     //
     // --- AMQP on Pulsar Broker configuration ---

@@ -14,8 +14,8 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Direct message router.
@@ -27,12 +27,8 @@ public class DirectMessageRouter extends AbstractAmqpMessageRouter {
     }
 
     @Override
-    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
-                                                  Map<String, Object> properties) {
-        if (this.bindingKeys.contains(routingKey)) {
-            return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
-        } else {
-            return CompletableFuture.completedFuture(null);
-        }
+    public boolean isMatch(Map<String, Object> properties) {
+        return this.bindingKeys.contains(properties.get(MessageConvertUtils.PROP_ROUTING_KEY).toString());
     }
+
 }

@@ -50,11 +50,11 @@ import org.testng.annotations.Test;
 @Slf4j
 public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
-    @Test
+    @Test(timeOut = 1000 * 5)
     public void basic_consume_case() throws IOException, TimeoutException, InterruptedException {
-        String exchangeName = "test-exchange";
+        String exchangeName = randExName();
         String routingKey = "test.key";
-        String queueName = "test-queue";
+        String queueName = randQuName();
         @Cleanup
         Connection conn = getConnection("vhost1", false);
         @Cleanup
@@ -64,6 +64,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         channel.queueDeclare(queueName, true, false, false, null);
         channel.queueBind(queueName, exchangeName, routingKey);
 
+        CountDownLatch countDownLatch = new CountDownLatch(1);
         List<String> messages = new ArrayList<>();
         channel.basicConsume(queueName, false,
             new DefaultConsumer(channel) {
@@ -76,21 +77,22 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
                     messages.add(new String(body));
                     // (process the message components here ...)
                     channel.basicAck(deliveryTag, false);
+                    countDownLatch.countDown();
                 }
             });
 
         byte[] messageBodyBytes = "Hello, world!".getBytes();
         channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
 
-        TimeUnit.MILLISECONDS.sleep(200L);
+        countDownLatch.await();
         Assert.assertEquals(messages.get(0), "Hello, world!");
     }
 
-    @Test
+    @Test(timeOut = 1000 * 5)
     void basic_consume_nack_case() throws IOException, TimeoutException, InterruptedException {
-        String exchangeName = "test-exchange";
+        String exchangeName = randExName();
         String routingKey = "test.key";
-        String queueName = "test-queue";
+        String queueName = randQuName();
         AtomicInteger atomicInteger = new AtomicInteger();
         final Semaphore waitForAtLeastOneDelivery = new Semaphore(0);
         @Cleanup
@@ -134,12 +136,12 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertEquals(atomicInteger.get(), 0);
     }
 
-    @Test
+    @Test(timeOut = 1000 * 5)
     void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException,
         InterruptedException {
-        String exchangeName = "test-exchange";
+        String exchangeName = randExName();
         String routingKey = "test.key";
-        String queueName = "test-queue1";
+        String queueName = randQuName();
         @Cleanup
         Connection conn = getConnection("vhost1", false);
         CountDownLatch messagesToBeProcessed = new CountDownLatch(2);
@@ -177,9 +179,9 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
     }
 
-    @Test(timeOut = 1000 * 10)
+    @Test(timeOut = 1000 * 5)
     private void basicPublishTest() throws IOException, TimeoutException {
-        final String queueName = "testQueue";
+        final String queueName = randQuName();
         final String message = "Hello AOP!";
         final int messagesNum = 10;
 
@@ -217,12 +219,12 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         }
     }
 
-    @Test(timeOut = 1000 * 10)
+    @Test(timeOut = 1000 * 5)
     private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException {
         final String vhost = "vhost1";
-        final String exchangeName = "ex";
-        final String queueName1 = "ex-q1";
-        final String queueName2 = "ex-q2";
+        final String exchangeName = randExName();
+        final String queueName1 = randQuName();
+        final String queueName2 = randQuName();
 
         @Cleanup
         Connection connection = getConnection("vhost1", false);
@@ -286,13 +288,13 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertEquals(entryId, byteBuf2.readLong());
     }
 
-    @Test
+    @Test(timeOut = 1000 * 5)
     private void fanoutConsumeTest() throws IOException, TimeoutException, InterruptedException {
 
         final String vhost = "vhost1";
-        final String exchangeName = "ex1";
-        final String queueName1 = "ex1-q1";
-        final String queueName2 = "ex1-q2";
+        final String exchangeName = randExName();
+        final String queueName1 = randQuName();
+        final String queueName2 = randQuName();
 
         @Cleanup
         Connection connection = getConnection(vhost, false);
@@ -308,6 +310,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         String contentMsg = "Hello AOP!";
         channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
 
+        CountDownLatch countDownLatch = new CountDownLatch(2);
         final AtomicInteger count = new AtomicInteger(0);
 
         channel.basicConsume(queueName1, false, "myConsumerTag",
@@ -320,6 +323,7 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
                     String message = new String(body, "UTF-8");
                     System.out.println(" [x] Received Consumer '" + message + "'");
                     count.incrementAndGet();
+                    countDownLatch.countDown();
                 }
             });
 
@@ -333,10 +337,11 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
                     String message = new String(body, "UTF-8");
                     System.out.println(" [x] Received Consumer '" + message + "'");
                     count.incrementAndGet();
+                    countDownLatch.countDown();
                 }
             });
 
-        Thread.sleep(1000);
+        countDownLatch.await();
         Assert.assertTrue(count.get() == 2);
 
     }

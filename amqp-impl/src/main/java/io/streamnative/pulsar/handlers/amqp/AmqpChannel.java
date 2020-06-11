@@ -482,6 +482,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
         } catch (Exception e) {
+            log.warn("Failed to bind queue[{}] with exchange[{}].", queue, exchange, e);
             connection.sendConnectionClose(INTERNAL_ERROR,
                 "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
         }
@@ -1221,7 +1222,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     public boolean isBlockedOnCredit() {
-        log.info("isBlockedOnCredit {}", blockedOnCredit.get());
+        if (log.isDebugEnabled()) {
+            log.debug("isBlockedOnCredit {}", blockedOnCredit.get());
+        }
         return this.blockedOnCredit.get();
     }
 

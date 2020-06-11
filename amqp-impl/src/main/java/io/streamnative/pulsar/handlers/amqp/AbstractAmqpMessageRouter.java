@@ -20,10 +20,13 @@ import io.streamnative.pulsar.handlers.amqp.impl.TopicMessageRouter;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Base class for AMQP message router.
  */
+@Slf4j
 public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
 
     protected AmqpExchange exchange;
@@ -101,5 +104,22 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
                 return null;
         }
     }
+
+    @Override
+    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId,
+                                                  String routingKey, Map<String, Object> properties) {
+        CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
+        if (isMatch(properties)) {
+            try {
+                return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
+            } catch (Exception e) {
+                log.error("Failed to route message.", e);
+                completableFuture.completeExceptionally(e);
+            }
+        }
+        return completableFuture;
+    }
+
+    public abstract boolean isMatch(Map<String, Object> properties);
 
 }

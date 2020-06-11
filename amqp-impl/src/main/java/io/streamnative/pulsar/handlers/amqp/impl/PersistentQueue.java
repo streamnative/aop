@@ -33,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -95,6 +96,11 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public void unbindExchange(AmqpExchange exchange) {
         super.unbindExchange(exchange);
         updateQueueProperties();
+    }
+
+    @Override
+    public Topic getTopic() {
+        return indexTopic;
     }
 
     private void updateQueueProperties() {

@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.pulsar.broker.service.Topic;
 
 /**
  * Interface of the AMQP queue.
@@ -87,4 +88,6 @@ public interface AmqpQueue {
      * @return
      */
     boolean isAutoDelete();
+
+    Topic getTopic();
 }

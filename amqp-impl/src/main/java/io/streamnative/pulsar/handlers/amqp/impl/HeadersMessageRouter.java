@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -37,15 +36,6 @@ public class HeadersMessageRouter extends AbstractAmqpMessageRouter {
     }
 
     @Override
-    public CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
-                                                  Map<String, Object> properties) {
-        if (isMatch(properties)) {
-            return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
-        } else {
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-
     public boolean isMatch(Map<String, Object> headers) {
         initMappings();
         if (headers == null) {

@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.TopicName;
 
 /**
@@ -61,6 +62,8 @@ public class AmqpTopicManager {
                                 try {
                                     if (topicOptional.isPresent()) {
                                         Topic topic = topicOptional.get();
+                                        PersistentTopic persistentTopic = (PersistentTopic) topic;
+                                        persistentTopic.setDeleteWhileInactive(false);
                                         topicCompletableFuture.complete(topic);
                                     } else {
                                         log.error("Get empty topic for name {}", topicName);

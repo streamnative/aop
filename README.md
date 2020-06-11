@@ -74,7 +74,7 @@ maxNoOfChannels|64|the maximum number of channels which can exist concurrently o
 maxFrameSize|4MB|the maximum frame size on a connection.
 heartBeat|60s|the default heartbeat timeout on broker
 amqpProxyPort|5682|the amqp proxy service port
-useProxy|false|whether to start proxy service
+amqpProxyEnable|false|whether to start proxy service
 
 ### Config Pulsar broker to run AoP protocol handler as PluginF
 
@@ -344,7 +344,7 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     brokerServicePort=6651
     amqpListeners=amqp://127.0.0.1:5672
     
-    useProxy=true
+    amqpProxyEnable=true
     amqpProxyPort=5682
     ```
 

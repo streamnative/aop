@@ -1222,7 +1222,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     public boolean isBlockedOnCredit() {
-        log.info("isBlockedOnCredit {}", blockedOnCredit.get());
+        if (log.isDebugEnabled()) {
+            log.debug("isBlockedOnCredit {}", blockedOnCredit.get());
+        }
         return this.blockedOnCredit.get();
     }
 

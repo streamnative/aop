@@ -123,8 +123,15 @@ public class AmqpConsumer extends Consumer {
                 entryCompletableFuture.whenComplete((msg, ex) -> {
                     if (ex == null) {
                         long deliveryTag = channel.getNextDeliveryTag();
-                        try {
 
+                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
+                                (PositionImpl) msg.getPosition());
+                        if (!autoAck) {
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                    index.getPosition(), this, msg.getLength());
+                        }
+
+                        try {
                             connection.getAmqpOutputConverter().writeDeliver(MessageConvertUtils.entryToAmqpBody(msg),
                                 channel.getChannelId(), getRedeliveryTracker().contains(index.getPosition()),
                                 deliveryTag, AMQShortString.createAMQShortString(consumerTag));
@@ -132,13 +139,8 @@ public class AmqpConsumer extends Consumer {
                             log.error("sendMessages UnsupportedEncodingException", e.getMessage());
                         }
 
-                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                            (PositionImpl) msg.getPosition());
                         if (autoAck) {
                             messagesAck(index.getPosition());
-                        } else {
-                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
-                                index.getPosition(), this, msg.getLength());
                         }
                     } else {
                         messagesAck(index.getPosition());

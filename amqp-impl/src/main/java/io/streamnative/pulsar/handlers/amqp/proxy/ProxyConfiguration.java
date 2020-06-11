@@ -27,21 +27,4 @@ import org.apache.pulsar.common.configuration.FieldContext;
 @Setter
 public class ProxyConfiguration extends AmqpServiceConfiguration {
 
-    @Category
-    private static final String CATEGORY_SERVER = "Server";
-    @Category
-    private static final String CATEGORY_BROKER_DISCOVERY = "Broker Discovery";
-
-    @FieldContext(
-            category = CATEGORY_SERVER,
-            doc = "The port for serving binary protobuf request."
-    )
-    private Optional<Integer> proxyPort;
-
-    @FieldContext(
-            category = CATEGORY_BROKER_DISCOVERY,
-            doc = "The service url points to the broker cluster."
-    )
-    private String brokerServiceURL;
-
 }

@@ -66,15 +66,15 @@ mvn clean install -DskipTests
 
 ### Configuration
 
-config|default|desc
---|--|--
-amqpTenant|public|amqp on pulsar broker tenant
-amqpListeners|amqp://127.0.0.1:5672|amqp service port
-maxNoOfChannels|64|the maximum number of channels which can exist concurrently on a connection.
-maxFrameSize|4MB|the maximum frame size on a connection.
-heartBeat|60s|the default heartbeat timeout on broker
-amqpProxyPort|5682|the amqp proxy service port
-amqpProxyEnable|false|whether to start proxy service
+|Name|Description|Default|
+|---|---|---|
+amqpTenant|AMQP on pulsar broker tenant|public
+amqpListeners|AMQP service port|amqp://127.0.0.1:5672
+amqpMaxNoOfChannels|The maximum number of channels which can exist concurrently on a connection|64
+amqpMaxFrameSize|The maximum frame size on a connection|4194304 (4MB)
+amqpHeartBeat|The aop connection default heartbeat timeout|60 (s)
+amqpProxyPort|The AMQP proxy service port|5682
+amqpProxyEnable|Whether to start proxy service|false
 
 ### Config Pulsar broker to run AoP protocol handler as PluginF
 
@@ -241,9 +241,6 @@ currently this repo disabled fork, developer all work on this repo.
     ```
     # conf file: $PULSAR_HOME/conf/standalone.conf
     
-    # modify the default number of namespace bundles to 1
-    defaultNumberOfNamespaceBundles=1
-    
     # add amqp configs
     messagingProtocols=amqp
     protocolHandlerDirectory=./protocols
@@ -261,8 +258,8 @@ currently this repo disabled fork, developer all work on this repo.
 6. add namespace for vhost
 
     ```
-    # for example, the vhost name is `vhost`
-    bin/pulsar-admin namespaces create public/vhost1
+    # for example, the vhost name is `vhost1`
+    bin/pulsar-admin namespaces create -b 1 public/vhost1
     # set retention for the namespace
     bin/pulsar-admin namespaces set-retention -s 100M -t 2d public/vhost1
     ```
@@ -337,8 +334,6 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     broker config
 
     ```yaml
-    defaultNumberOfNamespaceBundles=1
-    
     messagingProtocols=amqp
     protocolHandlerDirectory=./protocols
     brokerServicePort=6651

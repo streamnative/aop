@@ -345,4 +345,12 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertTrue(count.get() == 2);
 
     }
+
+    @Test(timeOut = 1000 * 5)
+    private void defaultExchangeTest() {
+        final String exchangeName = randExName();
+        final String queueName1 = randQuName();
+        final String queueName2 = randQuName();
+    }
+
 }

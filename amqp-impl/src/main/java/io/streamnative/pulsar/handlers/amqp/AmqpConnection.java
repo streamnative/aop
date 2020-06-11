@@ -109,9 +109,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.methodRegistry = new MethodRegistry(this.protocolVersion);
         this.bufferSender = new AmqpByteBufferSenderImpl(this);
         this.amqpConfig = amqpConfig;
-        this.maxChannels = amqpConfig.getMaxNoOfChannels();
-        this.maxFrameSize = amqpConfig.getMaxFrameSize();
-        this.heartBeat = amqpConfig.getHeartBeat();
+        this.maxChannels = amqpConfig.getAmqpMaxNoOfChannels();
+        this.maxFrameSize = amqpConfig.getAmqpMaxFrameSize();
+        this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
     }
 

@@ -20,28 +20,31 @@ import static org.junit.Assert.fail;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
+import org.junit.Test;
+
 /**
  * Testcase.
  */
 public class DefaultExchange extends BrokerTestCase {
-    String queueName;
+    String queueName = "queue1";
 
     @Override
     protected void createResources() throws IOException {
-        queueName = channel.queueDeclare().getQueue();
+        channel.queueDeclare(queueName, true, false, false, null);
     }
 
     // See bug 22101: publish and declare are the only operations
     // permitted on the default exchange
 
-    //@Test
-    public void defaultExchangePublish() throws IOException {
+    @Test
+    public void defaultExchangePublish() throws Exception {
         basicPublishVolatile("", queueName); // Implicit binding
+        Thread.sleep(2000);
         assertDelivered(queueName, 1);
     }
 
-    //@Test
-    public void bindToDefaultExchange() throws IOException {
+    @Test
+    public void bindToDefaultExchange() {
         try {
             channel.queueBind(queueName, "", "foobar");
             fail();
@@ -50,8 +53,8 @@ public class DefaultExchange extends BrokerTestCase {
         }
     }
 
-    //@Test
-    public void unbindFromDefaultExchange() throws IOException {
+    @Test
+    public void unbindFromDefaultExchange() {
         try {
             channel.queueUnbind(queueName, "", queueName);
             fail();
@@ -60,8 +63,8 @@ public class DefaultExchange extends BrokerTestCase {
         }
     }
 
-    //@Test
-    public void declareDefaultExchange() throws IOException {
+    @Test
+    public void declareDefaultExchange() {
         try {
             channel.exchangeDeclare("", "direct", true);
             fail();
@@ -70,8 +73,8 @@ public class DefaultExchange extends BrokerTestCase {
         }
     }
 
-    //@Test
-    public void deleteDefaultExchange() throws IOException {
+    @Test
+    public void deleteDefaultExchange() {
         try {
             channel.exchangeDelete("");
             fail();

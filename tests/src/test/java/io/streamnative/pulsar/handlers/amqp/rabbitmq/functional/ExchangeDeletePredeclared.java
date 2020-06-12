@@ -16,16 +16,21 @@
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
+import static org.junit.Assert.fail;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
+import org.junit.Test;
+
 /**
  * Testcase.
  */
 public class ExchangeDeletePredeclared extends BrokerTestCase {
+    @Test
     public void testDeletingPredeclaredAmqExchange() throws IOException {
         try {
             channel.exchangeDelete("amq.fanout");
+            fail();
         } catch (IOException e) {
             checkShutdownSignal(AMQP.ACCESS_REFUSED, e);
         }

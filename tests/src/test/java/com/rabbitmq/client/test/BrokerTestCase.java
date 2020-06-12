@@ -37,6 +37,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import javax.net.ssl.SSLContext;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.impl.PulsarClientImpl;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
@@ -73,7 +75,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         }
     };
 
-    protected ConnectionFactory connectionFactory = newConnectionFactory();
+    protected ConnectionFactory connectionFactory;
 
     protected ConnectionFactory newConnectionFactory() {
         ConnectionFactory connectionFactory = TestUtils.connectionFactory();
@@ -119,6 +121,8 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
             admin.namespaces().setRetention("public/vhost1",
                     new RetentionPolicies(60, 1000));
         }
+        ((PulsarClientImpl) getPulsarServiceList().get(0).getClient()).getLookup().
+                getBroker(TopicName.get("public/vhost1/test")).join();
         checkPulsarServiceState();
         assumeTrue(shouldRun());
         openConnection();
@@ -191,6 +195,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     public void openConnection()
             throws IOException, TimeoutException {
         if (connection == null) {
+            connectionFactory = newConnectionFactory();
             connectionFactory.setPort(getAmqpBrokerPortList().get(0));
             connection = connectionFactory.newConnection();
         }

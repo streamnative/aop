@@ -284,12 +284,22 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testQueueDelete() {
-        QueueDeleteBody cmd = methodRegistry.createQueueDeleteBody(0, "queue", false, false,
-            false);
+        NamespaceName namespaceName = NamespaceName.get("public", "vhost1");
+        connection.setNamespaceName(namespaceName);
+        QueueDeclareBody cmd = methodRegistry.createQueueDeclareBody(0, "queue", false, true,
+                false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+
+        QueueDeleteBody cmd1 = methodRegistry.createQueueDeleteBody(0, "queue", false, false,
+            false);
+        cmd1.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
+
         AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof QueueDeleteOkBody);
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
+        AMQBody response1 = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response1 instanceof QueueDeleteOkBody);
     }
 
     @SneakyThrows

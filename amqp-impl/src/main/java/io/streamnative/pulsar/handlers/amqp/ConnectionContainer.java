@@ -100,14 +100,6 @@ public class ConnectionContainer {
     }
 
     private static void defaultExchangeInit(NamespaceName namespaceName) {
-        AmqpExchange inMemoryExchange = ExchangeContainer.getExchange(namespaceName,
-                AbstractAmqpExchange.DEFAULT_EXCHANGE);
-
-        if (inMemoryExchange == null) {
-            ExchangeContainer.putExchange(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE,
-                    new InMemoryExchange("", AmqpExchange.Type.Direct, false));
-        }
-
         addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
         addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
         addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);

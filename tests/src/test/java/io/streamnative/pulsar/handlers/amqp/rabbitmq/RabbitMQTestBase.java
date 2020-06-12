@@ -73,8 +73,6 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
                 admin.namespaces().createNamespace(ns, 1);
-                admin.namespaces().setRetention(ns,
-                        new RetentionPolicies(60, 1000));
             }
         }
         checkPulsarServiceState();

@@ -105,10 +105,6 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testExchangeDeclareFail() {
-        String tenant = "public";
-        String namespace = "ns";
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
             .createExchangeDeclareBody(0, "test", "fanout", false, false, false, false, true, null);
@@ -120,11 +116,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testExchangeDeclareSuccess() {
-        String tenant = "public";
-        String namespace = "ns";
         String exchange = "test";
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
         ExchangeDeclareBody cmd = methodRegistry
@@ -137,11 +129,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testExchangeDeclarePassive(){
-        String tenant = "public";
-        String namespace = "ns";
         String exchange = "test";
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
         ExchangeDeclareBody cmd1 = methodRegistry
                 .createExchangeDeclareBody(0, exchange, "fanout",
@@ -164,8 +152,6 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testQueueDeclarePassive(){
-        NamespaceName namespaceName = NamespaceName.get("public", "vhost1");
-        connection.setNamespaceName(namespaceName);
         QueueDeclareBody cmd1 = methodRegistry.createQueueDeclareBody(0, "queue", false, true,
                 false, false, false, null);
         cmd1.generateFrame(1).writePayload(toServerSender);
@@ -187,11 +173,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     @SneakyThrows
     @Test
     public void testExchangeDelete() {
-        String tenant = "public";
-        String namespace = "ns";
         String exchange = "test1";
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
         ExchangeDeclareBody cmd = methodRegistry
@@ -212,13 +194,9 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     @Test
     public void testExchangeBound() {
-        String tenant = "public";
-        String namespace = "ns";
         String exchange = "test";
         List<String> subs = new ArrayList<>();
         subs.add(exchange);
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
 
         ExchangeBoundBody cmd = methodRegistry.createExchangeBoundBody(exchange, "key", "queue");
         cmd.generateFrame(1).writePayload(toServerSender);
@@ -242,14 +220,10 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     @SneakyThrows
     @Test(dataProvider = "exchangeAndQueueIsDurableBuilder")
     public void testQueueBind(boolean exchangeIsDurable, boolean queueIsDurable) {
-        String tenant = "public";
-        String namespace = "ns";
         String exchange = "test" + count;
         String queue = "queue" + count;
         List<String> subs = new ArrayList<>();
         subs.add(exchange);
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
         exchangeDeclare(exchange, exchangeIsDurable);
@@ -305,14 +279,10 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     @SneakyThrows
     @Test
     public void testQueueUnbind() {
-        String tenant = "public";
-        String namespace = "ns";
         String exchange = "test";
         String queue = "queue";
         List<String> subs = new ArrayList<>();
         subs.add(exchange);
-        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
-        connection.setNamespaceName(namespaceName);
         exchangeDeclare(exchange, true);
         queueDeclare(queue, true);
 

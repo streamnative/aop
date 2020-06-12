@@ -552,7 +552,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         AmqpExchange amqpExchange = ExchangeContainer.
                 getExchange(connection.getNamespaceName(), exchangeName);
         if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)) {
-            closeChannel(ErrorCodes.ACCESS_REFUSED, "Can not bind to default exchange ");
+            closeChannel(ErrorCodes.ACCESS_REFUSED, "Can not unbind to default exchange ");
             return;
         }
         if (amqpQueue instanceof InMemoryQueue && amqpExchange instanceof InMemoryExchange) {

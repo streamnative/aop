@@ -257,7 +257,7 @@ public abstract class AmqpProtocolHandlerTestBase {
             conf.setBrokerServicePort(Optional.of(brokerPort));
             ((AmqpServiceConfiguration) conf).setAmqpListeners("amqp://127.0.0.1:" + amqpBrokerPort);
             ((AmqpServiceConfiguration) conf).setAmqpProxyPort(proxyPort);
-            ((AmqpServiceConfiguration) conf).setUseProxy(true);
+            ((AmqpServiceConfiguration) conf).setAmqpProxyEnable(true);
             conf.setWebServicePort(Optional.of(brokerWebServicePort));
             conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
 

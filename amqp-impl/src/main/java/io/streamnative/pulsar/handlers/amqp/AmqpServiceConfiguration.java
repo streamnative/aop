@@ -68,33 +68,33 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
         required = true,
         doc = "The maximum number of channels which can exist concurrently on a connection."
     )
-    private int maxNoOfChannels = 64;
+    private int amqpMaxNoOfChannels = 64;
 
     @FieldContext(
         category = CATEGORY_AMQP,
         required = true,
         doc = "The maximum frame size on a connection."
     )
-    private int maxFrameSize = 4 * 1024 * 1024;
+    private int amqpMaxFrameSize = 4 * 1024 * 1024;
 
     @FieldContext(
         category = CATEGORY_AMQP,
         required = true,
         doc = "The default heartbeat timeout on broker"
     )
-    private int heartBeat = 60 * 1000;
+    private int amqpHeartBeat = 60 * 1000;
 
     @FieldContext(
         category = CATEGORY_AMQP_PROXY,
         required = false,
         doc = "The amqp proxy port"
     )
-    private int amqpProxyPort;
+    private int amqpProxyPort = 5682;
 
     @FieldContext(
             category = CATEGORY_AMQP_PROXY,
             required = false,
             doc = "Whether start amqp protocol handler with proxy"
     )
-    private boolean useProxy;
+    private boolean amqpProxyEnable = false;
 }

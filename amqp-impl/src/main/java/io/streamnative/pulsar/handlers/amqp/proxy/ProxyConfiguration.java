@@ -14,34 +14,10 @@
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
-import java.util.Optional;
-import lombok.Getter;
-import lombok.Setter;
-import org.apache.pulsar.common.configuration.Category;
-import org.apache.pulsar.common.configuration.FieldContext;
 
 /**
  * Configuration for AMQP proxy service.
  */
-@Getter
-@Setter
 public class ProxyConfiguration extends AmqpServiceConfiguration {
-
-    @Category
-    private static final String CATEGORY_SERVER = "Server";
-    @Category
-    private static final String CATEGORY_BROKER_DISCOVERY = "Broker Discovery";
-
-    @FieldContext(
-            category = CATEGORY_SERVER,
-            doc = "The port for serving binary protobuf request."
-    )
-    private Optional<Integer> proxyPort;
-
-    @FieldContext(
-            category = CATEGORY_BROKER_DISCOVERY,
-            doc = "The service url points to the broker cluster."
-    )
-    private String brokerServiceURL;
 
 }

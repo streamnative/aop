@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.Maps;
@@ -79,8 +80,9 @@ public class ProxyService implements Closeable {
 
     private void configValid(ProxyConfiguration proxyConfig) {
         checkNotNull(proxyConfig);
-        checkNotNull(proxyConfig.getProxyPort());
-        checkNotNull(proxyConfig.getBrokerServiceURL());
+        checkArgument(proxyConfig.getAmqpProxyPort() > 0);
+        checkNotNull(proxyConfig.getAdvertisedAddress());
+        checkNotNull(proxyConfig.getBrokerServicePort());
     }
 
     public void start() throws Exception {
@@ -90,13 +92,14 @@ public class ProxyService implements Closeable {
         EventLoopUtil.enableTriggeredMode(serverBootstrap);
         serverBootstrap.childHandler(new ServiceChannelInitializer(this));
         try {
-            listenChannel = serverBootstrap.bind(proxyConfig.getProxyPort().get()).sync().channel();
+            listenChannel = serverBootstrap.bind(proxyConfig.getAmqpProxyPort()).sync().channel();
         } catch (InterruptedException e) {
-            throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getProxyPort().get(), e);
+            throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getAmqpProxyPort(), e);
         }
 
-        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(
-                proxyConfig.getBrokerServiceURL()).build();
+        String brokerServiceUrl = "pulsar://" + proxyConfig.getAdvertisedAddress() + ":"
+                + proxyConfig.getBrokerServicePort().get();
+        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(brokerServiceUrl).build();
 
         this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
     }

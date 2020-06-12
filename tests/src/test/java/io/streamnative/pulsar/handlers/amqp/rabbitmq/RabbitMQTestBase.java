@@ -86,10 +86,10 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         super.internalCleanup();
     }
 
-    protected Connection getConnection(String vhost, boolean useProxy) throws IOException, TimeoutException {
+    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        if (useProxy) {
+        if (amqpProxyEnable) {
             int proxyPort = getProxyPort();
             connectionFactory.setPort(proxyPort);
             log.info("use proxyPort: {}", proxyPort);

@@ -201,8 +201,8 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         }
         // TODO AUTH
         ConnectionTuneBody tuneBody =
-                methodRegistry.createConnectionTuneBody(proxyConfig.getMaxNoOfChannels(),
-                        proxyConfig.getMaxFrameSize(), proxyConfig.getHeartBeat());
+                methodRegistry.createConnectionTuneBody(proxyConfig.getAmqpMaxNoOfChannels(),
+                        proxyConfig.getAmqpMaxFrameSize(), proxyConfig.getAmqpHeartBeat());
         writeFrame(tuneBody.generateFrame(0));
     }
 

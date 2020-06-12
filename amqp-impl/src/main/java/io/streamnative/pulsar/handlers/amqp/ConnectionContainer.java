@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Collections;
 import java.util.Map;

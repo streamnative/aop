@@ -30,7 +30,7 @@ public class AmqpConfigNameTest {
     private static final String FIELD_NAME_PRE = "amqp";
 
     /**
-     * This test is used to check config name
+     * This test is used to check config name.
      */
     @Test
     public void amqpServiceConfigurationTest() {

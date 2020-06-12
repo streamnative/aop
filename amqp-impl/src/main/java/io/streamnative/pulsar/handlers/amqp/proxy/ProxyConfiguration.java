@@ -14,17 +14,10 @@
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
-import java.util.Optional;
-import lombok.Getter;
-import lombok.Setter;
-import org.apache.pulsar.common.configuration.Category;
-import org.apache.pulsar.common.configuration.FieldContext;
 
 /**
  * Configuration for AMQP proxy service.
  */
-@Getter
-@Setter
 public class ProxyConfiguration extends AmqpServiceConfiguration {
 
 }

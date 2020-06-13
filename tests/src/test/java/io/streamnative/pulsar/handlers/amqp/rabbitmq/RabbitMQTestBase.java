@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import com.google.common.collect.Sets;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
@@ -203,5 +205,45 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         countDownLatch.await();
         System.out.println("[" + testName + "] Test finish. Receive total msg cnt: " + totalReceiveMsgCnt);
         Assert.assertEquals(expectedMsgCntPerQueue * queueList.size(), totalReceiveMsgCnt.get());
+    }
+
+    public void defaultEmptyExchangeTest(String vhost, Boolean amqpProxyEnable) throws Exception {
+        @Cleanup
+        Connection connection = getConnection("vhost1", amqpProxyEnable);
+        @Cleanup
+        Channel channel = connection.createChannel();
+
+        final int queueCount = 5;
+        final int messageCount = 100;
+        final String contentMsg = "Hello AoP ";
+
+        List<String> queueNameList = new ArrayList<>();
+        for (int i = 0; i < queueCount; i++) {
+            String queueName = randQuName();
+            queueNameList.add(queueName);
+            channel.queueDeclare(queueName, true, false, false, null);
+        }
+
+        for (String queueName : queueNameList) {
+            for (int i = 0; i < messageCount; i++) {
+                channel.basicPublish("", queueName, null, (contentMsg + i).getBytes(UTF_8));
+            }
+        }
+
+        AtomicInteger receiveMsgCount = new AtomicInteger(0);
+        CountDownLatch countDownLatch = new CountDownLatch(messageCount * queueCount);
+        for (String queueName : queueNameList) {
+            Consumer consumer = new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String consumerTag, Envelope envelope,
+                                           AMQP.BasicProperties properties, byte[] body) throws IOException {
+                    receiveMsgCount.incrementAndGet();
+                    countDownLatch.countDown();
+                }
+            };
+            channel.basicConsume(queueName, consumer);
+        }
+        countDownLatch.await();
+        Assert.assertEquals(messageCount * queueCount, receiveMsgCount.get());
     }
 }

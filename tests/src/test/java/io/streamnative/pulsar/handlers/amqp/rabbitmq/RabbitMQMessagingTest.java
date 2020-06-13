@@ -346,4 +346,9 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
     }
 
+    @Test(timeOut = 1000 * 5)
+    public void defaultEmptyExchangeTest() throws Exception {
+        defaultEmptyExchangeTest("vhost1", false);
+    }
+
 }

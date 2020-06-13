@@ -15,18 +15,37 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Maps;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.qpid.server.exchange.ExchangeDefaults;
+
 
 /**
  * Container for all exchanges in the broker.
  */
 @Slf4j
 public class ExchangeContainer {
+
+    private static final Map<String, AmqpExchange.Type> BUILDIN_EXCHANGE_NAME_SET = new HashMap<>();
+    private static PulsarService pulsarService;
+
+    public static void init(PulsarService pulsarService) {
+        if (ExchangeContainer.pulsarService == null) {
+            ExchangeContainer.pulsarService = pulsarService;
+            BUILDIN_EXCHANGE_NAME_SET.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
+            BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
+            BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
+            BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
+        }
+    }
 
     @Getter
     private static Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
@@ -60,6 +79,28 @@ public class ExchangeContainer {
         if (exchangeMap.containsKey(namespaceName)) {
             exchangeMap.get(namespaceName).remove(exchangeName);
         }
+    }
+
+    public static void initBuildInExchange(NamespaceName namespaceName) {
+        for (Map.Entry<String, AmqpExchange.Type> entry : BUILDIN_EXCHANGE_NAME_SET.entrySet()) {
+            if (getExchange(namespaceName, entry.getKey()) == null) {
+                addBuildInExchanges(namespaceName, entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    private static void addBuildInExchanges(NamespaceName namespaceName,
+                                            String exchangeName, AmqpExchange.Type exchangeType) {
+        String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
+        AmqpTopicManager.getTopic(pulsarService, topicName, true).whenComplete((topic, throwable) -> {
+            if (throwable != null) {
+                log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
+                return;
+            }
+            ExchangeContainer.putExchange(namespaceName, exchangeName,
+                    new PersistentExchange(exchangeName, exchangeType,
+                            (PersistentTopic) topic, false));
+        });
     }
 
 }

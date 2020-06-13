@@ -17,11 +17,16 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.concurrent.DefaultEventExecutor;
+import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
+import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
+import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
+import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
@@ -48,8 +53,10 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.admin.Namespaces;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.common.lookup.data.LookupData;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
+import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
@@ -108,6 +115,28 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
         initMockAmqpTopicManager();
         initProtocol();
+        initDefaultExchange();
+    }
+
+    private void initDefaultExchange() {
+        String tenant = "public";
+        String namespace = "vhost1";
+        NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
+        connection.setNamespaceName(namespaceName);
+        addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
+        addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
+        addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
+        addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
+    }
+
+    private void addBuildInExchanges(NamespaceName namespaceName,
+                                     String exchangeName, AmqpExchange.Type exchangeType) {
+        String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
+        Topic topic = AmqpTopicManager.
+                getOrCreateTopic(connection.getPulsarService(), topicName, true);
+        ExchangeContainer.putExchange(namespaceName, exchangeName,
+                new PersistentExchange(exchangeName, exchangeType,
+                        (PersistentTopic) topic, false));
     }
 
     private void initMockAmqpTopicManager(){

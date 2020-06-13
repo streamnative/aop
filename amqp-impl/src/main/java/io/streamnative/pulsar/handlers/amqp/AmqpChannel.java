@@ -738,22 +738,43 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         String exchangeName;
 
         if (exchange == null || exchange.length() == 0) {
-            AmqpExchange amqpExchange = ExchangeContainer.
-                    getExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-            exchangeName = amqpExchange.getName();
             AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), routingKey.toString());
-
             if (amqpQueue == null) {
                 log.error("Queue[{}] is not declared!", routingKey.toString());
                 connection.sendConnectionClose(NOT_FOUND, "Exchange or queue not found.", channelId);
                 return;
             }
 
-            // bind to default exchange.
-            if (amqpQueue.getRouter(exchangeName) == null) {
-                amqpQueue.bindExchange(amqpExchange,
-                        AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
-                        routingKey.toString(), null);
+            AmqpExchange amqpExchange = ExchangeContainer.
+                    getExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+            exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
+
+            if (amqpExchange == null) {
+                CompletableFuture<AmqpExchange> exchangeCompletableFuture =
+                        ExchangeContainer.addExchange(connection.getNamespaceName(),
+                                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
+                exchangeCompletableFuture.whenComplete((ex, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Exchange [{}] create failed!", AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+                        connection.sendConnectionClose(NOT_FOUND, "Exchange " + exchangeName + " not found.",
+                                channelId);
+                        return;
+                    }
+                    // bind to default exchange.
+                    if (amqpQueue.getRouter(exchangeName) == null) {
+                        amqpQueue.bindExchange(ex,
+                                AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
+                                routingKey.toString(), null);
+                    }
+                });
+                exchangeCompletableFuture.join();
+            } else {
+                // bind to default exchange.
+                if (amqpQueue.getRouter(exchangeName) == null) {
+                    amqpQueue.bindExchange(amqpExchange,
+                            AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
+                            routingKey.toString(), null);
+                }
             }
         } else {
             exchangeName = exchange.toString();

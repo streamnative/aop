@@ -38,8 +38,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ErrorCodes;
@@ -250,23 +248,15 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         assertState(ConnectionState.AWAIT_OPEN);
 
-        boolean isDefaultNamespace = false;
         String virtualHostStr = AMQShortString.toString(virtualHost);
         if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
             virtualHostStr = virtualHostStr.substring(1);
             if (StringUtils.isEmpty(virtualHostStr)){
                 virtualHostStr = DEFAULT_NAMESPACE;
-                isDefaultNamespace = true;
             }
         }
 
         NamespaceName namespaceName = NamespaceName.get(amqpConfig.getAmqpTenant(), virtualHostStr);
-        if (isDefaultNamespace) {
-            // avoid the namespace public/default is not owned in standalone mode
-            TopicName topic = TopicName.get(TopicDomain.persistent.value(),
-                    namespaceName, "__lookup__");
-            getPulsarService().getNamespaceService().getBrokerServiceUrlAsync(topic, true);
-        }
         // Policies policies = getPolicies(namespaceName);
 //        if (policies != null) {
         this.namespaceName = namespaceName;

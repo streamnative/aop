@@ -18,6 +18,7 @@ import com.google.common.collect.Maps;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -84,23 +85,27 @@ public class ExchangeContainer {
     public static void initBuildInExchange(NamespaceName namespaceName) {
         for (Map.Entry<String, AmqpExchange.Type> entry : BUILDIN_EXCHANGE_NAME_SET.entrySet()) {
             if (getExchange(namespaceName, entry.getKey()) == null) {
-                addBuildInExchanges(namespaceName, entry.getKey(), entry.getValue());
+                addExchange(namespaceName, entry.getKey(), entry.getValue());
             }
         }
     }
 
-    private static void addBuildInExchanges(NamespaceName namespaceName,
+    public static CompletableFuture<AmqpExchange> addExchange(NamespaceName namespaceName,
                                             String exchangeName, AmqpExchange.Type exchangeType) {
+        CompletableFuture<AmqpExchange> completableFuture = new CompletableFuture<>();
         String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
         AmqpTopicManager.getTopic(pulsarService, topicName, true).whenComplete((topic, throwable) -> {
             if (throwable != null) {
                 log.error("Create default exchange topic failed. errorMsg: {}", throwable.getMessage(), throwable);
+                completableFuture.completeExceptionally(throwable);
                 return;
             }
-            ExchangeContainer.putExchange(namespaceName, exchangeName,
-                    new PersistentExchange(exchangeName, exchangeType,
-                            (PersistentTopic) topic, false));
+            PersistentExchange amqpExchange = new PersistentExchange(exchangeName, exchangeType,
+                    (PersistentTopic) topic, false);
+            ExchangeContainer.putExchange(namespaceName, exchangeName, amqpExchange);
+            completableFuture.complete(amqpExchange);
         });
+        return completableFuture;
     }
 
 }

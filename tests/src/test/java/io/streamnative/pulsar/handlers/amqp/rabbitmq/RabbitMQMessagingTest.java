@@ -345,4 +345,5 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
         Assert.assertTrue(count.get() == 2);
 
     }
+
 }

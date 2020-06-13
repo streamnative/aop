@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.policies.data.ClusterData;
-import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -73,8 +72,6 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
                 admin.namespaces().createNamespace(ns, 1);
-                admin.namespaces().setRetention(ns,
-                        new RetentionPolicies(60, 1000));
             }
         }
         checkPulsarServiceState();
@@ -86,10 +83,10 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         super.internalCleanup();
     }
 
-    protected Connection getConnection(String vhost, boolean useProxy) throws IOException, TimeoutException {
+    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        if (useProxy) {
+        if (amqpProxyEnable) {
             int proxyPort = getProxyPort();
             connectionFactory.setPort(proxyPort);
             log.info("use proxyPort: {}", proxyPort);

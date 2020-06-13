@@ -410,11 +410,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             }
             QueueContainer.putQueue(connection.getNamespaceName(), queue.toString(), amqpQueue);
             setDefaultQueue(amqpQueue);
-            // bind to default exchange.
-            AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct);
-            AmqpExchange defaultExchange = ExchangeContainer.getExchange(connection.getNamespaceName(),
-                    AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-            amqpQueue.bindExchange(defaultExchange, messageRouter, queue.toString(), null);
 
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
@@ -752,6 +747,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 log.error("Queue[{}] is not declared!", routingKey.toString());
                 connection.sendConnectionClose(NOT_FOUND, "Exchange or queue not found.", channelId);
                 return;
+            }
+
+            // bind to default exchange.
+            if (amqpQueue.getRouter(exchangeName) == null) {
+                amqpQueue.bindExchange(amqpExchange,
+                        AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
+                        routingKey.toString(), null);
             }
         } else {
             exchangeName = exchange.toString();

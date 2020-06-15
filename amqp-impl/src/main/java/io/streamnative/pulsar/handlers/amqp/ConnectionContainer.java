@@ -42,8 +42,7 @@ public class ConnectionContainer {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
                 log.info("ConnectionContainer [onLoad] namespaceBundle: {}", namespaceBundle);
-                ExchangeContainer.pulsarService = pulsarService;
-                ExchangeContainer.initBuildInExchange(namespaceBundle.getNamespaceObject());
+                ExchangeContainer.initBuildInExchange(pulsarService, namespaceBundle.getNamespaceObject());
             }
 
             @Override

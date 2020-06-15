@@ -1,15 +1,12 @@
 /**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 
 package io.streamnative.pulsar.handlers.amqp;
@@ -29,7 +26,6 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 
-
 /**
  * Container for all exchanges in the broker.
  */
@@ -37,17 +33,13 @@ import org.apache.qpid.server.exchange.ExchangeDefaults;
 public class ExchangeContainer {
 
     private static final Map<String, AmqpExchange.Type> BUILDIN_EXCHANGE_NAME_SET = new HashMap<>();
-    public static PulsarService pulsarService;
     private static Map<NamespaceName, CountDownLatch> countDownLatchMap = new HashMap<>();
 
-    public static void init(PulsarService pulsarService) {
-        if (ExchangeContainer.pulsarService == null) {
-            ExchangeContainer.pulsarService = pulsarService;
-            BUILDIN_EXCHANGE_NAME_SET.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
-            BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
-            BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
-            BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
-        }
+    public static void init() {
+        BUILDIN_EXCHANGE_NAME_SET.put(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
+        BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
+        BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
+        BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
     }
 
     @Getter
@@ -66,7 +58,7 @@ public class ExchangeContainer {
 
     public static AmqpExchange getExchange(NamespaceName namespaceName, String exchangeName) {
         if (BUILDIN_EXCHANGE_NAME_SET.containsKey(exchangeName)
-                && countDownLatchMap.get(namespaceName) != null) {
+            && countDownLatchMap.get(namespaceName) != null) {
             try {
                 countDownLatchMap.get(namespaceName).await(2, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
@@ -95,18 +87,18 @@ public class ExchangeContainer {
         }
     }
 
-    public static void initBuildInExchange(NamespaceName namespaceName) {
+    public static void initBuildInExchange(PulsarService pulsarService, NamespaceName namespaceName) {
         CountDownLatch countDownLatch = new CountDownLatch(BUILDIN_EXCHANGE_NAME_SET.size());
         countDownLatchMap.put(namespaceName, countDownLatch);
         for (Map.Entry<String, AmqpExchange.Type> entry : BUILDIN_EXCHANGE_NAME_SET.entrySet()) {
             if (getExchange(namespaceName, entry.getKey()) == null) {
-                addBuildInExchanges(namespaceName, entry.getKey(), entry.getValue());
+                addBuildInExchanges(pulsarService, namespaceName, entry.getKey(), entry.getValue());
             }
         }
     }
 
-    private static void addBuildInExchanges(NamespaceName namespaceName,
-                                            String exchangeName, AmqpExchange.Type exchangeType) {
+    private static void addBuildInExchanges(PulsarService pulsarService, NamespaceName namespaceName,
+        String exchangeName, AmqpExchange.Type exchangeType) {
         String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
         AmqpTopicManager.getTopic(pulsarService, topicName, true).whenComplete((topic, throwable) -> {
             if (throwable != null) {
@@ -114,8 +106,8 @@ public class ExchangeContainer {
                 return;
             }
             ExchangeContainer.putExchange(namespaceName, exchangeName,
-                    new PersistentExchange(exchangeName, exchangeType,
-                            (PersistentTopic) topic, false));
+                new PersistentExchange(exchangeName, exchangeType,
+                    (PersistentTopic) topic, false));
             countDownLatchMap.get(namespaceName).countDown();
         });
     }

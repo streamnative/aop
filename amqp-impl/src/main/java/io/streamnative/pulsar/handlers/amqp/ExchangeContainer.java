@@ -66,7 +66,8 @@ public class ExchangeContainer {
     }
 
     public static AmqpExchange getExchange(NamespaceName namespaceName, String exchangeName) {
-        if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)) {
+        if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) &&
+                countDownLatch != null) {
             try {
                 countDownLatch.await(2, TimeUnit.SECONDS);
             } catch (InterruptedException e) {

@@ -76,7 +76,7 @@ amqpHeartBeat|The aop connection default heartbeat timeout|60 (s)
 amqpProxyPort|The AMQP proxy service port|5682
 amqpProxyEnable|Whether to start proxy service|false
 
-### Config Pulsar broker to run AoP protocol handler as PluginF
+### Config Pulsar broker to run AoP protocol handler as Plugin
 
 As mentioned above, AoP module is loaded along with Pulsar broker. You need to add configs in Pulsar's config file, such as `broker.conf` or `standalone.conf`.
 

@@ -72,7 +72,7 @@ public class ExchangeContainer {
             } catch (InterruptedException e) {
                 log.error("Default exchanges init timeout. ");
                 return null;
-            }finally {
+            } finally {
                 countDownLatchMap.remove(namespaceName);
             }
         }

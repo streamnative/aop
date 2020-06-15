@@ -86,8 +86,8 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public void start(BrokerService service) {
         brokerService = service;
 
-        ConnectionContainer.init(brokerService.getPulsar());
         ExchangeContainer.init(brokerService.getPulsar());
+        ConnectionContainer.init(brokerService.getPulsar());
 
         if (amqpConfig.isAmqpProxyEnable()) {
             ProxyConfiguration proxyConfig = new ProxyConfiguration();

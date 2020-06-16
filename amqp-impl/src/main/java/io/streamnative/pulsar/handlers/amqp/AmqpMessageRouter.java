@@ -108,4 +108,11 @@ public interface AmqpMessageRouter {
     CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
                                            Map<String, Object> properties);
 
+    /**
+     *
+     * @param properties
+     * @return
+     */
+    boolean isMatch(Map<String, Object> properties);
+
 }

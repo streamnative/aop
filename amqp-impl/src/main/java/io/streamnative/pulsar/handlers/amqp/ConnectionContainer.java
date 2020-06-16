@@ -95,4 +95,8 @@ public class ConnectionContainer {
         connectionMap.getOrDefault(namespaceName, Collections.emptySet()).remove(amqpConnection);
     }
 
+    public static Set<AmqpConnection> getNamespaceConnections(NamespaceName namespaceName) {
+        return connectionMap.getOrDefault(namespaceName, Collections.emptySet());
+    }
+
 }

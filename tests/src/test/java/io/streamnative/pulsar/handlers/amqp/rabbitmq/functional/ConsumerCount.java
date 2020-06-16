@@ -20,14 +20,16 @@ import static org.junit.Assert.assertEquals;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
+import org.junit.Test;
+
 /**
  * Testcase.
  */
 public class ConsumerCount extends BrokerTestCase {
-    //@Test
+    @Test
     public void consumerCount() throws IOException {
         String q = generateQueueName();
-        channel.queueDeclare(q, false, true, false, null);
+        channel.queueDeclare(q, true, true, false, null);
         assertEquals(0, channel.consumerCount(q));
 
         String tag = channel.basicConsume(q, new DefaultConsumer(channel));

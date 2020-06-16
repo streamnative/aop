@@ -30,6 +30,7 @@ import com.rabbitmq.client.MessageProperties;
 import com.rabbitmq.client.Method;
 import com.rabbitmq.client.ShutdownSignalException;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase;
+import io.streamnative.pulsar.handlers.amqp.PortManager;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Map;
@@ -75,7 +76,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         }
     };
 
-    protected ConnectionFactory connectionFactory;
+    protected ConnectionFactory connectionFactory = newConnectionFactory();
 
     protected ConnectionFactory newConnectionFactory() {
         ConnectionFactory connectionFactory = TestUtils.connectionFactory();
@@ -136,6 +137,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     @After
     public void cleanup() throws Exception {
         super.internalCleanup();
+        PortManager.clear();
 //        if(shouldRun()) {
 //            closeChannel();
 //            closeConnection();
@@ -182,7 +184,6 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     protected void restart()
             throws Exception {
         cleanup();
-        bareRestart();
         setup();
     }
 
@@ -194,8 +195,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 
     public void openConnection()
             throws IOException, TimeoutException {
-        if (connection == null) {
-            connectionFactory = newConnectionFactory();
+        if (connection == null || connection.getCloseReason() != null) {
             connectionFactory.setPort(getAmqpBrokerPortList().get(0));
             connection = connectionFactory.newConnection();
         }
@@ -212,6 +212,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     public void openChannel()
             throws IOException {
         channel = connection.createChannel();
+        channel.confirmSelect();
     }
 
     public void closeChannel()
@@ -307,6 +308,13 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     public void basicPublishVolatile(byte[] msg, String x, String routingKey,
                                         AMQP.BasicProperties properties) throws IOException {
         channel.basicPublish(x, routingKey, properties, msg);
+        try {
+            channel.waitForConfirms(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            e.printStackTrace();
+        }
     }
 
     protected void declareAndBindDurableQueue(String q, String x, String r) throws IOException {
@@ -340,7 +348,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     }
 
     protected void declareTransientTopicExchange(String x) throws IOException {
-        channel.exchangeDeclare(x, "topic", false);
+        channel.exchangeDeclare(x, "topic", true);
     }
 
     protected void declareTransientFanoutExchange(String x) throws IOException {

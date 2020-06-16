@@ -120,6 +120,4 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
         return completableFuture;
     }
 
-    public abstract boolean isMatch(Map<String, Object> properties);
-
 }

@@ -44,4 +44,8 @@ public class PortManager {
     private static int getBasePort() {
         return Integer.valueOf(System.getProperty("test.basePort", "15000"));
     }
+
+    public static void clear() {
+        nextPort = getBasePort();
+    }
 }

@@ -17,22 +17,28 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import static org.junit.Assert.assertEquals;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
+import org.junit.Test;
+
 /**
  * Testcase.
  */
 public class MessageCount extends BrokerTestCase {
-    //@Test
-    public void messageCount() throws IOException {
-        String q = generateQueueName();
-        channel.queueDeclare(q, false, true, false, null);
-        assertEquals(0, channel.messageCount(q));
+    @Test
+    public void messageCount() throws IOException, InterruptedException {
+        String exchange = generateExchangeName();
+        String queue = generateQueueName();
+        String routingKey = "key-1";
+        declareExchangeAndQueueToBind(queue, exchange, routingKey);
+        assertEquals(0, channel.messageCount(queue));
 
-        basicPublishVolatile(q);
-        assertEquals(1, channel.messageCount(q));
-        basicPublishVolatile(q);
-        assertEquals(2, channel.messageCount(q));
+        basicPublishPersistent("1".getBytes(), exchange, routingKey);
+        Thread.sleep(200);
+        assertEquals(1, channel.messageCount(queue));
+        basicPublishPersistent("1".getBytes(), exchange, routingKey);
+        Thread.sleep(200);
+        assertEquals(2, channel.messageCount(queue));
 
-        channel.queuePurge(q);
-        assertEquals(0, channel.messageCount(q));
+//        channel.queuePurge(q);
+//        assertEquals(0, channel.messageCount(q));
     }
 }

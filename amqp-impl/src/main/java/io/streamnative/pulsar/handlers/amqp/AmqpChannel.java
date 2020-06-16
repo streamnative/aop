@@ -17,7 +17,6 @@ import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.protocol.ErrorCodes.NOT_FOUND;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
@@ -65,7 +64,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
-import org.apache.qpid.server.protocol.v0_8.transport.BasicNackBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
@@ -78,6 +76,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.txn.AsyncCommand;
 import org.apache.qpid.server.txn.ServerTransaction;
+
+
 
 /**
  * Amqp Channel level method processor.
@@ -110,7 +110,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      */
     private IncomingMessage currentMessage;
 
-    private final String defaultSubscription = "defaultSubscription";
+    public static final String DEFAULT_SUBSCRIPTION = "defaultSubscription";
     public static final AMQShortString EMPTY_STRING = AMQShortString.createAMQShortString((String) null);
     /**
      * This tag is unique per subscription to a queue. The server returns this in response to a basic.consume request.
@@ -302,7 +302,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             } else {
                 if (amqpExchange.getDurable()) {
                     PersistentTopic topic = (PersistentTopic) amqpExchange.getTopic();
-                    if (ifUnused && topic.getSubscriptions().isEmpty()) {
+                    if (ifUnused && amqpExchange.getQueueSize() > 0) {
                         closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                     } else {
                         try {
@@ -318,7 +318,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     }
                 } else {
                     // Is this exchange in used?
-                    if (amqpExchange.getQueueSize() > 0) {
+                    if (ifUnused && amqpExchange.getQueueSize() > 0) {
                         closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                     }
                     ExchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
@@ -380,21 +380,23 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 checkExclusiveQueue(amqpQueue);
                 setDefaultQueue(amqpQueue);
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
-                QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
+                QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody
+                    (queue, amqpQueue.getMessageCount(), amqpQueue.getConsumerCount());
                 connection.writeFrame(responseBody.generateFrame(channelId));
             }
         } else {
             checkExclusiveQueue(amqpQueue);
             if (amqpQueue != null) {
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
-                QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
+                QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody
+                    (queue, amqpQueue.getMessageCount(), amqpQueue.getConsumerCount());
                 connection.writeFrame(responseBody.generateFrame(channelId));
                 return;
             }
-            if (!durable) {
-                // in-memory integration
-                amqpQueue = new InMemoryQueue(queue.toString(), connection.getConnectionId(), exclusive, autoDelete);
-            } else {
+//            if (!durable) {
+//                // in-memory integration
+//                amqpQueue = new InMemoryQueue(queue.toString(), connection.getConnectionId(), exclusive, autoDelete);
+//            } else {
                 try {
                     String queueTopicName = PersistentQueue.getQueueTopicName(
                             connection.getNamespaceName(), queue.toString());
@@ -407,12 +409,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Queue failed.", channelId);
                     return;
                 }
-            }
+//            }
             QueueContainer.putQueue(connection.getNamespaceName(), queue.toString(), amqpQueue);
             setDefaultQueue(amqpQueue);
 
             MethodRegistry methodRegistry = connection.getMethodRegistry();
-            QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(queue, 0, 0);
+            QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody
+                (queue, amqpQueue.getMessageCount(), amqpQueue.getConsumerCount());
             connection.writeFrame(responseBody.generateFrame(channelId));
         }
     }
@@ -662,7 +665,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
             try {
                 AmqpConsumer consumer = subscribe(consumerTag1, queue.toString(), indexTopic,
-                    noAck, exclusive);
+                    noAck, exclusive, arguments);
                 if (!nowait) {
                     MethodRegistry methodRegistry = connection.getMethodRegistry();
                     AMQMethodBody responseBody = methodRegistry.
@@ -684,7 +687,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private AmqpConsumer subscribe(String consumerTag, String queueName, Topic topic,
-        boolean ack, boolean exclusive) throws ConsumerTagInUseException,
+        boolean ack, boolean exclusive, FieldTable argumentsTable) throws ConsumerTagInUseException,
         InterruptedException, ExecutionException, BrokerServiceException {
         if (consumerTag == null) {
             consumerTag = "consumerTag_" + getNextConsumerTag();
@@ -693,15 +696,27 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (tag2ConsumersMap.containsKey(consumerTag)) {
             throw new ConsumerTagInUseException("Consumer already exists with same consumerTag: " + consumerTag);
         }
-        Subscription subscription = topic.getSubscription(defaultSubscription);
+        Subscription subscription = topic.getSubscription(DEFAULT_SUBSCRIPTION);
         AmqpConsumer consumer;
         try {
             if (subscription == null) {
-                subscription = topic.createSubscription(defaultSubscription,
+                subscription = topic.createSubscription(DEFAULT_SUBSCRIPTION,
                     PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
             }
+            Map<String, Object> arguments = FieldTable.convertToMap(argumentsTable);
+            int priority = 0;
+            try {
+                if (arguments.get("x-priority") != null) {
+                    priority = Integer.parseInt(arguments.get("x-priority").toString());
+                }
+            } catch (Exception e) {
+                log.error("arguments value parse error e {}", e.getMessage());
+                closeChannel(ErrorCodes.IN_USE, "arguments error");
+                return null;
+            }
+
             consumer = new AmqpConsumer(subscription, exclusive ? PulsarApi.CommandSubscribe.SubType.Exclusive :
-                PulsarApi.CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
+                PulsarApi.CommandSubscribe.SubType.Shared, topic.getName(), 0, priority,
                 consumerTag, 0, connection.getServerCnx(), "", null,
                 false, PulsarApi.CommandSubscribe.InitialPosition.Latest,
                 null, this, consumerTag, queueName, ack);
@@ -739,12 +754,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         if (exchange == null || exchange.length() == 0) {
             AmqpExchange amqpExchange = ExchangeContainer.
-                    getExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+                getExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
             exchangeName = amqpExchange.getName();
-            AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), routingKey.toString());
+            String keyStr = routingKey == null ? "" : routingKey.toString();
+            AmqpQueue amqpQueue = QueueContainer.getQueue(connection.getNamespaceName(), keyStr);
 
             if (amqpQueue == null) {
-                log.error("Queue[{}] is not declared!", routingKey.toString());
+                log.error("Queue[{}] is not declared!", keyStr);
                 connection.sendConnectionClose(NOT_FOUND, "Exchange or queue not found.", channelId);
                 return;
             }
@@ -781,11 +797,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         Topic topic = amqpQueue.getIndexTopic();
         AmqpConsumer amqpConsumer = fetchConsumerMap.computeIfAbsent(queueName, value -> {
 
-            Subscription subscription = topic.getSubscription(defaultSubscription);
+            Subscription subscription = topic.getSubscription(DEFAULT_SUBSCRIPTION);
             AmqpConsumer consumer;
             try {
                 if (subscription == null) {
-                    subscription = topic.createSubscription(defaultSubscription,
+                    subscription = topic.createSubscription(DEFAULT_SUBSCRIPTION,
                         PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
                 }
                 consumer = new AmqpPullConsumer(subscription, PulsarApi.CommandSubscribe.SubType.Shared,
@@ -915,15 +931,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
 
-
-            Message<byte[]> message;
-            try {
-                message = MessageConvertUtils.toPulsarMessage(currentMessage);
-            } catch (UnsupportedEncodingException e) {
-                connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
-                return;
-            }
-
             AmqpExchange amqpExchange;
             if (exchangeName == null || exchangeName.length() == 0) {
                 exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
@@ -931,6 +938,45 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
             if (amqpExchange == null) {
                 log.error("publish message error amqpExchange is null.");
+                return;
+            }
+            // no queue can be routing
+            BasicContentHeaderProperties properties = currentMessage.getContentHeader().getProperties();
+            Map<String, Object> routingMatch = new HashMap<>();
+            if (properties != null) {
+                Map<String, Object> headers = properties.getHeadersAsMap();
+                if (headers.size() > 0) {
+                    routingMatch.putAll(headers);
+                }
+            }
+            routingMatch.put(MessageConvertUtils.PROP_ROUTING_KEY, routingKey);
+            if (!amqpExchange.isAnyMatch(routingMatch)) {
+                boolean mandatory = info.isMandatory();
+
+                if (log.isDebugEnabled()) {
+                    log.debug("Unroutable message exchange='{}', routing key='{}', mandatory={},"
+                        + " confirmOnPublish={}", exchangeName, routingKey, mandatory, confirmOnPublish);
+                }
+
+                if (info.isMandatory() || info.isImmediate()) {
+                    connection.getAmqpOutputConverter().writeReturn(info,
+                        currentMessage.getContentHeader(), MessageConvertUtils.toAmqpMessage(currentMessage),
+                        channelId, ErrorCodes.NO_ROUTE, AMQShortString.validValueOf("no queue can be routing"));
+                }
+                if (confirmOnPublish) {
+                    confirmedMessageCounter++;
+                    connection.writeFrame(new AMQFrame(channelId,
+                        new BasicAckBody(confirmedMessageCounter,
+                            false)));
+                }
+                return;
+            }
+
+            Message<byte[]> message;
+            try {
+                message = MessageConvertUtils.toPulsarMessage(currentMessage);
+            } catch (UnsupportedEncodingException e) {
+                connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
                 return;
             }
             connection.getPulsarService().getOrderedExecutor().executeOrdered(amqpExchange, SafeRunnable.safeRun(() -> {
@@ -942,26 +988,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         }
                         if (confirmOnPublish) {
                             confirmedMessageCounter++;
-                            recordFuture(Futures.immediateFuture(null),
-                                new ServerTransaction.Action() {
-                                    private final long deliveryTag = confirmedMessageCounter;
-
-                                    @Override
-                                    public void postCommit() {
-                                        BasicAckBody body = connection.getMethodRegistry()
-                                            .createBasicAckBody(
-                                                deliveryTag, false);
-                                        connection.writeFrame(body.generateFrame(channelId));
-                                    }
-
-                                    @Override
-                                    public void onRollback() {
-                                        final BasicNackBody body = new BasicNackBody(deliveryTag,
-                                            false,
-                                            false);
-                                        connection.writeFrame(new AMQFrame(channelId, body));
-                                    }
-                                });
+                            BasicAckBody body = connection.getMethodRegistry().
+                                createBasicAckBody(confirmedMessageCounter, false);
+                            connection.writeFrame(body.generateFrame(channelId));
                         }
 
                     } else {

@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
@@ -141,4 +142,10 @@ public interface AmqpExchange {
 
     int getQueueSize();
 
+    /**
+     * whether have one match.
+     * @param properties
+     * @return
+     */
+    boolean isAnyMatch(Map<String, Object> properties);
 }

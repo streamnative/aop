@@ -143,4 +143,12 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 TOPIC_PREFIX, "exchangeName");
     }
 
+    @Override
+    public long getMessageCount(){
+       return indexTopic.getManagedLedger().getNumberOfEntries();
+    }
+
+    @Override public int getConsumerCount() {
+        return indexTopic.getNumberOfConsumers();
+    }
 }

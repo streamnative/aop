@@ -13,7 +13,6 @@
  */
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
-
 import static com.rabbitmq.client.test.TestUtils.prepareForRecovery;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -62,6 +61,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.Test;
+
 
 
 /**
@@ -73,14 +74,14 @@ public class ConnectionRecovery extends BrokerTestCase {
 
     private static final int MANY_DECLARATIONS_LOOP_COUNT = 500;
 
-    //@Test
+    @Test
     public void connectionRecovery() throws IOException, InterruptedException {
         assertThat(connection.isOpen()).isTrue();
         closeAndWaitForRecovery();
         assertThat(connection.isOpen()).isTrue();
     }
 
-    //@Test
+    @Test
     public void namedConnectionRecovery()
             throws IOException, InterruptedException, TimeoutException {
         String connectionName = "custom name";
@@ -88,7 +89,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         try {
             assertThat(c.isOpen()).isTrue();
             assertThat(connectionName).isEqualTo(c.getClientProvidedName());
-            TestUtils.closeAndWaitForRecovery(c);
+            closeAndWaitForRecovery();
             assertThat(c.isOpen()).isTrue();
             assertThat(connectionName).isEqualTo(c.getClientProvidedName());
         } finally {
@@ -97,16 +98,23 @@ public class ConnectionRecovery extends BrokerTestCase {
     }
 
     //@Test
-    public void connectionRecoveryWithServerRestart() throws IOException, InterruptedException {
-        assertThat(connection.isOpen()).isTrue();
-        restartPrimaryAndWaitForRecovery();
-        assertThat(connection.isOpen()).isTrue();
+    public void connectionRecoveryWithServerRestart() throws Exception {
+        String connectionName = "custom name";
+        RecoverableConnection c = newRecoveringConnection(connectionName);
+        try {
+            assertThat(c.isOpen()).isTrue();
+            restartPrimaryAndWaitForRecovery();
+            assertThat(c.isOpen()).isTrue();
+        } finally {
+            c.abort();
+        }
     }
 
-    //@Test
+    @Test
     public void connectionRecoveryWithArrayOfAddresses()
             throws IOException, InterruptedException, TimeoutException {
-        final Address[] addresses = {new Address("127.0.0.1"), new Address("127.0.0.1", 5672)};
+        final Address[] addresses = {new Address("127.0.0.1"),
+            new Address("127.0.0.1", getAmqpBrokerPortList().get(0))};
         RecoverableConnection c = newRecoveringConnection(addresses);
         try {
             assertThat(c.isOpen()).isTrue();
@@ -118,11 +126,12 @@ public class ConnectionRecovery extends BrokerTestCase {
 
     }
 
-    //@Test
+    @Test
     public void connectionRecoveryWithListOfAddresses()
             throws IOException, InterruptedException, TimeoutException {
 
-        final List<Address> addresses = Arrays.asList(new Address("127.0.0.1"), new Address("127.0.0.1", 5672));
+        final List<Address> addresses = Arrays.asList(new Address("127.0.0.1"),
+            new Address("127.0.0.1", getAmqpBrokerPortList().get(0)));
 
         RecoverableConnection c = newRecoveringConnection(addresses);
         try {
@@ -134,7 +143,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void connectionRecoveryWithDisabledTopologyRecovery()
             throws IOException, InterruptedException, TimeoutException {
         RecoverableConnection c = newRecoveringConnection(true);
@@ -199,7 +208,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     }
 
     // see https://github.com/rabbitmq/rabbitmq-java-client/issues/135
-    //@Test
+    @Test
     public void thatShutdownHooksOnConnectionFireBeforeRecoveryStarts() throws IOException, InterruptedException {
         final List<String> events = new CopyOnWriteArrayList<String>();
         final CountDownLatch latch = new CountDownLatch(2); // one when started, another when complete
@@ -248,7 +257,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         wait(latch);
     }
 
-    //@Test
+    @Test
     public void shutdownHooksRecoveryOnConnection() throws IOException, InterruptedException {
         final CountDownLatch latch = new CountDownLatch(2);
         connection.addShutdownListener(new ShutdownListener() {
@@ -264,7 +273,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         wait(latch);
     }
 
-    //@Test
+    @Test
     public void shutdownHooksRecoveryOnChannel() throws IOException, InterruptedException {
         final CountDownLatch latch = new CountDownLatch(3);
         channel.addShutdownListener(new ShutdownListener() {
@@ -303,7 +312,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         wait(latch);
     }
 
-    //@Test
+    @Test
     public void channelRecovery() throws IOException, InterruptedException {
         Channel ch1 = connection.createChannel();
         Channel ch2 = connection.createChannel();
@@ -332,7 +341,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         wait(latch);
     }
 
-    //@Test
+    @Test
     public void confirmListenerRecovery() throws IOException, InterruptedException, TimeoutException {
         final CountDownLatch latch = new CountDownLatch(1);
         channel.addConfirmListener(new ConfirmListener() {
@@ -355,7 +364,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         wait(latch);
     }
 
-    //@Test
+    @Test
     public void exchangeRecovery() throws IOException, InterruptedException, TimeoutException {
         Channel ch = connection.createChannel();
         String x = "java-client.test.recovery.x1";
@@ -366,7 +375,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         ch.exchangeDelete(x);
     }
 
-    //@Test
+    @Test
     public void exchangeRecoveryWithNoWait() throws IOException, InterruptedException, TimeoutException {
         Channel ch = connection.createChannel();
         String x = "java-client.test.recovery.x1-nowait";
@@ -377,12 +386,12 @@ public class ConnectionRecovery extends BrokerTestCase {
         ch.exchangeDelete(x);
     }
 
-    //@Test
+    @Test
     public void clientNamedQueueRecovery() throws IOException, InterruptedException, TimeoutException {
         testClientNamedQueueRecoveryWith("java-client.test.recovery.q1", false);
     }
 
-    //@Test
+    @Test
     public void clientNamedQueueRecoveryWithNoWait() throws IOException, InterruptedException, TimeoutException {
         testClientNamedQueueRecoveryWith("java-client.test.recovery.q1-nowait", true);
     }
@@ -421,7 +430,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     // bug 26552
     //@Test
     public void clientNamedTransientAutoDeleteQueueAndBindingRecovery()
-            throws IOException, InterruptedException, TimeoutException {
+        throws Exception {
         String q = UUID.randomUUID().toString();
         String x = "tmp-fanout";
         Channel ch = connection.createChannel();
@@ -446,7 +455,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     // bug 26552
     //@Test
     public void serverNamedTransientAutoDeleteQueueAndBindingRecovery()
-            throws IOException, InterruptedException, TimeoutException {
+        throws Exception {
         String x = "tmp-fanout";
         Channel ch = connection.createChannel();
         ch.exchangeDelete(x);
@@ -982,11 +991,12 @@ public class ConnectionRecovery extends BrokerTestCase {
     private static void expectQueueRecovery(Channel ch, String q)
             throws IOException, InterruptedException, TimeoutException {
         ch.confirmSelect();
-        ch.queuePurge(q);
+        //ch.queuePurge(q);
         AMQP.Queue.DeclareOk ok1 = declareClientNamedQueue(ch, q);
         assertThat(ok1.getMessageCount()).isEqualTo(0);
         ch.basicPublish("", q, null, "msg".getBytes());
         waitForConfirms(ch);
+        Thread.sleep(100);
         AMQP.Queue.DeclareOk ok2 = declareClientNamedQueue(ch, q);
         assertThat(ok2.getMessageCount()).isEqualTo(1);
     }
@@ -1031,15 +1041,15 @@ public class ConnectionRecovery extends BrokerTestCase {
         TestUtils.closeAndWaitForRecovery((AutorecoveringConnection) this.connection);
     }
 
-    private void restartPrimaryAndWaitForRecovery() throws IOException, InterruptedException {
+    private void restartPrimaryAndWaitForRecovery() throws Exception {
         restartPrimaryAndWaitForRecovery(this.connection);
     }
 
-    private void restartPrimaryAndWaitForRecovery(Connection connection) throws IOException, InterruptedException {
+    private void restartPrimaryAndWaitForRecovery(Connection connection) throws Exception {
         CountDownLatch latch = prepareForRecovery(connection);
         // restart without tearing down and setting up
         // new connection and channel
-        bareRestart();
+        restart();
         wait(latch);
     }
 
@@ -1049,47 +1059,51 @@ public class ConnectionRecovery extends BrokerTestCase {
 
     @Override
     protected ConnectionFactory newConnectionFactory() {
-        return buildConnectionFactoryWithRecoveryEnabled(false);
+        ConnectionFactory cf = TestUtils.connectionFactory();
+        cf.setNetworkRecoveryInterval(RECOVERY_INTERVAL);
+        cf.setAutomaticRecoveryEnabled(true);
+        return cf;
     }
 
-    private static RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery)
+    private RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(disableTopologyRecovery);
         return (AutorecoveringConnection) cf.newConnection();
     }
 
-    private static RecoverableConnection newRecoveringConnection(Address[] addresses)
+    private RecoverableConnection newRecoveringConnection(Address[] addresses)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(false);
         // specifically use the Address[] overload
         return (AutorecoveringConnection) cf.newConnection(addresses);
     }
 
-    private static RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery,
+    private RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery,
                                                                  List<Address> addresses)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(disableTopologyRecovery);
         return (AutorecoveringConnection) cf.newConnection(addresses);
     }
 
-    private static RecoverableConnection newRecoveringConnection(List<Address> addresses)
+    private RecoverableConnection newRecoveringConnection(List<Address> addresses)
             throws IOException, TimeoutException {
         return newRecoveringConnection(false, addresses);
     }
 
-    private static RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery, String connectionName)
+    private RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery, String connectionName)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(disableTopologyRecovery);
         return (RecoverableConnection) cf.newConnection(connectionName);
     }
 
-    private static RecoverableConnection newRecoveringConnection(String connectionName)
+    private RecoverableConnection newRecoveringConnection(String connectionName)
             throws IOException, TimeoutException {
         return newRecoveringConnection(false, connectionName);
     }
 
-    private static ConnectionFactory buildConnectionFactoryWithRecoveryEnabled(boolean disableTopologyRecovery) {
+    private ConnectionFactory buildConnectionFactoryWithRecoveryEnabled(boolean disableTopologyRecovery) {
         ConnectionFactory cf = TestUtils.connectionFactory();
+        cf.setPort(getAmqpBrokerPortList().get(0));
         cf.setNetworkRecoveryInterval(RECOVERY_INTERVAL);
         cf.setAutomaticRecoveryEnabled(true);
         if (disableTopologyRecovery) {
@@ -1105,7 +1119,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     }
 
     private static void waitForConfirms(Channel ch) throws InterruptedException, TimeoutException {
-        ch.waitForConfirms(30 * 60 * 1000);
+        ch.waitForConfirms(6 * 1000);
     }
 
     private static void assertRecordedQueues(Connection conn, int size) {

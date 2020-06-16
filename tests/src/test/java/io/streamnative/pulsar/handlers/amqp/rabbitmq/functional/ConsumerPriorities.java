@@ -33,6 +33,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import org.junit.Test;
 
 /**
  * Testcase.
@@ -63,15 +64,15 @@ public class ConsumerPriorities extends BrokerTestCase {
     private static final long DELIVERY_TIMEOUT_MS = 100;
     private static final long CANCEL_OK_TIMEOUT_MS = 10 * 1000;
 
-    //@Test
+    @Test
     public void consumerPriorities() throws Exception {
         String queue = channel.queueDeclare().getQueue();
         QueueMessageConsumer highConsumer = new QueueMessageConsumer(channel);
         QueueMessageConsumer medConsumer = new QueueMessageConsumer(channel);
         QueueMessageConsumer lowConsumer = new QueueMessageConsumer(channel);
         String high = channel.basicConsume(queue, true, args(1), highConsumer);
-        String med = channel.basicConsume(queue, true, medConsumer);
-        channel.basicConsume(queue, true, args(-1), lowConsumer);
+        String med = channel.basicConsume(queue, true, args(2), medConsumer);
+        channel.basicConsume(queue, true, args(3), lowConsumer);
 
         publish(queue, COUNT, "high");
         assertContents(highConsumer, COUNT, "high");

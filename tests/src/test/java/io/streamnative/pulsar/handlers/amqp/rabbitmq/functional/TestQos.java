@@ -18,7 +18,6 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.GetResponse;
@@ -33,7 +32,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 
@@ -106,18 +104,17 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void noAckNoAlterLimit()
-        throws IOException, InterruptedException {
+            throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         declareBindConsume(channel, c, true);
         channel.basicQos(1, true);
         fill(2);
-        Thread.sleep(200);
         drain(c, 2);
     }
 
     //@Test
     public void noAckObeysLimit()
-        throws IOException, InterruptedException {
+            throws IOException {
         channel.basicQos(1, true);
         QueueingConsumer c1 = new QueueingConsumer(channel);
         declareBindConsume(channel, c1, false);
@@ -158,13 +155,13 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void fairness()
-        throws IOException, InterruptedException {
+            throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         final int queueCount = 1;
         final int messageCount = 100;
         List<String> queues = configure(c, 1, queueCount, messageCount);
 
-        for (int i = 0; i < messageCount; i++) {
+        for (int i = 0; i < messageCount - 1; i++) {
             List<Delivery> d = drain(c, 1);
             ack(d, false);
         }
@@ -180,7 +177,7 @@ public class TestQos extends BrokerTestCase {
         //probably good enough.
         for (String q : queues) {
             AMQP.Queue.DeclareOk ok = channel.queueDeclarePassive(q);
-            assertTrue(ok.getMessageCount() < messageCount);
+            assertTrue(ok.getMessageCount() == messageCount);
         }
 
     }
@@ -193,8 +190,7 @@ public class TestQos extends BrokerTestCase {
         //consumers get a fair share of the messages.
 
         channel.basicQos(1, true);
-        String q = channel.queueDeclare(UUID.randomUUID().toString(), true, false,
-            false, null).getQueue();
+        String q = channel.queueDeclare().getQueue();
         channel.queueBind(q, "amq.fanout", "");
 
         final Map<String, Integer> counts =
@@ -236,9 +232,9 @@ public class TestQos extends BrokerTestCase {
         assertTrue(counts.get("c2").intValue() > 0);
     }
 
-    //@Test
+   //@Test
     public void consumerLifecycle()
-        throws IOException, InterruptedException {
+            throws IOException {
         channel.basicQos(1, true);
         QueueingConsumer c = new QueueingConsumer(channel);
         String queue = generateQueueName();
@@ -259,7 +255,7 @@ public class TestQos extends BrokerTestCase {
 
     //@Test
     public void setLimitAfterConsume()
-        throws IOException, InterruptedException {
+            throws IOException {
         QueueingConsumer c = new QueueingConsumer(channel);
         declareBindConsume(c);
         channel.basicQos(1, true);
@@ -267,7 +263,6 @@ public class TestQos extends BrokerTestCase {
         //We actually only guarantee that the limit takes effect
         //*eventually*, so this can in fact fail. It's pretty unlikely
         //though.
-        Thread.sleep(200);
         List<Delivery> d = drain(c, 1);
         ack(d, true);
         drain(c, 1);
@@ -461,11 +456,9 @@ public class TestQos extends BrokerTestCase {
     }
 
     protected String declareBind(Channel ch) throws IOException {
-        String queue = generateQueueName();
-        String exchangeName = "amq.fanout";
-        ch.queueDeclare(queue, true, false, false, null).getQueue();
-        ch.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
-        ch.queueBind(queue, exchangeName, "");
+        AMQP.Queue.DeclareOk ok = ch.queueDeclare();
+        String queue = ok.getQueue();
+        ch.queueBind(queue, "amq.fanout", "");
         return queue;
     }
 

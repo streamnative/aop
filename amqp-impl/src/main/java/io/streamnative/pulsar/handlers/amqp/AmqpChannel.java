@@ -1030,7 +1030,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                         }
 
                                     } else {
-                                        log.error("publish message error {}", throwable.getMessage());
+                                        log.error("publish message error {}", throwable1.getMessage());
                                     }
                                 });
 

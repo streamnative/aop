@@ -18,6 +18,7 @@ import com.google.common.collect.Maps;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -59,26 +60,30 @@ public class ExchangeContainer {
         });
     }
 
-    public static AmqpExchange getExchange(NamespaceName namespaceName, String exchangeName) {
-        if (BUILDIN_EXCHANGE_NAME_SET.containsKey(exchangeName)
-            && countDownLatchMap.get(namespaceName) != null) {
-            try {
-                countDownLatchMap.get(namespaceName).await(2, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                log.error("Default exchanges init timeout. ");
-                return null;
-            } finally {
-                countDownLatchMap.remove(namespaceName);
+    public static CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
+                                                                   String exchangeName) {
+        CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = CompletableFuture.supplyAsync(() -> {
+            if (BUILDIN_EXCHANGE_NAME_SET.containsKey(exchangeName)
+                    && countDownLatchMap.get(namespaceName) != null) {
+                try {
+                    countDownLatchMap.get(namespaceName).await(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    log.error("Default exchanges init timeout. ");
+                    return null;
+                } finally {
+                    countDownLatchMap.remove(namespaceName);
+                }
             }
-        }
-        if (namespaceName == null || StringUtils.isEmpty(exchangeName)) {
-            return null;
-        }
-        Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
-        if (map == null) {
-            return null;
-        }
-        return map.getOrDefault(exchangeName, null);
+            if (namespaceName == null || StringUtils.isEmpty(exchangeName)) {
+                return null;
+            }
+            Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
+            if (map == null) {
+                return null;
+            }
+            return map.getOrDefault(exchangeName, null);
+        });
+        return amqpExchangeCompletableFuture;
     }
 
     public static void deleteExchange(NamespaceName namespaceName, String exchangeName) {
@@ -94,9 +99,14 @@ public class ExchangeContainer {
         CountDownLatch countDownLatch = new CountDownLatch(BUILDIN_EXCHANGE_NAME_SET.size());
         countDownLatchMap.put(namespaceName, countDownLatch);
         for (Map.Entry<String, AmqpExchange.Type> entry : BUILDIN_EXCHANGE_NAME_SET.entrySet()) {
-            if (getExchange(namespaceName, entry.getKey()) == null) {
-                addBuildInExchanges(pulsarService, namespaceName, entry.getKey(), entry.getValue());
-            }
+            CompletableFuture<AmqpExchange> completableFuture = asyncGetExchange(namespaceName, entry.getKey());
+            completableFuture.whenComplete((amqpExchange, throwable) -> {
+                if (null != throwable) {
+                    log.error("Get exchange failed:{}", throwable.getMessage());
+                } else if (amqpExchange == null){
+                    addBuildInExchanges(pulsarService, namespaceName, entry.getKey(), entry.getValue());
+                }
+            });
         }
     }
 

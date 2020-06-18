@@ -32,7 +32,7 @@ public class AmqpClientChannel {
     }
 
     public Object poll() {
-        int count = 3;
+        int count = 5;
         Object object = responses.poll();
         while (object == null && count > 0) {
             try {

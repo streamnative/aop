@@ -32,6 +32,17 @@ public class AmqpClientChannel {
     }
 
     public Object poll() {
-        return responses.poll();
+        int count = 3;
+        Object object = responses.poll();
+        while (object == null && count > 0) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            object = responses.poll();
+            count--;
+        }
+        return object;
     }
 }

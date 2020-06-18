@@ -181,12 +181,12 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
 
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
         ExchangeDeleteBody cmd1 = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
         cmd1.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
 
         AMQBody response1 = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response1 instanceof ExchangeDeleteOkBody);
@@ -227,20 +227,19 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
         exchangeDeclare(exchange, exchangeIsDurable);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
 
         queueDeclare(queue, queueIsDurable);
+        toServerSender.flush();
+        response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
 
         QueueBindBody cmd = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
             false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
-
-        response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof QueueDeclareOkBody);
-
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueBindOkBody);
         count++;

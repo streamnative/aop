@@ -36,7 +36,7 @@ public class AmqpClientChannel {
         Object object = responses.poll();
         while (object == null && count > 0) {
             try {
-                Thread.sleep(10);
+                Thread.sleep(100);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

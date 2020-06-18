@@ -156,14 +156,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
                 false, false, false, null);
         cmd1.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
 
         QueueDeclareBody cmd2 = methodRegistry.createQueueDeclareBody(0, "queue", true, true,
                 false, false, false, null);
         cmd2.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof QueueDeclareOkBody);
 
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueDeclareOkBody);
@@ -283,21 +282,21 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         List<String> subs = new ArrayList<>();
         subs.add(exchange);
         exchangeDeclare(exchange, true);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
         queueDeclare(queue, true);
+        toServerSender.flush();
+        AMQBody response1 = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response1 instanceof QueueDeclareOkBody);
 
         QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString(queue),
             AMQShortString.createAMQShortString(exchange), AMQShortString.createAMQShortString("key"), null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
-
-        response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof QueueDeclareOkBody);
-
-        response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof QueueUnbindOkBody);
+        AMQBody response2 = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response2 instanceof QueueUnbindOkBody);
     }
 
     @Test

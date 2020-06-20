@@ -22,7 +22,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
-import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
@@ -41,7 +40,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.SafeRunnable;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Subscription;
@@ -125,12 +123,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final AmqpFlowCreditManager creditManager;
     private final AtomicBoolean blockedOnCredit = new AtomicBoolean(false);
     public static final int DEFAULT_CONSUMER_PERMIT = 1000;
+    private ExchangeService exchangeService;
 
     public AmqpChannel(int channelId, AmqpConnection connection) {
         this.channelId = channelId;
         this.connection = connection;
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
         this.creditManager = new AmqpFlowCreditManager(0, 0);
+        this.exchangeService = new ExchangeServiceImpl(this);
     }
 
     @Override
@@ -153,131 +153,132 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
                                        boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
-        if (log.isDebugEnabled()) {
-            log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
-                            + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
-                            + "nowait: {}, arguments: {} ]", channelId, exchange,
-                    type, passive, durable, autoDelete, internal, nowait, arguments);
-        }
-
-        if (isDefaultExchange(exchange)) {
-            StringBuffer sb = new StringBuffer();
-            sb.append("Attempt to redeclare default exchange: of type")
-                    .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).append("to").append(type).append(".");
-            connection.sendConnectionClose(ErrorCodes.ACCESS_REFUSED, sb.toString(), channelId);
-        } else {
-            String exchangeName = exchange.toString().
-                    replaceAll("\r", "").
-                    replaceAll("\n", "").trim();
-            final MethodRegistry methodRegistry = connection.getMethodRegistry();
-            final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
-            AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
-            if (passive) {
-                if (null == amqpExchange) {
-                    if (durable) {
-                        TopicName topicName = TopicName.get(
-                            TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
-                        CompletableFuture<Topic> tf = AmqpTopicManager.getTopic(connection.getPulsarService(),
-                                topicName.toString(),
-                                false);
-                        tf.whenComplete((t, e) -> {
-                            if (e != null) {
-                                closeChannel(INTERNAL_ERROR, e.getMessage());
-                                return;
-                            }
-                            if (t == null) {
-                                closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
-                                return;
-                            }
-                            ExchangeContainer.
-                                putExchange(connection.getNamespaceName(), exchangeName,
-                                    new PersistentExchange(exchangeName, AmqpExchange.Type.value(
-                                        type.toString()), (PersistentTopic) t, autoDelete));
-                            if (!nowait) {
-                                sync();
-                                connection.writeFrame(declareOkBody.generateFrame(channelId));
-                            }
-                        });
-                    } else {
-                        closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
-                    }
-                } else if (!(type == null || type.length() == 0)
-                        && !amqpExchange.getType().toString().equalsIgnoreCase(type.toString())) {
-                    connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Attempt to redeclare exchange: '"
-                            + exchangeName
-                            + "' of type "
-                            + amqpExchange.getType()
-                            + " to "
-                            + type
-                            + ".", getChannelId());
-                } else if (!nowait) {
-                    sync();
-                    connection.writeFrame(declareOkBody.generateFrame(getChannelId()));
-                }
-            } else {
-                if (null != amqpExchange) {
-                    if (!amqpExchange.getType().toString().equalsIgnoreCase(type.toString())
-                            || !amqpExchange.getAutoDelete() == autoDelete
-                            || !amqpExchange.getDurable() == durable) {
-                        connection.sendConnectionClose(ErrorCodes.IN_USE, "Attempt to redeclare exchange: '"
-                                + exchangeName
-                                + "' of type "
-                                + amqpExchange.getType()
-                                + " to "
-                                + type
-                                + ".", getChannelId());
-                    } else {
-                        if (!nowait) {
-                            sync();
-                            connection.writeFrame(declareOkBody.generateFrame(channelId));
-                        }
-                    }
-                } else {
-                    // create new exchange, on first step, we just create a Pulsar Topic.
-                    if (PulsarService.State.Started == connection.getPulsarService().getState()) {
-
-                        if (!durable) {
-                            // in-memory integration
-                            InMemoryExchange inMemoryExchange = new InMemoryExchange(
-                                    exchangeName, AmqpExchange.Type.value(type.toString()), autoDelete);
-                            ExchangeContainer.putExchange(connection.getNamespaceName(),
-                                    exchangeName, inMemoryExchange);
-                            if (!nowait) {
-                                sync();
-                                connection.writeFrame(declareOkBody.generateFrame(channelId));
-                            }
-                            return;
-                        }
-
-                        String exchangeTopicName = PersistentExchange.getExchangeTopicName(
-                                connection.getNamespaceName(), exchangeName);
-                        try {
-                            PersistentTopic persistentTopic =
-                                    (PersistentTopic) AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(),
-                                    exchangeTopicName, true);
-                            if (persistentTopic == null) {
-                                connection.sendConnectionClose(INTERNAL_ERROR,
-                                        "AOP Create Exchange failed.", channelId);
-                                return;
-                            }
-                            ExchangeContainer.
-                                    putExchange(connection.getNamespaceName(), exchangeName,
-                                            new PersistentExchange(exchangeName, AmqpExchange.Type.value(
-                                                    type.toString()), persistentTopic, autoDelete));
-                            if (!nowait) {
-                                sync();
-                                connection.writeFrame(declareOkBody.generateFrame(channelId));
-                            }
-                        } catch (Exception e) {
-                            log.error(channelId + "Exchange declare failed! exchangeName: " + exchangeName, e);
-                            connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
-                        }
-                    } else {
-                        connection.sendConnectionClose(INTERNAL_ERROR, "PulsarService not start.", channelId);
-                    }
-                }
-            }
-        }
+        this.exchangeService.exchangeDeclare(exchange,type,passive,durable,autoDelete,internal,nowait,arguments);
+//        if (log.isDebugEnabled()) {
+//            log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
+//                            + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
+//                            + "nowait: {}, arguments: {} ]", channelId, exchange,
+//                    type, passive, durable, autoDelete, internal, nowait, arguments);
+//        }
+//
+//        if (isDefaultExchange(exchange)) {
+//            StringBuffer sb = new StringBuffer();
+//            sb.append("Attempt to redeclare default exchange: of type")
+//                    .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS).append("to").append(type).append(".");
+//            connection.sendConnectionClose(ErrorCodes.ACCESS_REFUSED, sb.toString(), channelId);
+//        } else {
+//            String exchangeName = exchange.toString().
+//                    replaceAll("\r", "").
+//                    replaceAll("\n", "").trim();
+//            final MethodRegistry methodRegistry = connection.getMethodRegistry();
+//            final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
+//            AmqpExchange amqpExchange = ExchangeContainer.getExchange(connection.getNamespaceName(), exchangeName);
+//            if (passive) {
+//                if (null == amqpExchange) {
+//                    if (durable) {
+//                        TopicName topicName = TopicName.get(
+//                            TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
+//                        CompletableFuture<Topic> tf = AmqpTopicManager.getTopic(connection.getPulsarService(),
+//                                topicName.toString(),
+//                                false);
+//                        tf.whenComplete((t, e) -> {
+//                            if (e != null) {
+//                                closeChannel(INTERNAL_ERROR, e.getMessage());
+//                                return;
+//                            }
+//                            if (t == null) {
+//                                closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
+//                                return;
+//                            }
+//                            ExchangeContainer.
+//                                putExchange(connection.getNamespaceName(), exchangeName,
+//                                    new PersistentExchange(exchangeName, AmqpExchange.Type.value(
+//                                        type.toString()), (PersistentTopic) t, autoDelete));
+//                            if (!nowait) {
+//                                sync();
+//                                connection.writeFrame(declareOkBody.generateFrame(channelId));
+//                            }
+//                        });
+//                    } else {
+//                        closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
+//                    }
+//                } else if (!(type == null || type.length() == 0)
+//                        && !amqpExchange.getType().toString().equalsIgnoreCase(type.toString())) {
+//                    connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Attempt to redeclare exchange: '"
+//                            + exchangeName
+//                            + "' of type "
+//                            + amqpExchange.getType()
+//                            + " to "
+//                            + type
+//                            + ".", getChannelId());
+//                } else if (!nowait) {
+//                    sync();
+//                    connection.writeFrame(declareOkBody.generateFrame(getChannelId()));
+//                }
+//            } else {
+//                if (null != amqpExchange) {
+//                    if (!amqpExchange.getType().toString().equalsIgnoreCase(type.toString())
+//                            || !amqpExchange.getAutoDelete() == autoDelete
+//                            || !amqpExchange.getDurable() == durable) {
+//                        connection.sendConnectionClose(ErrorCodes.IN_USE, "Attempt to redeclare exchange: '"
+//                                + exchangeName
+//                                + "' of type "
+//                                + amqpExchange.getType()
+//                                + " to "
+//                                + type
+//                                + ".", getChannelId());
+//                    } else {
+//                        if (!nowait) {
+//                            sync();
+//                            connection.writeFrame(declareOkBody.generateFrame(channelId));
+//                        }
+//                    }
+//                } else {
+//                    // create new exchange, on first step, we just create a Pulsar Topic.
+//                    if (PulsarService.State.Started == connection.getPulsarService().getState()) {
+//
+//                        if (!durable) {
+//                            // in-memory integration
+//                            InMemoryExchange inMemoryExchange = new InMemoryExchange(
+//                                    exchangeName, AmqpExchange.Type.value(type.toString()), autoDelete);
+//                            ExchangeContainer.putExchange(connection.getNamespaceName(),
+//                                    exchangeName, inMemoryExchange);
+//                            if (!nowait) {
+//                                sync();
+//                                connection.writeFrame(declareOkBody.generateFrame(channelId));
+//                            }
+//                            return;
+//                        }
+//
+//                        String exchangeTopicName = PersistentExchange.getExchangeTopicName(
+//                                connection.getNamespaceName(), exchangeName);
+//                        try {
+//                            PersistentTopic persistentTopic =
+//                                    (PersistentTopic) AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(),
+//                                    exchangeTopicName, true);
+//                            if (persistentTopic == null) {
+//                                connection.sendConnectionClose(INTERNAL_ERROR,
+//                                        "AOP Create Exchange failed.", channelId);
+//                                return;
+//                            }
+//                            ExchangeContainer.
+//                                    putExchange(connection.getNamespaceName(), exchangeName,
+//                                            new PersistentExchange(exchangeName, AmqpExchange.Type.value(
+//                                                    type.toString()), persistentTopic, autoDelete));
+//                            if (!nowait) {
+//                                sync();
+//                                connection.writeFrame(declareOkBody.generateFrame(channelId));
+//                            }
+//                        } catch (Exception e) {
+//                            log.error(channelId + "Exchange declare failed! exchangeName: " + exchangeName, e);
+//                            connection.sendConnectionClose(INTERNAL_ERROR, "AOP Create Exchange failed.", channelId);
+//                        }
+//                    } else {
+//                        connection.sendConnectionClose(INTERNAL_ERROR, "PulsarService not start.", channelId);
+//                    }
+//                }
+//            }
+//        }
     }
 
     @Override
@@ -978,7 +979,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         unfinishedCommandsQueue.add(new AsyncCommand(future, action));
     }
 
-    private void sync() {
+    public void sync() {
         if (log.isDebugEnabled()) {
             log.debug("sync() called on channel " + debugIdentity());
         }
@@ -1160,7 +1161,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
     }
 
-    private void closeChannel(int cause, final String message) {
+    public void closeChannel(int cause, final String message) {
         connection.closeChannelAndWriteFrame(this, cause, message);
     }
 

@@ -78,12 +78,11 @@ public class ExchangeContainer {
                 amqpExchangeCompletableFuture.complete(null);
             }
             Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
-            if (map == null) {
+            if (map == null || map.getOrDefault(exchangeName, null) == null) {
                 // check pulsar topic
-                TopicName topicName = TopicName.get(
-                        TopicDomain.persistent.value(), namespaceName, exchangeName);
+                String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
                 CompletableFuture<Topic> topicCompletableFuture =
-                        AmqpTopicManager.getTopic(pulsarService, topicName.toString(), createIfMissing);
+                        AmqpTopicManager.getTopic(pulsarService, topicName, createIfMissing);
                 topicCompletableFuture.whenComplete((topic, throwable) -> {
                     if (throwable != null) {
                         log.error("Get topic error:{}", throwable.getMessage());
@@ -91,17 +90,19 @@ public class ExchangeContainer {
                     } else {
                         if (null == topic) {
                             log.error("Exchange topic not existed, exchangeName:{}", exchangeName);
+                            amqpExchangeCompletableFuture.complete(null);
                         } else {
                             // recover metadata if existed
                             PersistentTopic persistentTopic = (PersistentTopic) topic;
                             Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
                             AmqpExchange.Type amqpExchangeType;
                             // if properties has type, ignore the exchangeType
-                            if (null != properties) {
+                            if (null != properties && properties.size() > 0
+                                && null != properties.get(PersistentExchange.TYPE)) {
                                 String type = properties.get(PersistentExchange.TYPE);
-                                amqpExchangeType = AmqpExchange.Type.valueOf(type);
+                                amqpExchangeType = AmqpExchange.Type.value(type);
                             } else {
-                                amqpExchangeType = AmqpExchange.Type.valueOf(exchangeType);
+                                amqpExchangeType = AmqpExchange.Type.value(exchangeType);
                             }
                             PersistentExchange amqpExchange = new PersistentExchange(exchangeName,
                                     amqpExchangeType,

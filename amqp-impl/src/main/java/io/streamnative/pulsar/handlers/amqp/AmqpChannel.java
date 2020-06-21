@@ -1234,7 +1234,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     }
 
-    private void setDefaultQueue(AmqpQueue queue) {
+    public void setDefaultQueue(AmqpQueue queue) {
         defaultQueue = queue;
     }
 
@@ -1242,7 +1242,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return defaultQueue;
     }
 
-    private void checkExclusiveQueue(AmqpQueue amqpQueue) {
+    public void checkExclusiveQueue(AmqpQueue amqpQueue) {
         if (amqpQueue != null && amqpQueue.isExclusive()
             && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
             closeChannel(ErrorCodes.ALREADY_EXISTS,

@@ -17,6 +17,7 @@ import static org.apache.curator.shaded.com.google.common.base.Preconditions.che
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
@@ -62,7 +63,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
-    private ObjectMapper jsonMapper = ObjectMapperFactory.create();
+    private ObjectMapper jsonMapper = new JsonMapper();
     private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
     private AmqpExchangeReplicator messageReplicator;
 
@@ -218,7 +219,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
         try {
             properties.put(EXCHANGE, exchangeName);
             properties.put(TYPE, exchangeType.toString());
-            properties.put(QUEUES, jsonMapper.writeValueAsString(getQueueNames()));
+            List<String> queueNames = getQueueNames();
+            if(queueNames.size() != 0) {
+                properties.put(QUEUES, jsonMapper.writeValueAsString(getQueueNames()));
+            }
         } catch (JsonProcessingException e) {
             log.error("[{}] covert map of routers to String error: {}", exchangeName, e.getMessage());
             return;

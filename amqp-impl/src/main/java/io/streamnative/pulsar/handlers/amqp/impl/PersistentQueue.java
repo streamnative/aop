@@ -14,9 +14,9 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
@@ -53,13 +53,14 @@ public class PersistentQueue extends AbstractAmqpQueue {
     @Getter
     private PersistentTopic indexTopic;
 
-    private ObjectMapper jsonMapper = ObjectMapperFactory.create();
+    private ObjectMapper jsonMapper;
 
     public PersistentQueue(String queueName, PersistentTopic indexTopic, long connectionId,
                            boolean exclusive, boolean autoDelete) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
         topicNameValidate();
+        jsonMapper = new ObjectMapper();
     }
 
     @Override
@@ -101,6 +102,23 @@ public class PersistentQueue extends AbstractAmqpQueue {
     @Override
     public Topic getTopic() {
         return indexTopic;
+    }
+
+    public void recoverRoutersFromQueueProperties(Map<String, String> properties) {
+        if (null == properties || properties.size() == 0) {
+            return;
+        }
+        try {
+            List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS), List.class);
+            amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
+                AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
+                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                String exchangeName = amqpQueueProperty.getExchangeName();
+                routers.put(exchangeName, messageRouter);
+            });
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
     }
 
     private void updateQueueProperties() {

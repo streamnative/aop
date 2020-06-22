@@ -26,6 +26,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
+import io.streamnative.pulsar.handlers.amqp.QueueContainer;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
@@ -115,6 +116,8 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
         initMockAmqpTopicManager();
         initProtocol();
+        ExchangeContainer.init(connection.getPulsarService());
+        QueueContainer.setPulsarService(connection.getPulsarService());
         initDefaultExchange();
     }
 
@@ -123,10 +126,10 @@ public abstract class AmqpProtocolTestBase {
         String namespace = "vhost1";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
-        addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
-        addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
-        addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
-        addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
+//        addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
+//        addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
+//        addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
+//        addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
     }
 
     private void addBuildInExchanges(NamespaceName namespaceName,
@@ -155,6 +158,9 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
         Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
         Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
+        CompletableFuture deleteCpm = new CompletableFuture<>();
+        Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);
+        deleteCpm.complete(null);
 
         completableFuture.complete(persistentTopic);
         NamespaceService namespaceService = Mockito.mock(NamespaceService.class);

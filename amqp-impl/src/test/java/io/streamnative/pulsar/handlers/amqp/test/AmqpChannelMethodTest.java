@@ -94,7 +94,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     @Test
     public void testAccessRequest() {
         AccessRequestBody cmd = methodRegistry
-            .createAccessRequestBody(AMQShortString.createAMQShortString("test"), true, false, true, true, true);
+                .createAccessRequestBody(AMQShortString.createAMQShortString("test"), true, false, true, true, true);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -103,11 +103,11 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertEquals(accessRequestOkBody.getTicket(), 0);
     }
 
-    @Test
+//    @Test
     public void testExchangeDeclareFail() {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry
-            .createExchangeDeclareBody(0, "test", "fanout", false, false, false, false, true, null);
+                .createExchangeDeclareBody(0, "test", "fanout", false, false, false, false, true, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -120,7 +120,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
         ExchangeDeclareBody cmd = methodRegistry
-            .createExchangeDeclareBody(0, exchange, "fanout", false, true, false, false, false, null);
+                .createExchangeDeclareBody(0, exchange, "fanout", false, true, false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -156,15 +156,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
                 false, false, false, null);
         cmd1.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof QueueDeclareOkBody);
 
         QueueDeclareBody cmd2 = methodRegistry.createQueueDeclareBody(0, "queue", true, true,
                 false, false, false, null);
         cmd2.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof QueueDeclareOkBody);
-
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueDeclareOkBody);
 
@@ -181,12 +179,12 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
 
+        AMQBody response = (AMQBody) clientChannel.poll();
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
         ExchangeDeleteBody cmd1 = methodRegistry.createExchangeDeleteBody(0, exchange, false, true);
         cmd1.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
 
         AMQBody response1 = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response1 instanceof ExchangeDeleteOkBody);
@@ -210,7 +208,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         NamespaceName namespaceName = NamespaceName.get("public", "vhost1");
         connection.setNamespaceName(namespaceName);
         QueueDeclareBody cmd = methodRegistry.createQueueDeclareBody(0, "queue", false, true,
-            false, false, false, null);
+                false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -227,20 +225,19 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
 
         exchangeDeclare(exchange, exchangeIsDurable);
-
-        queueDeclare(queue, queueIsDurable);
-
-        QueueBindBody cmd = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
-            false, null);
-        cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
         AMQBody response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
 
+        queueDeclare(queue, queueIsDurable);
+        toServerSender.flush();
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueDeclareOkBody);
 
+        QueueBindBody cmd = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
+                false, null);
+        cmd.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueBindOkBody);
         count++;
@@ -249,7 +246,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     @Test
     public void testQueuePurge() {
         QueuePurgeBody cmd = methodRegistry
-            .createQueuePurgeBody(0, AMQShortString.createAMQShortString("queue"), false);
+                .createQueuePurgeBody(0, AMQShortString.createAMQShortString("queue"), false);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
@@ -264,14 +261,13 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
                 false, false, false, null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-
-        QueueDeleteBody cmd1 = methodRegistry.createQueueDeleteBody(0, "queue", false, false,
-            false);
-        cmd1.generateFrame(1).writePayload(toServerSender);
-        toServerSender.flush();
-
         AMQBody response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueDeclareOkBody);
+
+        QueueDeleteBody cmd1 = methodRegistry.createQueueDeleteBody(0, "queue", false, false,
+                false);
+        cmd1.generateFrame(1).writePayload(toServerSender);
+        toServerSender.flush();
         AMQBody response1 = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response1 instanceof QueueDeleteOkBody);
     }
@@ -287,7 +283,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         queueDeclare(queue, true);
 
         QueueUnbindBody cmd = methodRegistry.createQueueUnbindBody(0, AMQShortString.createAMQShortString(queue),
-            AMQShortString.createAMQShortString(exchange), AMQShortString.createAMQShortString("key"), null);
+                AMQShortString.createAMQShortString(exchange), AMQShortString.createAMQShortString("key"), null);
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
 
@@ -348,20 +344,20 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
 
     private void exchangeDeclare(String exchange, boolean durable) {
         ExchangeDeclareBody exchangeDeclareBody = methodRegistry
-            .createExchangeDeclareBody(0, exchange, "fanout", false, durable,
-                false, false, false, null);
+                .createExchangeDeclareBody(0, exchange, "fanout", false, durable,
+                        false, false, false, null);
         exchangeDeclareBody.generateFrame(1).writePayload(toServerSender);
     }
 
     private void queueDeclare(String queue, boolean durable) {
         QueueDeclareBody queueDeclareBody = methodRegistry.createQueueDeclareBody(0, queue,
-            false, durable, false, false, false, null);
+                false, durable, false, false, false, null);
         queueDeclareBody.generateFrame(1).writePayload(toServerSender);
     }
 
     private void queueBind(String exchange, String queue) {
         QueueBindBody queueBindBody = methodRegistry.createQueueBindBody(0, queue, exchange, "key",
-            false, null);
+                false, null);
         queueBindBody.generateFrame(1).writePayload(toServerSender);
     }
 
@@ -384,7 +380,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         response = (AMQBody) clientChannel.poll();
         Assert.assertTrue(response instanceof QueueBindOkBody);
         BasicConsumeBody basicConsumeBody = methodRegistry.createBasicConsumeBody(0, queueName,
-            "consumerTag1", false, true, false, false, null);
+                "consumerTag1", false, true, false, false, null);
         basicConsumeBody.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         response = (AMQBody) clientChannel.poll();
@@ -395,7 +391,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testBasicCancel() {
         testBasicConsume();
         BasicCancelBody basicCancelBody = methodRegistry.
-            createBasicCancelBody(AMQShortString.createAMQShortString("consumerTag1"), false);
+                createBasicCancelBody(AMQShortString.createAMQShortString("consumerTag1"), false);
         basicCancelBody.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();

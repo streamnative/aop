@@ -15,7 +15,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Maps;
-import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -23,10 +22,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 
 /**
@@ -35,6 +37,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class QueueContainer {
     private static Executor executor = Executors.newCachedThreadPool();
+    @Setter
     private static PulsarService pulsarService;
 
     @Getter
@@ -52,7 +55,7 @@ public class QueueContainer {
     }
 
     public static CompletableFuture<AmqpQueue> asyncGetQueue(NamespaceName namespaceName,
-        String queueName, boolean createIfMissing) {
+                                                             String queueName, boolean createIfMissing) {
         CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
         executor.execute(() -> {
             if (namespaceName == null || StringUtils.isEmpty(queueName)) {
@@ -61,15 +64,32 @@ public class QueueContainer {
             Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
             if (map == null || map.getOrDefault(queueName, null) == null) {
                 // check pulsar topic
+                if(pulsarService.getState() != PulsarService.State.Started){
+                    queueCompletableFuture.completeExceptionally(
+                            new PulsarServerException("PulsarService not start"));
+                }
                 String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
                 CompletableFuture<Topic> topicCompletableFuture =
-                    AmqpTopicManager.getTopic(pulsarService, topicName, createIfMissing);
+                        AmqpTopicManager.getTopic(pulsarService, topicName, createIfMissing);
                 topicCompletableFuture.whenComplete((topic, throwable) -> {
                     if (throwable != null) {
                         log.error("Get topic error:{}", throwable.getMessage());
                         queueCompletableFuture.complete(null);
                     } else {
+                        if (null == topic) {
+                            log.error("Queue topic not existed, queueName:{}", queueName);
+                            queueCompletableFuture.complete(null);
+                        } else {
+                            // recover metadata if existed
+                            PersistentTopic persistentTopic = (PersistentTopic) topic;
+                            Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
 
+                            PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
+                                    0, false, false);
+                            amqpQueue.recoverRoutersFromQueueProperties(properties);
+                            QueueContainer.putQueue(namespaceName, queueName, amqpQueue);
+                            queueCompletableFuture.complete(amqpQueue);
+                        }
                     }
                 });
 
@@ -99,4 +119,5 @@ public class QueueContainer {
             queueMap.get(namespaceName).remove(queueName);
         }
     }
+
 }

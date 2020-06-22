@@ -17,12 +17,18 @@ package io.streamnative.pulsar.handlers.amqp;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
-public interface ExchangeService {
+public interface QueueService {
 
-    void exchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
-                         boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments);
+    void queueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
+                      boolean autoDelete, boolean nowait, FieldTable arguments);
 
-    void exchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait);
+    void queueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait);
 
-    void exchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queueName);
+    void queueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+                   boolean nowait, FieldTable argumentsTable);
+
+    void queueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+                     FieldTable arguments);
+
+    void queuePurge(AMQShortString queue, boolean nowait);
 }

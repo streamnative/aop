@@ -114,8 +114,6 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
         initMockAmqpTopicManager();
         initProtocol();
-        ExchangeContainer.init(connection.getPulsarService());
-        QueueContainer.setPulsarService(connection.getPulsarService());
         initDefaultExchange();
     }
 

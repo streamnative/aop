@@ -219,7 +219,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             consumerTag1 = consumerTag.toString();
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                QueueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                        queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
@@ -309,7 +310,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         if (isDefaultExchange(exchange)) {
             CompletableFuture<AmqpExchange> completableFuture = ExchangeContainer.
-                    asyncGetExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
+                    asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
+                            AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
                             true, ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
             completableFuture.whenComplete((amqpExchange, throwable) -> {
                 if (null != throwable) {
@@ -318,7 +320,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 } else {
                     String queueName = routingKey.toString();
                     CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                            QueueContainer.asyncGetQueue(connection.getNamespaceName(), queueName, false);
+                            QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                                    queueName, false);
                     amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable1) -> {
                         if (throwable1 != null) {
                             log.error("Get Topic error:{}", throwable1.getMessage());
@@ -359,7 +362,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicGet(AMQShortString queue, boolean noAck) {
         String queueName = AMQShortString.toString(queue);
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                QueueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                        queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
@@ -528,7 +532,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
             }
             CompletableFuture<AmqpExchange> completableFuture = ExchangeContainer.
-                    asyncGetExchange(connection.getNamespaceName(), exchangeName, createIfMissing, exchangeType);
+                    asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(), exchangeName,
+                            createIfMissing,
+                            exchangeType);
             completableFuture.whenComplete((amqpExchange, throwable) -> {
                         if (null != throwable) {
                             log.error("Get exchange failed:{}", throwable.getMessage());

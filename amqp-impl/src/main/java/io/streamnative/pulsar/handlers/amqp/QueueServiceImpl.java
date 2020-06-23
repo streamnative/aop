@@ -57,9 +57,9 @@ public class QueueServiceImpl implements QueueService {
         }
         AMQShortString finalQueue = queue;
         boolean createIfMissing = passive ? false : true;
-        QueueContainer.setPulsarService(connection.getPulsarService());
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                QueueContainer.asyncGetQueue(connection.getNamespaceName(), finalQueue.toString(), createIfMissing);
+                QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                        finalQueue.toString(), createIfMissing);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
@@ -91,7 +91,8 @@ public class QueueServiceImpl implements QueueService {
             delete(amqpQueue);
         } else {
             CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                    QueueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                    QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                            queue.toString(), false);
             amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
                 if (throwable != null) {
                     log.error("Get Topic error:{}", throwable.getMessage());
@@ -123,7 +124,8 @@ public class QueueServiceImpl implements QueueService {
             bind(exchange, amqpQueue, bindingKey.toString(), arguments);
         } else {
             CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                    QueueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                    QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                            queue.toString(), false);
             AMQShortString finalBindingKey = bindingKey;
             amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
                 if (throwable != null) {
@@ -153,7 +155,8 @@ public class QueueServiceImpl implements QueueService {
                     exchange, bindingKey, arguments);
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                QueueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                        queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
@@ -171,7 +174,8 @@ public class QueueServiceImpl implements QueueService {
                     exchangeName = exchange.toString();
                 }
                 CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                        ExchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName,
+                        ExchangeContainer.asyncGetExchange(connection.getPulsarService(),
+                                connection.getNamespaceName(), exchangeName,
                                 false, null);
                 amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable1) -> {
                     if (throwable1 != null) {
@@ -252,7 +256,8 @@ public class QueueServiceImpl implements QueueService {
         }
 
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                ExchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName,
+                ExchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
+                        exchangeName,
                         createIfMissing, exchangeType);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {

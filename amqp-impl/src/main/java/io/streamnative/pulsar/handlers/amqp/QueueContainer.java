@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
@@ -37,8 +36,6 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class QueueContainer {
     private static Executor executor = Executors.newCachedThreadPool();
-    @Setter
-    private static PulsarService pulsarService;
 
     @Getter
     private static Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
@@ -54,7 +51,7 @@ public class QueueContainer {
         });
     }
 
-    public static CompletableFuture<AmqpQueue> asyncGetQueue(NamespaceName namespaceName,
+    public static CompletableFuture<AmqpQueue> asyncGetQueue(PulsarService pulsarService, NamespaceName namespaceName,
                                                              String queueName, boolean createIfMissing) {
         CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
         executor.execute(() -> {

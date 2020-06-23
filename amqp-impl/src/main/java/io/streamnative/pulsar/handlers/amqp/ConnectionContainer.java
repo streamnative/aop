@@ -31,12 +31,10 @@ import org.apache.zookeeper.ZooKeeper;
 @Slf4j
 public class ConnectionContainer {
 
-    private static PulsarService pulsarService;
     public static ZooKeeper zooKeeper;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     public static void init(PulsarService pulsarService) {
-        ConnectionContainer.pulsarService = pulsarService;
         ConnectionContainer.zooKeeper = pulsarService.getLocalZkCache().getZooKeeper();
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override

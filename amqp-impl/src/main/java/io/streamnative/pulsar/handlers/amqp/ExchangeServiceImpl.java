@@ -79,7 +79,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         boolean createIfMissing = passive ? false : true;
 
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                ExchangeContainer.asyncGetExchange(connection.getNamespaceName(),
+                ExchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
                         exchangeName, createIfMissing,
                         type.toString());
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
@@ -120,7 +120,9 @@ public class ExchangeServiceImpl implements ExchangeService {
         } else {
             String exchangeName = formatString(exchange.toString());
             CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                    ExchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
+                    ExchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
+                            exchangeName, false,
+                            null);
             amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                 if (throwable != null) {
                     log.error("Get Topic error:{}", throwable.getMessage());

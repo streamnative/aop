@@ -82,8 +82,8 @@ public class QueueContainer {
                             Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
 
                             PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
-                                    0, false, false);
-                            amqpQueue.recoverRoutersFromQueueProperties(properties, namespaceName);
+                                0, false, false);
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, pulsarService, namespaceName);
                             QueueContainer.putQueue(namespaceName, queueName, amqpQueue);
                             queueCompletableFuture.complete(amqpQueue);
                         }

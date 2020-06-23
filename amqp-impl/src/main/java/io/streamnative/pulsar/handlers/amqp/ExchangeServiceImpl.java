@@ -31,6 +31,9 @@ import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 
+/**
+ * Logic of exchange.
+ */
 @Slf4j
 public class ExchangeServiceImpl implements ExchangeService {
     private final int channelId;
@@ -58,7 +61,9 @@ public class ExchangeServiceImpl implements ExchangeService {
     }
 
 
-    public void exchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable, boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
+    public void exchangeDeclare(AMQShortString exchange, AMQShortString type,
+                                boolean passive, boolean durable, boolean autoDelete,
+                                boolean internal, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
                             + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
@@ -87,8 +92,10 @@ public class ExchangeServiceImpl implements ExchangeService {
                 } else {
                     if (!(type == null || type.length() == 0)
                             && !amqpExchange.getType().toString().equalsIgnoreCase(type.toString())) {
-                        connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Attempt to redeclare exchange: '"
-                                + exchangeName + "' of type " + amqpExchange.getType() + " to " + type + ".", channelId);
+                        connection.sendConnectionClose(ErrorCodes.NOT_ALLOWED,
+                                "Attempt to redeclare exchange: '"
+                                        + exchangeName + "' of type " + amqpExchange.getType()
+                                        + " to " + type + ".", channelId);
                     } else if (!nowait) {
                         amqpChannel.sync();
                         connection.writeFrame(declareOkBody.generateFrame(channelId));

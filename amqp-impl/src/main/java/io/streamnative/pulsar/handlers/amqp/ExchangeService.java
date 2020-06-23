@@ -17,6 +17,9 @@ package io.streamnative.pulsar.handlers.amqp;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
+/**
+ * Logic of exchange.
+ */
 public interface ExchangeService {
 
     void exchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,

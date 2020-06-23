@@ -166,7 +166,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                  boolean nowait, FieldTable argumentsTable) {
-        queueService.queueBind(queue,exchange,bindingKey,nowait,argumentsTable);
+        queueService.queueBind(queue, exchange, bindingKey, nowait, argumentsTable);
     }
 
     @Override
@@ -340,7 +340,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                 setPublishFrame(info, null);
                             }
                         }
-                    });
+                    }).join();
                 }
             }).join();
         } else {
@@ -508,8 +508,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
-
-
             Message<byte[]> message;
             try {
                 message = MessageConvertUtils.toPulsarMessage(currentMessage);

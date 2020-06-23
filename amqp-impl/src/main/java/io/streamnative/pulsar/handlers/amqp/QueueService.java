@@ -17,6 +17,9 @@ package io.streamnative.pulsar.handlers.amqp;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
+/**
+ * Logic of queue.
+ */
 public interface QueueService {
 
     void queueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,

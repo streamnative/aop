@@ -28,6 +28,9 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 
+/**
+ * Logic of queue.
+ */
 @Slf4j
 public class QueueServiceImpl implements QueueService {
     private final int channelId;
@@ -184,7 +187,8 @@ public class QueueServiceImpl implements QueueService {
                             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
                             connection.writeFrame(responseBody.generateFrame(channelId));
                         } catch (Exception e) {
-                            connection.sendConnectionClose(INTERNAL_ERROR, "unbind failed:" + e.getMessage(), channelId);
+                            connection.sendConnectionClose(INTERNAL_ERROR,
+                                    "unbind failed:" + e.getMessage(), channelId);
                         }
                     }
                 });
@@ -206,7 +210,7 @@ public class QueueServiceImpl implements QueueService {
 
     private void delete(AmqpQueue amqpQueue) {
         if (amqpQueue == null) {
-            amqpChannel.closeChannel(ErrorCodes.NOT_FOUND, "Queue '" + amqpQueue.getName() + "' does not exist.");
+            amqpChannel.closeChannel(ErrorCodes.NOT_FOUND, "Queue does not exist.");
         } else {
             amqpChannel.checkExclusiveQueue(amqpQueue);
             QueueContainer.deleteQueue(connection.getNamespaceName(), amqpQueue.getName());
@@ -235,8 +239,8 @@ public class QueueServiceImpl implements QueueService {
 
     private void bind(AMQShortString exchange, AmqpQueue amqpQueue,
                       String bindingKey, Map<String, Object> arguments) {
-        String exchangeName = amqpChannel.isDefaultExchange(exchange) ?
-                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE : exchange.toString();
+        String exchangeName = amqpChannel.isDefaultExchange(exchange)
+                ? AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE : exchange.toString();
         if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)) {
             amqpChannel.closeChannel(ErrorCodes.ACCESS_REFUSED, "Can not bind to default exchange ");
         }

@@ -64,7 +64,7 @@ public class QueueContainer {
             Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
             if (map == null || map.getOrDefault(queueName, null) == null) {
                 // check pulsar topic
-                if(pulsarService.getState() != PulsarService.State.Started){
+                if (pulsarService.getState() != PulsarService.State.Started) {
                     queueCompletableFuture.completeExceptionally(
                             new PulsarServerException("PulsarService not start"));
                 }

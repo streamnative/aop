@@ -35,6 +35,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.client.impl.PulsarClientImpl;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfo;
 import org.testng.Assert;
@@ -182,6 +185,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                     countDownLatch.countDown();
                 }
             };
+            consumeChannel.setDefaultConsumer(consumer);
             try {
                 consumeChannel.basicConsume(queueName, false, consumer);
                 log.info("[{}] consume start. queueName: {}", testName, queueName);
@@ -241,6 +245,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
                     countDownLatch.countDown();
                 }
             };
+            channel.setDefaultConsumer(consumer);
             channel.basicConsume(queueName, consumer);
         }
         countDownLatch.await();

@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -49,7 +48,6 @@ import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
-import org.apache.pulsar.common.util.ObjectMapperFactory;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 
 /**
@@ -220,7 +218,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             properties.put(EXCHANGE, exchangeName);
             properties.put(TYPE, exchangeType.toString());
             List<String> queueNames = getQueueNames();
-            if(queueNames.size() != 0) {
+            if (queueNames.size() != 0) {
                 properties.put(QUEUES, jsonMapper.writeValueAsString(getQueueNames()));
             }
         } catch (JsonProcessingException e) {

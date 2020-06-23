@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Maps;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +29,6 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.qpid.server.exchange.ExchangeDefaults;
 
 
 /**
@@ -39,7 +37,7 @@ import org.apache.qpid.server.exchange.ExchangeDefaults;
 @Slf4j
 public class ExchangeContainer {
 
-//    private static final Map<String, AmqpExchange.Type> BUILDIN_EXCHANGE_NAME_SET = new HashMap<>();
+    //    private static final Map<String, AmqpExchange.Type> BUILDIN_EXCHANGE_NAME_SET = new HashMap<>();
     private static PulsarService pulsarService;
     private static Executor executor = Executors.newCachedThreadPool();
 
@@ -83,7 +81,7 @@ public class ExchangeContainer {
             Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
             if (map == null || map.getOrDefault(exchangeName, null) == null) {
                 // check pulsar topic
-                if(pulsarService.getState() != PulsarService.State.Started){
+                if (pulsarService.getState() != PulsarService.State.Started) {
                     amqpExchangeCompletableFuture.completeExceptionally(
                             new PulsarServerException("PulsarService not start"));
                 }
@@ -105,7 +103,7 @@ public class ExchangeContainer {
                             AmqpExchange.Type amqpExchangeType;
                             // if properties has type, ignore the exchangeType
                             if (null != properties && properties.size() > 0
-                                && null != properties.get(PersistentExchange.TYPE)) {
+                                    && null != properties.get(PersistentExchange.TYPE)) {
                                 String type = properties.get(PersistentExchange.TYPE);
                                 amqpExchangeType = AmqpExchange.Type.value(type);
                             } else {

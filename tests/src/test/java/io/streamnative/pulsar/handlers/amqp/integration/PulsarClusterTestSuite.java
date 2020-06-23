@@ -20,19 +20,32 @@ package io.streamnative.pulsar.handlers.amqp.integration;
 
 import static java.util.stream.Collectors.joining;
 
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
 import io.streamnative.pulsar.handlers.amqp.integration.container.BrokerContainer;
 import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarCluster;
 import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarClusterSpec;
 import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarClusterTestBase;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.api.PulsarClient;
 import org.testng.ITest;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 
 @Slf4j
 public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase implements ITest {
+
+    public PulsarClient client;
+    public PulsarAdmin admin;
 
     @BeforeSuite
     @Override
@@ -43,7 +56,7 @@ public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase imple
 
         PulsarClusterSpec spec = PulsarClusterSpec.builder()
             .numBookies(2)
-            .numBrokers(1)
+            .numBrokers(2)
             .clusterName(clusterName)
             .build();
 
@@ -56,8 +69,25 @@ public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase imple
 
         pulsarCluster.start();
 
+        this.client = PulsarClient.builder()
+                .serviceUrl(pulsarCluster.getPlainTextServiceUrl())
+                .build();
+        this.admin = PulsarAdmin.builder()
+                .serviceHttpUrl(pulsarCluster.getHttpServiceUrl())
+                .build();
+
+        List<String> vhostList = Arrays.asList("vhost1", "vhost2", "vhost3");
+        for (String vhost : vhostList) {
+            String ns = "public/" + vhost;
+            if (!admin.namespaces().getNamespaces("public").contains(ns)) {
+                admin.namespaces().createNamespace(ns, 1);
+            }
+        }
+
         log.info("Cluster {} is setup", spec.clusterName());
     }
+
+    protected abstract Map<String, String> getEnv();
 
     @AfterSuite
     @Override
@@ -70,5 +100,35 @@ public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase imple
         return "pulsar-cluster-test-suite";
     }
 
-    protected abstract Map<String, String> getEnv();
+    public String randExName() {
+        return randomName("ex-", 4);
+    }
+
+    public String randQuName() {
+        return randomName("qu-", 4);
+    }
+
+    public String randomName(String prefix, int numChars) {
+        StringBuilder sb = new StringBuilder(prefix);
+        for (int i = 0; i < numChars; i++) {
+            sb.append((char) (ThreadLocalRandom.current().nextInt(26) + 'a'));
+        }
+        return sb.toString();
+    }
+
+    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.setHost("localhost");
+        if (amqpProxyEnable) {
+            int proxyPort = pulsarCluster.getAnyBroker().getMappedPort(5682);
+            connectionFactory.setPort(proxyPort);
+            log.info("use proxyPort: {}", proxyPort);
+        } else {
+            connectionFactory.setPort(pulsarCluster.getAnyBroker().getMappedPort(5672));
+            log.info("use amqpBrokerPort: {}", connectionFactory.getPort());
+        }
+        connectionFactory.setVirtualHost(vhost);
+        return connectionFactory.newConnection();
+    }
+
 }

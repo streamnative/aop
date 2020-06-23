@@ -83,7 +83,7 @@ public class QueueContainer {
 
                             PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
                                     0, false, false);
-                            amqpQueue.recoverRoutersFromQueueProperties(properties);
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, namespaceName);
                             QueueContainer.putQueue(namespaceName, queueName, amqpQueue);
                             queueCompletableFuture.complete(amqpQueue);
                         }

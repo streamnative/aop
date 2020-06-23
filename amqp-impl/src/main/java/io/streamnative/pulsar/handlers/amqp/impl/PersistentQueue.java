@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
@@ -25,6 +26,7 @@ import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -103,20 +105,23 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return indexTopic;
     }
 
-    public void recoverRoutersFromQueueProperties(Map<String, String> properties) {
+    public void recoverRoutersFromQueueProperties(Map<String, String> properties, NamespaceName namespaceName) {
         if (null == properties || properties.size() == 0) {
             return;
         }
         try {
-            List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS), List.class);
+            List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
+                    new TypeReference<List<AmqpQueueProperties>>() {});
             amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
                 AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
                         generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                // recover exchange
                 String exchangeName = amqpQueueProperty.getExchangeName();
+                messageRouter.setQueue(this);
                 routers.put(exchangeName, messageRouter);
             });
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
+           log.error("Json decode error:{}", e.getMessage());
         }
     }
 

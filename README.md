@@ -37,7 +37,7 @@ In this guide, you will learn how to use the Pulsar broker to serve requests fro
 
 ### Download Pulsar 
 
-Download [Pulsar 2.6.0](https://github.com/streamnative/pulsar/releases/tag/v2.6.0-sn-candidate-2) binary package `apache-pulsar-2.6.0-sn-candidate-2-bin.tar.gz`. and unzip it.
+Download [Pulsar 2.6.0](https://github.com/streamnative/pulsar/releases/download/v2.6.0/apache-pulsar-2.6.0-bin.tar.gz) binary package `apache-pulsar-2.6.0-bin.tar.gz`. and unzip it.
 
 ### Download or Build AoP Plugin
 

@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp.qpid;
 
+import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Message;
@@ -24,9 +27,6 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.naming.Context;
 import javax.naming.InitialContext;
-import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
 import org.testng.annotations.Test;
@@ -40,7 +40,7 @@ public class QpidJMSClientTest extends QpidTestBase {
     @Test
     public void basicTest() throws Exception {
         System.out.println("In runTest");
-        System.setProperty("qpid.amqp.version","0-9-1");
+        System.setProperty("qpid.amqp.version", "0-9-1");
         Properties properties = new Properties();
 
         properties.put("java.naming.factory.initial", "org.apache.qpid.jndi.PropertiesFileInitialContextFactory");
@@ -52,8 +52,7 @@ public class QpidJMSClientTest extends QpidTestBase {
         System.out.println("properties loaded");
         Context context = new InitialContext(properties);
 
-        ConnectionFactory connectionFactory
-                = (ConnectionFactory) context.lookup("qpidConnectionFactory");
+        ConnectionFactory connectionFactory = (ConnectionFactory) context.lookup("qpidConnectionFactory");
         Connection connection = connectionFactory.createConnection();
         connection.start();
         System.out.println("Connection started");

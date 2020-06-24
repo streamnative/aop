@@ -15,6 +15,8 @@ package io.streamnative.pulsar.handlers.amqp.qpid;
 
 import com.google.common.collect.Sets;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase;
+import java.util.Arrays;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -23,9 +25,6 @@ import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfo;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-
-import java.util.Arrays;
-import java.util.List;
 
 /**
  *
@@ -60,7 +59,8 @@ public class QpidTestBase extends AmqpProtocolHandlerTestBase {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
                 admin.namespaces().createNamespace(ns, 1);
-                admin.lookups().lookupTopicAsync(TopicName.get(TopicDomain.persistent.value(), NamespaceName.get(ns), "__lookup__").toString());
+                admin.lookups().lookupTopicAsync(TopicName.get(TopicDomain.persistent.value(),
+                        NamespaceName.get(ns), "__lookup__").toString());
             }
         }
         checkPulsarServiceState();

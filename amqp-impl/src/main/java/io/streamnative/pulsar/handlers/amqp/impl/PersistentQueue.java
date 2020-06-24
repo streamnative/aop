@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -107,23 +108,28 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
     public void recoverRoutersFromQueueProperties(Map<String, String> properties, PulsarService pulsarService,
-        NamespaceName namespaceName) {
+                                                  NamespaceName namespaceName) {
         if (null == properties || properties.size() == 0) {
             return;
         }
         try {
             List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
-                new TypeReference<List<AmqpQueueProperties>>() {});
+                    new TypeReference<List<AmqpQueueProperties>>() {
+                    });
             amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
                 // recover exchange
                 String exchangeName = amqpQueueProperty.getExchangeName();
+                Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
+                Map<String, Object> arguments = amqpQueueProperty.getArguments();
                 CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = ExchangeContainer.
-                    asyncGetExchange(pulsarService, namespaceName, exchangeName, false, null);
+                        asyncGetExchange(pulsarService, namespaceName, exchangeName, false, null);
                 amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                     AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
-                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                            generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
                     messageRouter.setQueue(this);
                     messageRouter.setExchange(amqpExchange);
+                    messageRouter.setArguments(arguments);
+                    messageRouter.setBindingKeys(bindingKeys);
                     routers.put(exchangeName, messageRouter);
                 });
             });

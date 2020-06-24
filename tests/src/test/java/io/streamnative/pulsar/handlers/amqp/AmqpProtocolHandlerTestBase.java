@@ -224,6 +224,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         brokerWebServicePortTlsList.clear();
         proxyPortList.clear();
         pulsarServiceList.clear();
+        amqpBrokerPortList.clear();
     }
 
     public void stopBroker(int brokerIndex) throws Exception {

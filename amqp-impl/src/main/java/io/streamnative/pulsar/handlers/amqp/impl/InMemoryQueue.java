@@ -70,4 +70,18 @@ public class InMemoryQueue extends AbstractAmqpQueue {
     public Topic getTopic() {
         return null;
     }
+
+
+
+    @Override public long getMessageCount() {
+        long count = 0;
+        for (LinkedList<PositionImpl> value : indexStore.values()) {
+            count += value.size();
+        }
+        return count;
+    }
+
+    @Override public int getConsumerCount() {
+        return 0;
+    }
 }

@@ -19,13 +19,18 @@ package com.rabbitmq.client.test;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.impl.NetworkConnection;
+import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
+import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import org.apache.pulsar.common.naming.NamespaceName;
 
 /**
  * Host for rabbitmq client.
@@ -211,8 +216,9 @@ public class Host {
         return System.getProperty("rabbitmq.dir");
     }
 
-    public static void closeConnection(String pid) throws IOException {
-        rabbitmqctl("close_connection '" + pid + "' 'Closed via rabbitmqctl'");
+    public static void closeConnection(AmqpConnection connection) throws IOException {
+        ConnectionContainer.removeConnection(NamespaceName.get("public/vhost1"), connection);
+        connection.getCtx().close();
     }
 
     public static void closeAllConnections() throws IOException {
@@ -220,8 +226,9 @@ public class Host {
     }
 
     public static void closeConnection(NetworkConnection c) throws IOException {
-        ConnectionInfo ci = findConnectionInfoFor(Host.listConnections(), c);
-        closeConnection(ci.getPid());
+        AmqpConnection ci = findConnectionInfoFor(
+            ConnectionContainer.getNamespaceConnections(NamespaceName.get("public/vhost1")), c);
+        closeConnection(ci);
     }
 
     /**
@@ -283,10 +290,11 @@ public class Host {
         return result;
     }
 
-    private static ConnectionInfo findConnectionInfoFor(List<ConnectionInfo> xs, NetworkConnection c) {
-        ConnectionInfo result = null;
-        for (ConnectionInfo ci : xs) {
-            if (c.getLocalPort() == ci.getPeerPort()) {
+    private static AmqpConnection findConnectionInfoFor(Set<AmqpConnection> xs, NetworkConnection c) {
+        AmqpConnection result = null;
+        for (AmqpConnection ci : xs) {
+            InetSocketAddress remoteAddress = (InetSocketAddress) ci.getCtx().channel().remoteAddress();
+            if (c.getLocalPort() == remoteAddress.getPort()) {
                 result = ci;
                 break;
             }

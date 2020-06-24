@@ -19,6 +19,8 @@ import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -36,6 +38,7 @@ public class ExchangeContainer {
 
     private static final Map<String, AmqpExchange.Type> BUILDIN_EXCHANGE_NAME_SET = new HashMap<>();
     private static PulsarService pulsarService;
+    private static CountDownLatch countDownLatch;
 
     public static void init(PulsarService pulsarService) {
         if (ExchangeContainer.pulsarService == null) {
@@ -44,6 +47,7 @@ public class ExchangeContainer {
             BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
             BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
             BUILDIN_EXCHANGE_NAME_SET.put(ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
+            countDownLatch = new CountDownLatch(BUILDIN_EXCHANGE_NAME_SET.size());
         }
     }
 
@@ -62,6 +66,13 @@ public class ExchangeContainer {
     }
 
     public static AmqpExchange getExchange(NamespaceName namespaceName, String exchangeName) {
+        if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)) {
+            try {
+                countDownLatch.await(2, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                log.error("Default exchanges init timeout. ");
+            }
+        }
         if (namespaceName == null || StringUtils.isEmpty(exchangeName)) {
             return null;
         }
@@ -100,6 +111,7 @@ public class ExchangeContainer {
             ExchangeContainer.putExchange(namespaceName, exchangeName,
                     new PersistentExchange(exchangeName, exchangeType,
                             (PersistentTopic) topic, false));
+            countDownLatch.countDown();
         });
     }
 

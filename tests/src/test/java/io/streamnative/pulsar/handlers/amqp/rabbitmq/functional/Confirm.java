@@ -38,7 +38,7 @@ import org.junit.Test;
  * Testcase.
  */
 public class Confirm extends BrokerTestCase {
-    private static final int NUM_MESSAGES = 1000;
+    private static final int NUM_MESSAGES = 10;
 
     private static final String TTL_ARG = "x-message-ttl";
 
@@ -46,24 +46,25 @@ public class Confirm extends BrokerTestCase {
     @Before
     public void setUp() throws Exception {
         channel.confirmSelect();
-        channel.queueDeclare("confirm-test", true, true, false, null);
+        channel.queueDeclare("confirm-test", true, false, false, null);
         channel.queueDeclare("confirm-durable-nonexclusive", true, false,
                 false, null);
         channel.basicConsume("confirm-test", true,
                 new DefaultConsumer(channel));
-        channel.queueDeclare("confirm-test-nondurable", false, true,
+        channel.queueDeclare("confirm-test-nondurable", false, false,
                 false, null);
         channel.basicConsume("confirm-test-nondurable", true,
                 new DefaultConsumer(channel));
         channel.queueDeclare("confirm-test-noconsumer", true,
-                true, false, null);
-        channel.queueDeclare("confirm-test-2", true, true, false, null);
+                false, false, null);
+        channel.queueDeclare("confirm-test-2", true, false, false, null);
         channel.basicConsume("confirm-test-2", true,
                 new DefaultConsumer(channel));
         channel.queueBind("confirm-test", "amq.direct",
                 "confirm-multiple-queues");
         channel.queueBind("confirm-test-2", "amq.direct",
                 "confirm-multiple-queues");
+        channel.queueDeclare("confirm-test-recover", true, false, false, null);
     }
 
     @Override
@@ -83,16 +84,16 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    @Test
+    //@Test
     public void nonDurable()
             throws IOException, InterruptedException, TimeoutException {
         confirmTest("", "confirm-test-nondurable", true, false);
     }
 
-//    @Test
+    //@Test
     public void mandatoryNoRoute()
             throws IOException, InterruptedException, TimeoutException {
-        confirmTest("", "confirm-test-doesnotexist", false, true);
+        confirmTest("", "confirm-test-doesnotexist", true, true);
         confirmTest("", "confirm-test-doesnotexist", true, true);
     }
 
@@ -141,7 +142,7 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(90000);
     }
 
-    //@Test
+    @Test
     public void basicReject()
             throws IOException, InterruptedException, TimeoutException {
         basicRejectCommon(false);
@@ -164,7 +165,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void basicRejectRequeue()
             throws IOException, InterruptedException, TimeoutException {
         basicRejectCommon(true);
@@ -178,23 +179,23 @@ public class Confirm extends BrokerTestCase {
         channel.waitForConfirmsOrDie(60000);
     }
 
-    //@Test
+    @Test
     public void basicRecover()
             throws IOException, InterruptedException, TimeoutException {
-        publishN("", "confirm-test-noconsumer", true, false);
-
+        publishN("", "confirm-test-recover", true, false);
+        Thread.sleep(200);
         for (long i = 0; i < NUM_MESSAGES; i++) {
             GetResponse resp =
-                    channel.basicGet("confirm-test-noconsumer", false);
+                    channel.basicGet("confirm-test-recover", false);
             resp.getEnvelope().getDeliveryTag();
             // not acking
         }
 
         channel.basicRecover(true);
 
-        Thread.sleep(1000);
 
-        channel.basicConsume("confirm-test-noconsumer", true,
+
+        channel.basicConsume("confirm-test-recover", true,
                 new DefaultConsumer(channel));
 
         channel.waitForConfirmsOrDie(60000);
@@ -222,7 +223,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void waitForConfirms()
             throws IOException, InterruptedException, TimeoutException {
         final SortedSet<Long> unconfirmedSet =
@@ -255,7 +256,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void waitForConfirmsWithoutConfirmSelected()
             throws IOException, InterruptedException {
         channel = connection.createChannel();
@@ -270,7 +271,7 @@ public class Confirm extends BrokerTestCase {
         }
     }
 
-    //@Test
+    @Test
     public void waitForConfirmsException()
             throws IOException, InterruptedException, TimeoutException {
         publishN("", "confirm-test", true, false);
@@ -306,9 +307,9 @@ public class Confirm extends BrokerTestCase {
     }
 
     private void basicRejectCommon(boolean requeue)
-            throws IOException {
+        throws IOException, InterruptedException {
         publishN("", "confirm-test-noconsumer", true, false);
-
+        Thread.sleep(200);
         for (long i = 0; i < NUM_MESSAGES; i++) {
             GetResponse resp =
                     channel.basicGet("confirm-test-noconsumer", false);

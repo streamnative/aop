@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -71,6 +72,17 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     public AmqpExchange.Type getType() {
         return exchangeType;
     }
+
+    @Override
+    public boolean isAnyMatch(Map<String, Object> properties) {
+        for (AmqpQueue queue : queues) {
+            if (queue.getRouter(getName()).isMatch(properties)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     @Override
     public boolean equals(Object o) {

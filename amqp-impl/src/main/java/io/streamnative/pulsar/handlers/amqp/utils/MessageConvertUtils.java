@@ -385,4 +385,19 @@ public final class MessageConvertUtils {
         return headers;
     }
 
+    public static AmqpMessageData toAmqpMessage(IncomingMessage incomingMessage) {
+        ByteBuf byteBuf = Unpooled.buffer();
+        if (incomingMessage.getBodyCount() > 0) {
+            for (int i = 0; i < incomingMessage.getBodyCount(); i++) {
+                byteBuf.writeBytes(
+                    ((SingleQpidByteBuffer) incomingMessage.getContentChunk(i).getPayload())
+                        .getUnderlyingBuffer());
+            }
+        }
+        return AmqpMessageData.builder()
+            .messagePublishInfo(incomingMessage.getMessagePublishInfo())
+            .contentHeaderBody(incomingMessage.getContentHeader())
+            .contentBody(new ContentBody(byteBuf.nioBuffer()))
+            .build();
+    }
 }

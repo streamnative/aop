@@ -90,4 +90,16 @@ public interface AmqpQueue {
     boolean isAutoDelete();
 
     Topic getTopic();
+
+    /**
+     * get unAck message counts.
+     * @return
+     */
+    long getMessageCount();
+
+    /**
+     * get queue`s consumer count.
+     * @return
+     */
+    int getConsumerCount();
 }

@@ -35,7 +35,7 @@ public class StandaloneContainer extends PulsarContainer<StandaloneContainer> {
         super(clusterName,
             NAME,
             NAME + "-cluster",
-            "bin/pulsar",
+            null,
             BROKER_PORT,
             BROKER_HTTP_PORT);
     }
@@ -44,7 +44,7 @@ public class StandaloneContainer extends PulsarContainer<StandaloneContainer> {
         super(clusterName,
                 NAME,
                 NAME + "-cluster",
-                "bin/pulsar",
+                null,
                 BROKER_PORT,
                 BROKER_HTTP_PORT,
                 "",
@@ -54,7 +54,21 @@ public class StandaloneContainer extends PulsarContainer<StandaloneContainer> {
     @Override
     protected void configure() {
         super.configure();
-        setCommand("standalone");
+
+        StringBuilder command = new StringBuilder();
+//        if (commandList != null && commandList.size() > 0) {
+//            for (String cmd : commandList) {
+//                command.append(cmd).append(" && ");
+//            }
+//        }
+        command.append("bin/apply-config-from-env.py conf/standalone.conf "
+                + "&& bin/pulsar standalone --no-stream-storage");
+
+        this.withCommand(
+                "sh",
+                "-c",
+                command.toString()
+        );
     }
 
     @Override

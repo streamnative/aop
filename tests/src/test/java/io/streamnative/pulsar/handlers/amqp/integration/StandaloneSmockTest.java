@@ -5,7 +5,6 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarClusterTestBase;
 import lombok.Cleanup;
 import org.testng.Assert;
 import org.testng.ITest;
@@ -19,24 +18,15 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
 
-public class SmockTest extends PulsarClusterTestSuite implements ITest {
+public class StandaloneSmockTest extends PulsarStandaloneTestSuite implements ITest {
 
-    @Override
-    protected Map<String, String> getEnv() {
-        Map<String, String> envMap = new HashMap<>();
-        envMap.put("PULSAR_PREFIX_amqpProxyEnable", "true");
-        envMap.put("PULSAR_PREFIX_protocolHandlerDirectory", "/tmp/protocols");
-        envMap.put("PULSAR_PREFIX_messagingProtocols", "amqp");
-        return envMap;
-    }
-
-    @Test(timeOut = 1000 * 5)
+    @Test
     public void basic_consume_case() throws IOException, TimeoutException, InterruptedException {
         String exchangeName = randExName();
         String routingKey = "test.key";
         String queueName = randQuName();
         @Cleanup
-        Connection conn = getConnection("vhost1", true);
+        Connection conn = getConnection("vhost1", false);
         @Cleanup
         Channel channel = conn.createChannel();
 
@@ -67,6 +57,7 @@ public class SmockTest extends PulsarClusterTestSuite implements ITest {
         countDownLatch.await();
         Assert.assertEquals(messages.get(0), "Hello, world!");
     }
+
     @Override
     public String getTestName() {
         return "Smock test";

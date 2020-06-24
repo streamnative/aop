@@ -18,68 +18,38 @@
  */
 package io.streamnative.pulsar.handlers.amqp.integration;
 
-import static java.util.stream.Collectors.joining;
-
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
-import io.streamnative.pulsar.handlers.amqp.integration.container.BrokerContainer;
-import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarCluster;
-import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarClusterSpec;
-import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarClusterTestBase;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
+import io.streamnative.pulsar.handlers.amqp.integration.container.PulsarContainer;
+import io.streamnative.pulsar.handlers.amqp.integration.topologies.PulsarStandaloneTestBase;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.PulsarClient;
-import org.testcontainers.containers.BindMode;
 import org.testng.ITest;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeSuite;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
+
 @Slf4j
-public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase implements ITest {
+public class PulsarStandaloneTestSuite extends PulsarStandaloneTestBase implements ITest {
 
     public PulsarClient client;
     public PulsarAdmin admin;
 
     @BeforeSuite
-    @Override
-    public void setupCluster() throws Exception {
-        final String clusterName = Stream.of(this.getClass().getSimpleName(), randomName(5))
-                .filter(s -> s != null && !s.isEmpty())
-                .collect(joining("-"));
-
-        Map<String, String> classpathResources = new HashMap<>();
-        classpathResources.put("test-protocol-handler.nar", "/tmp/protocols/test-protocol-handler.nar");
-
-        PulsarClusterSpec spec = PulsarClusterSpec.builder()
-            .numBookies(2)
-            .numBrokers(2)
-            .clusterName(clusterName)
-            .classPathVolumeMounts(classpathResources)
-            .build();
-
-        log.info("Setting up cluster {} with {} bookies, {} brokers",
-                spec.clusterName(), spec.numBookies(), spec.numBrokers());
-        pulsarCluster = PulsarCluster.forSpec(spec);
-        for(BrokerContainer brokerContainer : pulsarCluster.getBrokers()){
-            getEnv().forEach(brokerContainer::withEnv);
-        }
-
-        pulsarCluster.start();
+    public void setUpCluster() throws Exception {
+        super.startCluster(PulsarContainer.DEFAULT_IMAGE_NAME);
 
         this.client = PulsarClient.builder()
-                .serviceUrl(pulsarCluster.getPlainTextServiceUrl())
+                .serviceUrl(container.getPlainTextServiceUrl())
                 .build();
         this.admin = PulsarAdmin.builder()
-                .serviceHttpUrl(pulsarCluster.getHttpServiceUrl())
+                .serviceHttpUrl(container.getHttpServiceUrl())
                 .build();
 
         List<String> vhostList = Arrays.asList("vhost1", "vhost2", "vhost3");
@@ -89,21 +59,16 @@ public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase imple
                 admin.namespaces().createNamespace(ns, 1);
             }
         }
-
-        log.info("Cluster {} is setup", spec.clusterName());
     }
 
-    protected abstract Map<String, String> getEnv();
-
     @AfterSuite
-    @Override
-    public void tearDownCluster() {
-        super.tearDownCluster();
+    public void tearDownCluster() throws Exception {
+        super.stopCluster();
     }
 
     @Override
     public String getTestName() {
-        return "pulsar-cluster-test-suite";
+        return "pulsar-standalone-suite";
     }
 
     public String randExName() {
@@ -126,11 +91,11 @@ public abstract class PulsarClusterTestSuite extends PulsarClusterTestBase imple
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
         if (amqpProxyEnable) {
-            int proxyPort = pulsarCluster.getAnyBroker().getMappedPort(5682);
+            int proxyPort = container.getMappedPort(5682);
             connectionFactory.setPort(proxyPort);
             log.info("use proxyPort: {}", proxyPort);
         } else {
-            connectionFactory.setPort(pulsarCluster.getAnyBroker().getMappedPort(5672));
+            connectionFactory.setPort(container.getMappedPort(5672));
             log.info("use amqpBrokerPort: {}", connectionFactory.getPort());
         }
         connectionFactory.setVirtualHost(vhost);

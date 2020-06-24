@@ -32,7 +32,7 @@ public class ZKContainer<SelfT extends PulsarContainer<SelfT>> extends PulsarCon
             clusterName,
             NAME,
             NAME,
-            "bin/run-local-zk.sh",
+            null,
             ZK_PORT,
             INVALID_PORT);
     }
@@ -66,5 +66,11 @@ public class ZKContainer<SelfT extends PulsarContainer<SelfT>> extends PulsarCon
                 "/pulsar/data/zookeeper"
             );
         }
+    }
+
+    @Override
+    protected void configure() {
+        super.configure();
+        setCommand("sh -c bin/run-local-zk.sh");
     }
 }

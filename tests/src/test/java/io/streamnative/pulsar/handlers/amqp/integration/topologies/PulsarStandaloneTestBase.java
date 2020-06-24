@@ -23,8 +23,15 @@ import static org.testng.Assert.assertEquals;
 import io.streamnative.pulsar.handlers.amqp.integration.container.ContainerExecResult;
 import io.streamnative.pulsar.handlers.amqp.integration.container.StandaloneContainer;
 import lombok.extern.slf4j.Slf4j;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Network;
 import org.testng.annotations.DataProvider;
+
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A test base to run tests on standalone cluster.
@@ -61,8 +68,16 @@ public abstract class PulsarStandaloneTestBase extends PulsarTestBase {
         String clusterName = PulsarClusterTestBase.randomName(8);
         container = new StandaloneContainer(clusterName, pulsarImageName)
             .withNetwork(network)
-            .withNetworkAliases(StandaloneContainer.NAME + "-" + clusterName)
-            .withEnv("PF_stateStorageServiceUrl", "bk://localhost:4181");
+            .withNetworkAliases(StandaloneContainer.NAME + "-" + clusterName);
+
+        Map<String, String> envMap = new HashMap<>();
+        envMap.put("PF_stateStorageServiceUrl", "bk://localhost:4181");
+        envMap.put("PULSAR_PREFIX_protocolHandlerDirectory", "/tmp/protocols");
+        envMap.put("PULSAR_PREFIX_messagingProtocols", "amqp");
+        container.withEnv(envMap);
+
+        container.withClasspathResourceMapping("test-protocol-handler.nar", "/tmp/protocols/test-protocol-handler.nar", BindMode.READ_WRITE);
+
         container.start();
         log.info("Pulsar cluster {} is up running:", clusterName);
         log.info("\tBinary Service Url : {}", container.getPlainTextServiceUrl());

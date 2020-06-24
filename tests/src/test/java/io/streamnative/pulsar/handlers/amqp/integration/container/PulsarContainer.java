@@ -122,6 +122,8 @@ public abstract class PulsarContainer<SelfT extends PulsarContainer<SelfT>> exte
         if (servicePort > 0) {
             addExposedPort(servicePort);
         }
+        addExposedPort(5672);
+        addExposedPort(5682);
     }
 
     protected void beforeStart() {}
@@ -141,7 +143,9 @@ public abstract class PulsarContainer<SelfT extends PulsarContainer<SelfT>> exte
         this.withCreateContainerCmdModifier(createContainerCmd -> {
             createContainerCmd.withHostName(hostname);
             createContainerCmd.withName(getContainerName());
-            createContainerCmd.withEntrypoint(serviceEntryPoint);
+            if (serviceEntryPoint != null && serviceEntryPoint.length() > 0) {
+                createContainerCmd.withEntrypoint(serviceEntryPoint);
+            }
         });
 
         beforeStart();

@@ -65,7 +65,7 @@ public class QpidJMSClientTest extends QpidTestBase {
         MessageConsumer messageConsumer = session.createConsumer(queue);
         MessageProducer messageProducer = session.createProducer(queue);
 
-        int messageCnt = 1;
+        int messageCnt = 1000;
         for (int i = 0; i < messageCnt; i++) {
             TextMessage message = session.createTextMessage("Hello world!");
             messageProducer.send(message);

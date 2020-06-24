@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -92,6 +93,9 @@ public class ConnectionContainer {
     }
 
     public static void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+        if (namespaceName == null) {
+            return;
+        }
         connectionMap.getOrDefault(namespaceName, Collections.emptySet()).remove(amqpConnection);
     }
 

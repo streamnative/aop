@@ -178,9 +178,19 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
         assertState(ConnectionState.AWAIT_START_OK);
         // TODO clientProperties
-        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
-        writeFrame(responseBody.generateFrame(0));
-        state = ConnectionState.AWAIT_SECURE_OK;
+
+        // TODO security process
+//        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
+//        writeFrame(responseBody.generateFrame(0));
+//        state = ConnectionState.AWAIT_SECURE_OK;
+
+        ConnectionTuneBody tuneBody =
+                methodRegistry.createConnectionTuneBody(maxChannels,
+                        maxFrameSize,
+                        heartBeat);
+
+        writeFrame(tuneBody.generateFrame(0));
+        state = ConnectionState.AWAIT_TUNE_OK;
     }
 
     @Override

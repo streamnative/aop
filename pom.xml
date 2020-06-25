@@ -265,6 +265,7 @@
             <encoding>UTF-8</encoding>
             <consoleOutput>true</consoleOutput>
             <failsOnError>true</failsOnError>
+            <!-- enable this to fail on "WARNING"s -->
             <!--<violationSeverity>warning</violationSeverity>-->
             <!--<failOnViolation>true</failOnViolation>-->
             <includeResources>false</includeResources>

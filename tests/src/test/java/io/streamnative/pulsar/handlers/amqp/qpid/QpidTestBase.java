@@ -72,5 +72,4 @@ public class QpidTestBase extends AmqpProtocolHandlerTestBase {
         super.internalCleanup();
     }
 
-
 }

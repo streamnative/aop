@@ -100,6 +100,7 @@ public class ExchangeContainer {
             ExchangeContainer.putExchange(namespaceName, exchangeName,
                     new PersistentExchange(exchangeName, exchangeType,
                             (PersistentTopic) topic, false));
+            log.info("[addBuildInExchanges] namespaceName: {}, exchangeName: {}", namespaceName, exchangeName);
         });
     }
 

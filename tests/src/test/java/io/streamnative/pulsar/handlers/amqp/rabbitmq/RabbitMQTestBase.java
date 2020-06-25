@@ -35,6 +35,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfo;
 import org.testng.Assert;
@@ -74,6 +77,8 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
                 admin.namespaces().createNamespace(ns, 1);
+                admin.lookups().lookupTopicAsync(TopicName.get(TopicDomain.persistent.value(),
+                        NamespaceName.get(ns), "__lookup__").toString());
             }
         }
         checkPulsarServiceState();

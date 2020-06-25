@@ -29,13 +29,21 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 /**
  * Qpid-JMS client test.
  */
 @Slf4j
-public class QpidJMSClientTest extends QpidTestBase {
+public class QpidJMSTest extends QpidTestBase {
+
+    @BeforeClass
+    @Override
+    public void setup() throws Exception {
+        setBrokerCount(3);
+        super.setup();
+    }
 
     @Test
     public void basicTest() throws Exception {

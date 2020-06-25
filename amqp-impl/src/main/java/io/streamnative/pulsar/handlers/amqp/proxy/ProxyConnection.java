@@ -189,8 +189,11 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             log.debug("ProxyConnection - [receiveConnectionStartOk] clientProperties: {}, mechanism: {}, locale: {}",
                     clientProperties, mechanism, locale);
         }
-        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
-        writeFrame(responseBody.generateFrame(0));
+        // TODO AUTH
+        ConnectionTuneBody tuneBody =
+                methodRegistry.createConnectionTuneBody(proxyConfig.getAmqpMaxNoOfChannels(),
+                        proxyConfig.getAmqpMaxFrameSize(), proxyConfig.getAmqpHeartBeat());
+        writeFrame(tuneBody.generateFrame(0));
     }
 
     // step 3
@@ -199,7 +202,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         if (log.isDebugEnabled()) {
             log.debug("ProxyConnection - [receiveConnectionSecureOk] response: {}", new String(response, UTF_8));
         }
-        // TODO AUTH
         ConnectionTuneBody tuneBody =
                 methodRegistry.createConnectionTuneBody(proxyConfig.getAmqpMaxNoOfChannels(),
                         proxyConfig.getAmqpMaxFrameSize(), proxyConfig.getAmqpHeartBeat());

@@ -261,6 +261,7 @@
           <configuration>
             <configLocation>resources/checkstyle.xml</configLocation>
             <suppressionsLocation>resources/suppressions.xml</suppressionsLocation>
+            <linkXRef>false</linkXRef>
             <encoding>UTF-8</encoding>
             <consoleOutput>true</consoleOutput>
             <failsOnError>true</failsOnError>

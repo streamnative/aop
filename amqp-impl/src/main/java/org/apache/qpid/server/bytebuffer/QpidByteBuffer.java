@@ -14,19 +14,17 @@
 package org.apache.qpid.server.bytebuffer;
 
 import io.netty.channel.ChannelHandlerContext;
-
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
 
 public interface QpidByteBuffer extends AutoCloseable
 {

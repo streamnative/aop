@@ -16,6 +16,7 @@
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import static org.junit.Assert.assertNull;
+
 import com.rabbitmq.client.AMQP;
 import java.io.IOException;
 import java.util.Collections;

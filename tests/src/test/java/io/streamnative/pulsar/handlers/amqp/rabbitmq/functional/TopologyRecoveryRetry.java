@@ -19,6 +19,7 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import static com.rabbitmq.client.impl.recovery.TopologyRecoveryRetryLogic.RETRY_ON_QUEUE_NOT_FOUND_RETRY_HANDLER;
 import static com.rabbitmq.client.test.TestUtils.closeAllConnectionsAndWaitForRecovery;
 import static org.junit.Assert.assertTrue;
+
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.test.BrokerTestCase;

@@ -13,9 +13,11 @@
  */
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.AssertJUnit.assertTrue;
+
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.GetResponse;

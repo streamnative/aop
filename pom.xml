@@ -54,7 +54,7 @@
     <!-- plugin dependencies -->
     <dockerfile-maven.version>1.4.9</dockerfile-maven.version>
     <license-maven-plugin.version>3.0.rc1</license-maven-plugin.version>
-    <maven-checkstyle-plugin.version>3.0.0</maven-checkstyle-plugin.version>
+    <maven-checkstyle-plugin.version>3.1.1</maven-checkstyle-plugin.version>
     <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.0.0-M1</maven-surefire-plugin.version>
     <os-maven-plugin.version>1.4.1.Final</os-maven-plugin.version>
@@ -263,7 +263,9 @@
             <suppressionsLocation>resources/suppressions.xml</suppressionsLocation>
             <encoding>UTF-8</encoding>
             <consoleOutput>true</consoleOutput>
-            <failOnViolation>true</failOnViolation>
+            <failsOnError>true</failsOnError>
+            <!--<violationSeverity>warning</violationSeverity>-->
+            <!--<failOnViolation>true</failOnViolation>-->
             <includeResources>false</includeResources>
             <includeTestSourceDirectory>true</includeTestSourceDirectory>
           </configuration>

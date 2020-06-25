@@ -54,11 +54,11 @@
     <!-- plugin dependencies -->
     <dockerfile-maven.version>1.4.9</dockerfile-maven.version>
     <license-maven-plugin.version>3.0.rc1</license-maven-plugin.version>
-    <maven-checkstyle-plugin.version>3.0.0</maven-checkstyle-plugin.version>
+    <maven-checkstyle-plugin.version>3.1.1</maven-checkstyle-plugin.version>
     <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.0.0-M1</maven-surefire-plugin.version>
     <os-maven-plugin.version>1.4.1.Final</os-maven-plugin.version>
-    <puppycrawl.checkstyle.version>6.19</puppycrawl.checkstyle.version>
+    <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
     <spotbugs-maven-plugin.version>3.1.8</spotbugs-maven-plugin.version>
     <qpid-protocol-plugin.version>7.1.8</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
@@ -261,9 +261,13 @@
           <configuration>
             <configLocation>resources/checkstyle.xml</configLocation>
             <suppressionsLocation>resources/suppressions.xml</suppressionsLocation>
+            <linkXRef>false</linkXRef>
             <encoding>UTF-8</encoding>
             <consoleOutput>true</consoleOutput>
-            <failOnViolation>true</failOnViolation>
+            <failsOnError>true</failsOnError>
+            <!-- enable this to fail on "WARNING"s -->
+            <!--<violationSeverity>warning</violationSeverity>-->
+            <!--<failOnViolation>true</failOnViolation>-->
             <includeResources>false</includeResources>
             <includeTestSourceDirectory>true</includeTestSourceDirectory>
           </configuration>

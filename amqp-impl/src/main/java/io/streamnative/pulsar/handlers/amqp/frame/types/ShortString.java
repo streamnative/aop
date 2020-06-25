@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.frame.types;
 
 import static java.lang.String.format;
 
-
 import io.netty.buffer.ByteBuf;
 import java.nio.charset.Charset;
 

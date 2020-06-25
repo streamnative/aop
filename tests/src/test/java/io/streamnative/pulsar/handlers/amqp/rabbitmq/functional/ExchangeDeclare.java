@@ -17,6 +17,7 @@
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import static org.junit.Assert.assertEquals;
+
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;

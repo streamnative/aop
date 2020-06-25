@@ -18,6 +18,7 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import static com.rabbitmq.client.test.TestUtils.waitAtMost;
 import static org.assertj.core.api.Assertions.assertThat;
+
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;

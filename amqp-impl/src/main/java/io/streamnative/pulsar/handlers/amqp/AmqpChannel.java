@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.protocol.ErrorCodes.NOT_FOUND;
 import static org.apache.qpid.server.transport.util.Functions.hex;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -454,7 +455,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             closeChannel(ErrorCodes.NOT_FOUND, "No such exchange: '" + exchange + "'");
             return;
         }
-        if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)){
+        if (exchangeName.equals(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE)) {
             closeChannel(ErrorCodes.ACCESS_REFUSED, "Can not bind to default exchange ");
             return;
         }
@@ -580,7 +581,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             }
         }
     }
-
 
 
     @Override
@@ -914,7 +914,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
             String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
-
 
             Message<byte[]> message;
             try {

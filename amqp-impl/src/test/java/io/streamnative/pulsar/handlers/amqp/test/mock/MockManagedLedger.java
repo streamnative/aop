@@ -17,7 +17,6 @@ package io.streamnative.pulsar.handlers.amqp.test.mock;
 import io.netty.buffer.ByteBuf;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
@@ -31,6 +30,7 @@ import org.apache.pulsar.common.api.proto.PulsarApi;
  * ManagedLedger mock test.
  */
 public class MockManagedLedger implements ManagedLedger {
+
     @Override
     public String getName() {
         return null;

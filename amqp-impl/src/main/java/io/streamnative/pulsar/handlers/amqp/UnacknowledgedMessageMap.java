@@ -12,7 +12,9 @@
  * limitations under the License.
  */
 package io.streamnative.pulsar.handlers.amqp;
+
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collection;
 import java.util.Collections;
@@ -22,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Position;
-
 
 
 /**
@@ -59,7 +60,6 @@ public class UnacknowledgedMessageMap {
 
     private final Map<Long, MessageConsumerAssociation> map = new ConcurrentHashMap<>();
     private final AmqpChannel channel;
-
     public UnacknowledgedMessageMap(AmqpChannel channel) {
         this.channel = channel;
     }

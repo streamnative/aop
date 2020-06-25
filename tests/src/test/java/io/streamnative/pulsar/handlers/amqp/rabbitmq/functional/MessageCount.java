@@ -15,6 +15,7 @@
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
 import static org.junit.Assert.assertEquals;
+
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
 /**

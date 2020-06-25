@@ -16,6 +16,7 @@
 package com.rabbitmq.client.test;
 
 import static org.junit.Assert.assertTrue;
+
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;

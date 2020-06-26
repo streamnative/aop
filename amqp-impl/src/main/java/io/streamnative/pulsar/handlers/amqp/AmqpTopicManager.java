@@ -26,13 +26,17 @@ import org.apache.pulsar.common.naming.TopicName;
 @Slf4j
 public class AmqpTopicManager {
 
+    private PulsarService pulsarService;
 
-    public static Topic getOrCreateTopic(PulsarService pulsarService, String topicName, boolean createIfMissing) {
-        return getTopic(pulsarService, topicName, createIfMissing).join();
+    public AmqpTopicManager(PulsarService pulsarService) {
+        this.pulsarService = pulsarService;
     }
 
-    public static CompletableFuture<Topic> getTopic(PulsarService pulsarService, String topicName,
-                                                    boolean createIfMissing) {
+    public Topic getOrCreateTopic(String topicName, boolean createIfMissing) {
+        return getTopic(topicName, createIfMissing).join();
+    }
+
+    public CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing) {
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
         if (null == pulsarService) {
             log.error("PulsarService is not set.");

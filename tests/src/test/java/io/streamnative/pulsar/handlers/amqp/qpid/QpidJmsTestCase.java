@@ -29,45 +29,33 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 /**
- * Qpid-JMS client test.
+ * Qpid-JMS client test case.
  */
 @Slf4j
-public class QpidJMSTest extends QpidTestBase {
+public class QpidJmsTestCase {
 
-    @BeforeClass
-    @Override
-    public void setup() throws Exception {
-        setBrokerCount(3);
-        super.setup();
-    }
-
-    @Test
-    public void basicTest() throws Exception {
-        System.out.println("In runTest");
+    public void basicPubSubTest(int port) throws Exception {
+        log.info("start qpid-jms basic pub-sub test ...");
         System.setProperty("qpid.amqp.version", "0-9-1");
         Properties properties = new Properties();
 
         properties.put("java.naming.factory.initial", "org.apache.qpid.jndi.PropertiesFileInitialContextFactory");
         properties.put("connectionfactory.qpidConnectionFactory",
-                "amqp://guest:guest@clientid/vhost1?brokerlist='tcp://127.0.0.1:"
-                        + getAmqpBrokerPortList().get(0) + "'");
+                "amqp://guest:guest@clientid/vhost1?brokerlist='tcp://127.0.0.1:" + port + "'");
         properties.put("queue.myqueue", "queue1");
 
-        System.out.println("properties loaded");
         Context context = new InitialContext(properties);
 
         ConnectionFactory connectionFactory = (ConnectionFactory) context.lookup("qpidConnectionFactory");
         Connection connection = connectionFactory.createConnection();
         connection.start();
-        System.out.println("Connection started");
+        log.info("Connection started");
 
         Session session = connection.createSession(true, Session.SESSION_TRANSACTED);
         Queue queue = (Queue) context.lookup("myqueue");
-        System.out.println("Session created");
+        log.info("Session created");
 
         MessageConsumer messageConsumer = session.createConsumer(queue);
         MessageProducer messageProducer = session.createProducer(queue);
@@ -87,7 +75,7 @@ public class QpidJMSTest extends QpidTestBase {
                 countDownLatch.countDown();
                 receiveMsgCnt.incrementAndGet();
                 try {
-                    System.out.println(((TextMessage) message).getText());
+                    log.info("receive msg: {}", ((TextMessage) message).getText());
                     session.commit();
                 } catch (Exception e) {
                     log.error("Consume messages error.", e);
@@ -100,6 +88,7 @@ public class QpidJMSTest extends QpidTestBase {
 
         connection.close();
         context.close();
+        log.info("finish qpid-jms basic pub-sub test ...");
     }
 
 }

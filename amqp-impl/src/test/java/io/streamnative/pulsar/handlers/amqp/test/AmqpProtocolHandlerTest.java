@@ -49,14 +49,14 @@ public class AmqpProtocolHandlerTest extends AopProtocolHandlerTestBase {
         super.internalCleanup();
     }
 
-    @Test
+    @Test(timeOut = 1000 * 5)
     public void testConnection() throws IOException, TimeoutException {
         Connection connection = factory.newConnection();
         Assert.assertTrue(connection != null);
         connection.close();
     }
 
-    @Test
+    @Test(timeOut = 1000 * 5)
     public void testChannel() throws IOException, TimeoutException {
         Connection connection = factory.newConnection();
         Assert.assertTrue(connection != null);

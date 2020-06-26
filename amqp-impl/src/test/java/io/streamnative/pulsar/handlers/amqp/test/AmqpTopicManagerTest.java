@@ -28,7 +28,8 @@ public class AmqpTopicManagerTest extends AmqpProtocolTestBase {
     @Test
     public void testDeleteWhileInactiveIsFalse() {
         PulsarService pulsarService = connection.getPulsarService();
-        AbstractTopic abstractTopic = (AbstractTopic) AmqpTopicManager.getOrCreateTopic(pulsarService,
+        AmqpTopicManager amqpTopicManager = new AmqpTopicManager(pulsarService);
+        AbstractTopic abstractTopic = (AbstractTopic) amqpTopicManager.getOrCreateTopic(
                 "public/vhost1/test", true);
         Assert.assertFalse(abstractTopic.isDeleteWhileInactive());
     }

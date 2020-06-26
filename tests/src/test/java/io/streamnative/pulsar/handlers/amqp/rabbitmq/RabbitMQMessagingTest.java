@@ -17,11 +17,13 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpTestBase;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.io.IOException;
@@ -48,7 +50,7 @@ import org.testng.annotations.Test;
  * RabbitMQ messaging test.
  */
 @Slf4j
-public class RabbitMQMessagingTest extends RabbitMQTestBase {
+public class RabbitMQMessagingTest extends AmqpTestBase {
 
     @Test(timeOut = 1000 * 5)
     public void basic_consume_case() throws IOException, TimeoutException, InterruptedException {
@@ -348,7 +350,22 @@ public class RabbitMQMessagingTest extends RabbitMQTestBase {
 
     @Test(timeOut = 1000 * 5)
     public void defaultEmptyExchangeTest() throws Exception {
-        defaultEmptyExchangeTest("vhost1", false);
+        RabbitMQTestCase rabbitMQTestCase = new RabbitMQTestCase(admin);
+        rabbitMQTestCase.defaultEmptyExchangeTest(getAmqpBrokerPortList().get(0), "vhost1");
+    }
+
+    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.setHost("localhost");
+        if (amqpProxyEnable) {
+            int proxyPort = getProxyPort();
+            log.info("use proxyPort: {}", proxyPort);
+        } else {
+            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
+            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
+        }
+        connectionFactory.setVirtualHost(vhost);
+        return connectionFactory.newConnection();
     }
 
 }

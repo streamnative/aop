@@ -23,7 +23,6 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
 import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.zookeeper.ZooKeeper;
 
 /**
  * Connection container, listen bundle unload event, release connection resource.
@@ -31,18 +30,19 @@ import org.apache.zookeeper.ZooKeeper;
 @Slf4j
 public class ConnectionContainer {
 
-    private static PulsarService pulsarService;
-    public static ZooKeeper zooKeeper;
+    private ExchangeContainer exchangeContainer;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
-    public static void init(PulsarService pulsarService) {
-        ConnectionContainer.pulsarService = pulsarService;
-        ConnectionContainer.zooKeeper = pulsarService.getLocalZkCache().getZooKeeper();
+    public ConnectionContainer(PulsarService pulsarService, ExchangeContainer exchangeContainer) {
+        this.exchangeContainer = exchangeContainer;
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
-                log.info("ConnectionContainer [onLoad] namespaceBundle: {}", namespaceBundle);
-                ExchangeContainer.initBuildInExchange(namespaceBundle.getNamespaceObject());
+                int brokerPort = pulsarService.getBrokerListenPort().isPresent()
+                        ? pulsarService.getBrokerListenPort().get() : 0;
+                log.info("ConnectionContainer [onLoad] namespaceBundle: {}, brokerPort: {}",
+                        namespaceBundle, brokerPort);
+                ConnectionContainer.this.exchangeContainer.initBuildInExchange(namespaceBundle.getNamespaceObject());
             }
 
             @Override
@@ -92,6 +92,9 @@ public class ConnectionContainer {
     }
 
     public static void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+        if (namespaceName == null) {
+            return;
+        }
         connectionMap.getOrDefault(namespaceName, Collections.emptySet()).remove(amqpConnection);
     }
 

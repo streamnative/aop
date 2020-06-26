@@ -13,9 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 
+import static io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase.randExName;
+import static io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase.randQuName;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.collect.Sets;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
@@ -24,10 +25,8 @@ import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandlerTestBase;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeoutException;
@@ -35,76 +34,26 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.common.policies.data.ClusterData;
-import org.apache.pulsar.common.policies.data.TenantInfo;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 
 /**
- * Base test class for RabbitMQ Client.
+ * RabbitMQ test case.
  */
 @Slf4j
-public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
+public class RabbitMQTestCase {
 
-    @BeforeClass
-    @Override
-    public void setup() throws Exception {
-        super.internalSetup();
-        log.info("success internal setup");
+    private PulsarAdmin pulsarAdmin;
 
-        if (!admin.clusters().getClusters().contains(configClusterName)) {
-            // so that clients can test short names
-            admin.clusters().createCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + getBrokerWebservicePortList().get(0)));
-        } else {
-            admin.clusters().updateCluster(configClusterName,
-                    new ClusterData("http://127.0.0.1:" + getBrokerWebServicePortTlsList().get(0)));
-        }
-        if (!admin.tenants().getTenants().contains("public")) {
-            admin.tenants().createTenant("public",
-                    new TenantInfo(Sets.newHashSet("appid1", "appid2"), Sets.newHashSet("test")));
-        } else {
-            admin.tenants().updateTenant("public",
-                    new TenantInfo(Sets.newHashSet("appid1", "appid2"), Sets.newHashSet("test")));
-        }
-
-        List<String> vhostList = Arrays.asList("vhost1", "vhost2", "vhost3");
-        for (String vhost : vhostList) {
-            String ns = "public/" + vhost;
-            if (!admin.namespaces().getNamespaces("public").contains(ns)) {
-                admin.namespaces().createNamespace(ns, 1);
-            }
-        }
-        checkPulsarServiceState();
+    public RabbitMQTestCase(PulsarAdmin pulsarAdmin) {
+        this.pulsarAdmin = pulsarAdmin;
     }
 
-    @AfterClass
-    @Override
-    public void cleanup() throws Exception {
-        super.internalCleanup();
-    }
-
-    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
-        ConnectionFactory connectionFactory = new ConnectionFactory();
-        connectionFactory.setHost("localhost");
-        if (amqpProxyEnable) {
-            int proxyPort = getProxyPort();
-            connectionFactory.setPort(proxyPort);
-            log.info("use proxyPort: {}", proxyPort);
-        } else {
-            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
-            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
-        }
-        connectionFactory.setVirtualHost(vhost);
-        return connectionFactory.newConnection();
-    }
-
-    public void basicFanoutTest(String testName, String vhost, boolean bundleUnloadTest,
+    public void basicFanoutTest(int aopPort, String testName, String vhost, boolean bundleUnloadTest,
                                 int queueCnt) throws Exception {
         log.info("[{}] test start ...", testName);
         @Cleanup
-        Connection connection = getConnection(vhost, true);
+        Connection connection = getConnection(vhost, aopPort);
         log.info("[{}] connection init finish. address: {}:{} open: {}",
                 testName, connection.getAddress(), connection.getPort(), connection.isOpen());
         @Cleanup
@@ -193,7 +142,7 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         if (bundleUnloadTest) {
             try {
                 log.info("unload bundle start.");
-                admin.namespaces().unloadAsync("public/" + vhost).whenComplete((ignore, throwable) -> {
+                pulsarAdmin.namespaces().unloadAsync("public/" + vhost).whenComplete((ignore, throwable) -> {
                     isBundleUnload.set(true);
                     log.info("unload bundle finish.");
                 });
@@ -207,9 +156,9 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         Assert.assertEquals(expectedMsgCntPerQueue * queueList.size(), totalReceiveMsgCnt.get());
     }
 
-    public void defaultEmptyExchangeTest(String vhost, Boolean amqpProxyEnable) throws Exception {
+    public void defaultEmptyExchangeTest(int aopPort, String vhost) throws Exception {
         @Cleanup
-        Connection connection = getConnection("vhost1", amqpProxyEnable);
+        Connection connection = getConnection("vhost1", aopPort);
         @Cleanup
         Channel channel = connection.createChannel();
 
@@ -246,4 +195,13 @@ public class RabbitMQTestBase extends AmqpProtocolHandlerTestBase {
         countDownLatch.await();
         Assert.assertEquals(messageCount * queueCount, receiveMsgCount.get());
     }
+
+    private Connection getConnection(String vhost, int port) throws IOException, TimeoutException {
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.setHost("localhost");
+        connectionFactory.setPort(port);
+        connectionFactory.setVirtualHost(vhost);
+        return connectionFactory.newConnection();
+    }
+
 }

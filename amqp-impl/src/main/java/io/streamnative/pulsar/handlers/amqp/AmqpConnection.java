@@ -103,7 +103,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
 
-    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
+    @Getter
+    private final AmqpTopicManager amqpTopicManager;
+
+    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
+                          AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
         this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
@@ -115,7 +119,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxFrameSize = amqpConfig.getAmqpMaxFrameSize();
         this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
+        this.amqpTopicManager = amqpTopicManager;
     }
+
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -178,9 +184,19 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
         assertState(ConnectionState.AWAIT_START_OK);
         // TODO clientProperties
-        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
-        writeFrame(responseBody.generateFrame(0));
-        state = ConnectionState.AWAIT_SECURE_OK;
+
+        // TODO security process
+//        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
+//        writeFrame(responseBody.generateFrame(0));
+//        state = ConnectionState.AWAIT_SECURE_OK;
+
+        ConnectionTuneBody tuneBody =
+                methodRegistry.createConnectionTuneBody(maxChannels,
+                        maxFrameSize,
+                        heartBeat);
+
+        writeFrame(tuneBody.generateFrame(0));
+        state = ConnectionState.AWAIT_TUNE_OK;
     }
 
     @Override
@@ -349,7 +365,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this);
+            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpTopicManager);
             addChannel(channel);
 
             ChannelOpenOkBody response = getMethodRegistry().createChannelOpenOkBody();

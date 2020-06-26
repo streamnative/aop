@@ -67,6 +67,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicNackBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ChannelFlowOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
@@ -77,6 +78,9 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+import org.apache.qpid.server.protocol.v0_8.transport.TxCommitOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.TxRollbackOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.TxSelectOkBody;
 import org.apache.qpid.server.txn.AsyncCommand;
 import org.apache.qpid.server.txn.ServerTransaction;
 
@@ -127,11 +131,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final AtomicBoolean blockedOnCredit = new AtomicBoolean(false);
     public static final int DEFAULT_CONSUMER_PERMIT = 1000;
 
-    public AmqpChannel(int channelId, AmqpConnection connection) {
+    private final AmqpTopicManager amqpTopicManager;
+
+    public AmqpChannel(int channelId, AmqpConnection connection, AmqpTopicManager amqpTopicManager) {
         this.channelId = channelId;
         this.connection = connection;
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
         this.creditManager = new AmqpFlowCreditManager(0, 0);
+        this.amqpTopicManager = amqpTopicManager;
     }
 
     @Override
@@ -178,9 +185,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     if (durable) {
                         TopicName topicName = TopicName.get(
                             TopicDomain.persistent.value(), connection.getNamespaceName(), exchangeName);
-                        CompletableFuture<Topic> tf = AmqpTopicManager.getTopic(connection.getPulsarService(),
-                                topicName.toString(),
-                                false);
+                        CompletableFuture<Topic> tf = amqpTopicManager.getTopic(topicName.toString(), false);
                         tf.whenComplete((t, e) -> {
                             if (e != null) {
                                 closeChannel(INTERNAL_ERROR, e.getMessage());
@@ -254,8 +259,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                 connection.getNamespaceName(), exchangeName);
                         try {
                             PersistentTopic persistentTopic =
-                                    (PersistentTopic) AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(),
-                                    exchangeTopicName, true);
+                                    (PersistentTopic) amqpTopicManager.getOrCreateTopic(
+                                            exchangeTopicName, true);
                             if (persistentTopic == null) {
                                 connection.sendConnectionClose(INTERNAL_ERROR,
                                         "AOP Create Exchange failed.", channelId);
@@ -341,7 +346,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchange.toString());
 
-        Topic topic = AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(), topicName.toString(), false);
+        Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
             replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
             replyText = replyText.insert(0, "Exchange '").append(exchange).append("' not found");
@@ -399,8 +404,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 try {
                     String queueTopicName = PersistentQueue.getQueueTopicName(
                             connection.getNamespaceName(), queue.toString());
-                    PersistentTopic indexTopic = (PersistentTopic) AmqpTopicManager
-                            .getOrCreateTopic(connection.getPulsarService(), queueTopicName, true);
+                    PersistentTopic indexTopic = (PersistentTopic) amqpTopicManager.getOrCreateTopic(
+                            queueTopicName, true);
                     amqpQueue = new PersistentQueue(queue.toString(), indexTopic, connection.getConnectionId(),
                             exclusive, autoDelete);
                 } catch (Exception e) {
@@ -564,7 +569,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
                 connection.getNamespaceName(), exchangeName);
 
-        Topic topic = AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(), topicName.toString(), false);
+        Topic topic = amqpTopicManager.getOrCreateTopic(topicName.toString(), false);
         if (null == topic) {
             connection.sendConnectionClose(INTERNAL_ERROR, "exchange not found.", channelId);
         } else {
@@ -807,12 +812,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveChannelFlow(boolean active) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ChannelFlow[active: {}]", channelId, active);
+        }
+        // TODO channelFlow process
+        ChannelFlowOkBody body = connection.getMethodRegistry().createChannelFlowOkBody(true);
+        connection.writeFrame(body.generateFrame(channelId));
     }
 
     @Override
     public void receiveChannelFlowOk(boolean active) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ChannelFlowOk[active: {}]", channelId, active);
+        }
     }
 
     @Override
@@ -1085,17 +1097,32 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveTxSelect() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] TxSelect", channelId);
+        }
+        // TODO txSelect process
+        TxSelectOkBody txSelectOkBody = connection.getMethodRegistry().createTxSelectOkBody();
+        connection.writeFrame(txSelectOkBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveTxCommit() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] TxCommit", channelId);
+        }
+        // TODO txCommit process
+        TxCommitOkBody txCommitOkBody = connection.getMethodRegistry().createTxCommitOkBody();
+        connection.writeFrame(txCommitOkBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveTxRollback() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] TxRollback", channelId);
+        }
+        // TODO txRollback process
+        TxRollbackOkBody txRollbackBody = connection.getMethodRegistry().createTxRollbackOkBody();
+        connection.writeFrame(txRollbackBody.generateFrame(channelId));
     }
 
     @Override

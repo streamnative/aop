@@ -228,16 +228,6 @@ public abstract class AmqpProtocolTestBase {
                     amqpTopicManager, Mockito.mock(ExchangeContainer.class),
                     Mockito.mock(QueueContainer.class));
 
-//            PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
-//            Namespaces namespaces = Mockito.mock(Namespaces.class);
-//            ServiceConfiguration serviceConfiguration = Mockito.mock(ServiceConfiguration.class);
-//            Mockito.when(getPulsarService().getAdminClient()).thenReturn(adminClient);
-//            Mockito.when(getPulsarService().getAdminClient().namespaces()).thenReturn(namespaces);
-//            Mockito.when(getPulsarService().getBrokerService()).thenReturn(brokerService);
-//            Mockito.when(getPulsarService().getConfiguration()).thenReturn(serviceConfiguration);
-//            Mockito.when(getPulsarService().getOrderedExecutor()).thenReturn(
-//                    OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
-
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 

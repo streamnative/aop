@@ -136,8 +136,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                 if (listener.startsWith(PLAINTEXT_PREFIX)) {
                     builder.put(
                         new InetSocketAddress(brokerService.pulsar().getBindAddress(), getListenerPort(listener)),
-                        new AmqpChannelInitializer(brokerService.pulsar(),
-                            amqpConfig, amqpTopicManager, exchangeContainer, queueContainer));
+                        new AmqpChannelInitializer(brokerService.pulsar(), amqpConfig, amqpTopicManager));
                 } else {
                     log.error("Amqp listener {} not supported. supports {} and {}",
                         listener, PLAINTEXT_PREFIX, SSL_PREFIX);

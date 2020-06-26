@@ -29,18 +29,13 @@ public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
     @Getter
     private final AmqpServiceConfiguration amqpConfig;
     private final AmqpTopicManager amqpTopicManager;
-    private final ExchangeContainer exchangeContainer;
-    private final QueueContainer queueContainer;
 
     public AmqpChannelInitializer(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                                  AmqpTopicManager amqpTopicManager, ExchangeContainer exchangeContainer,
-                                  QueueContainer queueContainer) {
+                                  AmqpTopicManager amqpTopicManager) {
         super();
         this.pulsarService = pulsarService;
         this.amqpConfig = amqpConfig;
         this.amqpTopicManager = amqpTopicManager;
-        this.exchangeContainer = exchangeContainer;
-        this.queueContainer = queueContainer;
     }
 
     @Override
@@ -56,8 +51,7 @@ public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
         ch.pipeline().addLast("frameEncoder",
             new AmqpEncoder());
         ch.pipeline().addLast("handler",
-            new AmqpConnection(pulsarService, amqpConfig,
-                    amqpTopicManager, exchangeContainer, queueContainer));
+            new AmqpConnection(pulsarService, amqpConfig, amqpTopicManager));
     }
 
 }

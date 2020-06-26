@@ -26,7 +26,6 @@ import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
-import io.streamnative.pulsar.handlers.amqp.QueueContainer;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
@@ -224,10 +223,7 @@ public abstract class AmqpProtocolTestBase {
         private MockChannel channelMethodProcessor;
 
         public MockConnection() throws PulsarServerException {
-            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class),
-                    amqpTopicManager, Mockito.mock(ExchangeContainer.class),
-                    Mockito.mock(QueueContainer.class));
-
+            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class), amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 
@@ -251,8 +247,7 @@ public abstract class AmqpProtocolTestBase {
     private class MockChannel extends AmqpChannel {
 
         public MockChannel(int channelId, AmqpConnection serverMethodProcessor) {
-            super(channelId, serverMethodProcessor, amqpTopicManager,
-                    serverMethodProcessor.getExchangeContainer(), serverMethodProcessor.getQueueContainer());
+            super(channelId, serverMethodProcessor, amqpTopicManager);
         }
 
         @Override

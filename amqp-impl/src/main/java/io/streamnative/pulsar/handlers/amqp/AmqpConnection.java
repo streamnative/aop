@@ -105,14 +105,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Getter
     private final AmqpTopicManager amqpTopicManager;
-    @Getter
-    private final ExchangeContainer exchangeContainer;
-    @Getter
-    private final QueueContainer queueContainer;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                          AmqpTopicManager amqpTopicManager, ExchangeContainer exchangeContainer,
-                          QueueContainer queueContainer) {
+                          AmqpTopicManager amqpTopicManager) {
         super(pulsarService, amqpConfig);
         this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
@@ -125,8 +120,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
         this.amqpTopicManager = amqpTopicManager;
-        this.exchangeContainer = exchangeContainer;
-        this.queueContainer = queueContainer;
     }
 
 
@@ -372,8 +365,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this,
-                    amqpTopicManager, exchangeContainer, queueContainer);
+            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpTopicManager);
             addChannel(channel);
 
             ChannelOpenOkBody response = getMethodRegistry().createChannelOpenOkBody();

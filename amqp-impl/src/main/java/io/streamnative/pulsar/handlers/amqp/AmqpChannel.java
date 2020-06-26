@@ -132,18 +132,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public static final int DEFAULT_CONSUMER_PERMIT = 1000;
 
     private final AmqpTopicManager amqpTopicManager;
-    private final ExchangeContainer exchangeContainer;
-    private final QueueContainer queueContainer;
 
-    public AmqpChannel(int channelId, AmqpConnection connection, AmqpTopicManager amqpTopicManager,
-                       ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
+    public AmqpChannel(int channelId, AmqpConnection connection, AmqpTopicManager amqpTopicManager) {
         this.channelId = channelId;
         this.connection = connection;
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
         this.creditManager = new AmqpFlowCreditManager(0, 0);
         this.amqpTopicManager = amqpTopicManager;
-        this.exchangeContainer = exchangeContainer;
-        this.queueContainer = queueContainer;
     }
 
     @Override

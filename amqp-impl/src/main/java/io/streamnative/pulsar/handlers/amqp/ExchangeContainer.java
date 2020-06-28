@@ -36,17 +36,17 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class ExchangeContainer {
 
-    private static Executor executor = Executors.newCachedThreadPool();
+    private Executor executor = Executors.newCachedThreadPool();
     private AmqpTopicManager amqpTopicManager;
 
-    public ExchangeContainer(AmqpTopicManager amqpTopicManager) {
-        this.amqpTopicManager = amqpTopicManager;
+    public ExchangeContainer(AmqpBrokerService amqpBrokerService) {
+        this.amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
     }
 
     @Getter
-    private static Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
+    private Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
 
-    public static void putExchange(NamespaceName namespaceName, String exchangeName, AmqpExchange amqpExchange) {
+    public void putExchange(NamespaceName namespaceName, String exchangeName, AmqpExchange amqpExchange) {
         exchangeMap.compute(namespaceName, (name, map) -> {
             Map<String, AmqpExchange> amqpExchangeMap = map;
             if (amqpExchangeMap == null) {
@@ -57,11 +57,11 @@ public class ExchangeContainer {
         });
     }
 
-    public static CompletableFuture<AmqpExchange> asyncGetExchange(PulsarService pulsarService,
-                                                                   NamespaceName namespaceName,
-                                                                   String exchangeName,
-                                                                   boolean createIfMissing,
-                                                                   String exchangeType) {
+    public CompletableFuture<AmqpExchange> asyncGetExchange(PulsarService pulsarService,
+                                                            NamespaceName namespaceName,
+                                                            String exchangeName,
+                                                            boolean createIfMissing,
+                                                            String exchangeType) {
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = new CompletableFuture<>();
         if (StringUtils.isEmpty(exchangeType) && createIfMissing) {
             log.error("exchangeType should be set when createIfMissing is true");
@@ -80,7 +80,7 @@ public class ExchangeContainer {
                 }
                 String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
                 CompletableFuture<Topic> topicCompletableFuture =
-                        AmqpTopicManager.getTopic(pulsarService, topicName, createIfMissing);
+                        amqpTopicManager.getTopic(topicName, createIfMissing);
                 topicCompletableFuture.whenComplete((topic, throwable) -> {
                     if (throwable != null) {
                         log.error("Get topic error:{}", throwable.getMessage());
@@ -106,7 +106,7 @@ public class ExchangeContainer {
                                     amqpExchangeType,
                                     persistentTopic,
                                     false);
-                            ExchangeContainer.putExchange(namespaceName, exchangeName, amqpExchange);
+                            putExchange(namespaceName, exchangeName, amqpExchange);
                             amqpExchangeCompletableFuture.complete(amqpExchange);
                         }
                     }
@@ -118,7 +118,7 @@ public class ExchangeContainer {
         return amqpExchangeCompletableFuture;
     }
 
-    public static void deleteExchange(NamespaceName namespaceName, String exchangeName) {
+    public void deleteExchange(NamespaceName namespaceName, String exchangeName) {
         if (StringUtils.isEmpty(exchangeName)) {
             return;
         }

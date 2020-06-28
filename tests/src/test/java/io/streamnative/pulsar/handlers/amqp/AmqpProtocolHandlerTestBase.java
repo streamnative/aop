@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
+
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;

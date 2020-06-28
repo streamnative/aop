@@ -48,6 +48,8 @@ public class AmqpConsumer extends Consumer {
 
     private final AmqpChannel channel;
 
+    private QueueContainer queueContainer;
+
     private final boolean autoAck;
 
     private final String consumerTag;
@@ -67,7 +69,7 @@ public class AmqpConsumer extends Consumer {
 
     private final int maxPermits = 1000;
 
-    public AmqpConsumer(Subscription subscription,
+    public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
         String appId, Map<String, String> metadata, boolean readCompacted,
@@ -77,6 +79,7 @@ public class AmqpConsumer extends Consumer {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta);
         this.channel = channel;
+        this.queueContainer = queueContainer;
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
         this.queueName = queueName;
@@ -188,7 +191,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     public AmqpQueue getQueue() {
-        return QueueContainer.getQueue(channel.getConnection().getNamespaceName(), queueName);
+        return queueContainer.getQueue(channel.getConnection().getNamespaceName(), queueName);
     }
 
     @Override

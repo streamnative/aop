@@ -22,16 +22,16 @@ import org.apache.qpid.server.protocol.v0_8.FieldTable;
  */
 public interface QueueService {
 
-    void queueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
+    void queueDeclare(AmqpChannel channel, AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
                       boolean autoDelete, boolean nowait, FieldTable arguments);
 
-    void queueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait);
+    void queueDelete(AmqpChannel channel, AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait);
 
-    void queueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+    void queueBind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                    boolean nowait, FieldTable argumentsTable);
 
-    void queueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+    void queueUnbind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                      FieldTable arguments);
 
-    void queuePurge(AMQShortString queue, boolean nowait);
+    void queuePurge(AmqpChannel channel, AMQShortString queue, boolean nowait);
 }

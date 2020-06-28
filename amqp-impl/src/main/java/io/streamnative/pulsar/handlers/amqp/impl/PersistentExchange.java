@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;

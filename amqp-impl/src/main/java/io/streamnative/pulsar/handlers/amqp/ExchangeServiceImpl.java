@@ -15,13 +15,11 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -36,22 +34,18 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
  */
 @Slf4j
 public class ExchangeServiceImpl implements ExchangeService {
-    private final int channelId;
-    private final AmqpConnection connection;
-    private AmqpChannel amqpChannel;
+    private ExchangeContainer exchangeContainer;
 
-    public ExchangeServiceImpl(AmqpChannel amqpChannel) {
-        this.amqpChannel = amqpChannel;
-        this.channelId = amqpChannel.getChannelId();
-        this.connection = amqpChannel.getConnection();
+    public ExchangeServiceImpl(ExchangeContainer exchangeContainer) {
+        this.exchangeContainer = exchangeContainer;
     }
 
-    private void handleDefaultExchangeInExchangeDeclare(AMQShortString exchange) {
+    private void handleDefaultExchangeInExchangeDeclare(AmqpChannel channel, AMQShortString exchange) {
         if (isDefaultExchange(exchange)) {
             StringBuffer sb = new StringBuffer();
             sb.append("Attempt to redeclare default exchange: of type ")
                     .append(ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
-            amqpChannel.closeChannel(ErrorCodes.ACCESS_REFUSED, sb.toString());
+            channel.closeChannel(ErrorCodes.ACCESS_REFUSED, sb.toString());
         }
     }
 
@@ -61,9 +55,11 @@ public class ExchangeServiceImpl implements ExchangeService {
     }
 
 
-    public void exchangeDeclare(AMQShortString exchange, AMQShortString type,
+    public void exchangeDeclare(AmqpChannel channel, AMQShortString exchange, AMQShortString type,
                                 boolean passive, boolean durable, boolean autoDelete,
                                 boolean internal, boolean nowait, FieldTable arguments) {
+        int channelId = channel.getChannelId();
+        AmqpConnection connection = channel.getConnection();
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
                             + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
@@ -71,7 +67,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                     type, passive, durable, autoDelete, internal, nowait, arguments);
         }
 
-        handleDefaultExchangeInExchangeDeclare(exchange);
+        handleDefaultExchangeInExchangeDeclare(channel, exchange);
 
         String exchangeName = formatString(exchange.toString());
         final MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -79,7 +75,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         boolean createIfMissing = passive ? false : true;
 
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                ExchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
+                exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
                         exchangeName, createIfMissing,
                         type.toString());
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
@@ -88,7 +84,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                 connection.sendConnectionClose(ErrorCodes.NOT_FOUND, "Unknown exchange: " + exchangeName, channelId);
             } else {
                 if (null == amqpExchange) {
-                    amqpChannel.closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange:" + exchangeName);
+                    channel.closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange:" + exchangeName);
                 } else {
                     if (!(type == null || type.length() == 0)
                             && !amqpExchange.getType().toString().equalsIgnoreCase(type.toString())) {
@@ -97,7 +93,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                                         + exchangeName + "' of type " + amqpExchange.getType()
                                         + " to " + type + ".", channelId);
                     } else if (!nowait) {
-                        amqpChannel.sync();
+                        channel.sync();
                         connection.writeFrame(declareOkBody.generateFrame(channelId));
                     }
                 }
@@ -106,7 +102,9 @@ public class ExchangeServiceImpl implements ExchangeService {
     }
 
     @Override
-    public void exchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
+    public void exchangeDelete(AmqpChannel channel, AMQShortString exchange, boolean ifUnused, boolean nowait) {
+        int channelId = channel.getChannelId();
+        AmqpConnection connection = channel.getConnection();
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeDelete[ exchange: {}, ifUnused: {}, nowait:{} ]", channelId, exchange, ifUnused,
                     nowait);
@@ -120,7 +118,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         } else {
             String exchangeName = formatString(exchange.toString());
             CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                    ExchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
+                    exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
                             exchangeName, false,
                             null);
             amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
@@ -128,14 +126,14 @@ public class ExchangeServiceImpl implements ExchangeService {
                     log.error("Get Topic error:{}", throwable.getMessage());
                 } else {
                     if (null == amqpExchange) {
-                        amqpChannel.closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
+                        channel.closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
                     } else {
                         PersistentTopic topic = (PersistentTopic) amqpExchange.getTopic();
                         if (ifUnused && topic.getSubscriptions().isEmpty()) {
-                            amqpChannel.closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
+                            channel.closeChannel(ErrorCodes.IN_USE, "Exchange has bindings. ");
                         } else {
                             try {
-                                ExchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
+                                exchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
                                 topic.delete().get();
                                 ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().
                                         createExchangeDeleteOkBody();
@@ -153,34 +151,46 @@ public class ExchangeServiceImpl implements ExchangeService {
     }
 
     @Override
-    public void exchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queueName) {
+    public void exchangeBound(AmqpChannel channel, AMQShortString exchange, AMQShortString routingKey,
+                              AMQShortString queueName) {
+        int channelId = channel.getChannelId();
+        AmqpConnection connection = channel.getConnection();
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] ExchangeBound[ exchange: {}, routingKey: {}, queue:{} ]", channelId, exchange,
                     routingKey, queueName);
         }
-        int replyCode;
-        StringBuilder replyText = new StringBuilder();
-        TopicName topicName = TopicName.get(TopicDomain.persistent.value(),
-                connection.getNamespaceName(), exchange.toString());
 
-        Topic topic = AmqpTopicManager.getOrCreateTopic(connection.getPulsarService(), topicName.toString(), false);
-        if (null == topic) {
-            replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
-            replyText = replyText.insert(0, "Exchange '").append(exchange).append("' not found");
-        } else {
-            List<String> subs = topic.getSubscriptions().keys();
-            if (null == subs || subs.isEmpty()) {
-                replyCode = ExchangeBoundOkBody.QUEUE_NOT_FOUND;
-                replyText = replyText.insert(0, "Queue '").append(queueName).append("' not found");
+        String exchangeName = formatString(exchange.toString());
+        CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
+                exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
+                        exchangeName, false,
+                        null);
+        amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
+            if (throwable != null) {
+                log.error("Get Topic error:{}", throwable.getMessage());
+                connection.sendConnectionClose(ErrorCodes.NOT_FOUND, "Unknown exchange: " + exchangeName, channelId);
             } else {
-                replyCode = ExchangeBoundOkBody.OK;
-                replyText = null;
+                int replyCode;
+                StringBuilder replyText = new StringBuilder();
+                if (null == amqpExchange) {
+                    replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
+                    replyText = replyText.insert(0, "Exchange '").append(exchange).append("' not found");
+                } else {
+                    List<String> subs = amqpExchange.getTopic().getSubscriptions().keys();
+                    if (null == subs || subs.isEmpty()) {
+                        replyCode = ExchangeBoundOkBody.QUEUE_NOT_FOUND;
+                        replyText = replyText.insert(0, "Queue '").append(queueName).append("' not found");
+                    } else {
+                        replyCode = ExchangeBoundOkBody.OK;
+                        replyText = null;
+                    }
+                }
+                MethodRegistry methodRegistry = connection.getMethodRegistry();
+                ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
+                        .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
+                connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
             }
-        }
-        MethodRegistry methodRegistry = connection.getMethodRegistry();
-        ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
-                .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
-        connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
+        });
     }
 
     private boolean isDefaultExchange(final AMQShortString exchangeName) {

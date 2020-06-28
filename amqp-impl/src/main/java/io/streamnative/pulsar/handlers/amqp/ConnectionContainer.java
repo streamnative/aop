@@ -23,7 +23,6 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
 import org.apache.pulsar.common.naming.NamespaceBundle;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.zookeeper.ZooKeeper;
 
 /**
  * Connection container, listen bundle unload event, release connection resource.
@@ -31,16 +30,17 @@ import org.apache.zookeeper.ZooKeeper;
 @Slf4j
 public class ConnectionContainer {
 
-    public static ZooKeeper zooKeeper;
     private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
-    public static void init(PulsarService pulsarService) {
-        ConnectionContainer.zooKeeper = pulsarService.getLocalZkCache().getZooKeeper();
+    public ConnectionContainer(PulsarService pulsarService,
+                               ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
-                log.info("ConnectionContainer [onLoad] namespaceBundle: {}", namespaceBundle);
-//                ExchangeContainer.initBuildInExchange(namespaceBundle.getNamespaceObject());
+                int brokerPort = pulsarService.getBrokerListenPort().isPresent()
+                        ? pulsarService.getBrokerListenPort().get() : 0;
+                log.info("ConnectionContainer [onLoad] namespaceBundle: {}, brokerPort: {}",
+                        namespaceBundle, brokerPort);
             }
 
             @Override
@@ -61,14 +61,14 @@ public class ConnectionContainer {
                     connectionMap.remove(namespaceName);
                 }
 
-                if (ExchangeContainer.getExchangeMap().containsKey(namespaceName)) {
-                    ExchangeContainer.getExchangeMap().get(namespaceName).clear();
-                    ExchangeContainer.getExchangeMap().remove(namespaceName);
+                if (exchangeContainer.getExchangeMap().containsKey(namespaceName)) {
+                    exchangeContainer.getExchangeMap().get(namespaceName).clear();
+                    exchangeContainer.getExchangeMap().remove(namespaceName);
                 }
 
-                if (QueueContainer.getQueueMap().containsKey(namespaceName)) {
-                    QueueContainer.getQueueMap().get(namespaceName).clear();
-                    QueueContainer.getQueueMap().remove(namespaceName);
+                if (queueContainer.getQueueMap().containsKey(namespaceName)) {
+                    queueContainer.getQueueMap().get(namespaceName).clear();
+                    queueContainer.getQueueMap().remove(namespaceName);
                 }
             }
 

@@ -119,17 +119,18 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public static final int DEFAULT_CONSUMER_PERMIT = 1000;
     private ExchangeService exchangeService;
     private QueueService queueService;
+    private ExchangeContainer exchangeContainer;
+    private QueueContainer queueContainer;
 
-    private final AmqpTopicManager amqpTopicManager;
-
-    public AmqpChannel(int channelId, AmqpConnection connection, AmqpTopicManager amqpTopicManager) {
+    public AmqpChannel(int channelId, AmqpConnection connection, AmqpBrokerService amqpBrokerService) {
         this.channelId = channelId;
         this.connection = connection;
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
         this.creditManager = new AmqpFlowCreditManager(0, 0);
-        this.exchangeService = new ExchangeServiceImpl(this);
-        this.queueService = new QueueServiceImpl(this);
-        this.amqpTopicManager = amqpTopicManager;
+        this.exchangeService = amqpBrokerService.getExchangeService();
+        this.queueService = amqpBrokerService.getQueueService();
+        this.exchangeContainer = amqpBrokerService.getExchangeContainer();
+        this.queueContainer = amqpBrokerService.getQueueContainer();
     }
 
     @Override
@@ -152,45 +153,46 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
                                        boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
-        this.exchangeService.exchangeDeclare(exchange, type, passive, durable, autoDelete, internal, nowait, arguments);
+        this.exchangeService.exchangeDeclare(this, exchange, type, passive, durable, autoDelete, internal, nowait,
+                arguments);
     }
 
     @Override
     public void receiveExchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
-        exchangeService.exchangeDelete(exchange, ifUnused, nowait);
+        exchangeService.exchangeDelete(this, exchange, ifUnused, nowait);
     }
 
     @Override
     public void receiveExchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queueName) {
-        exchangeService.exchangeBound(exchange, routingKey, queueName);
+        exchangeService.exchangeBound(this, exchange, routingKey, queueName);
     }
 
     @Override
     public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
                                     boolean autoDelete, boolean nowait, FieldTable arguments) {
-        queueService.queueDeclare(queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+        queueService.queueDeclare(this, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
     }
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                  boolean nowait, FieldTable argumentsTable) {
-        queueService.queueBind(queue, exchange, bindingKey, nowait, argumentsTable);
+        queueService.queueBind(this, queue, exchange, bindingKey, nowait, argumentsTable);
     }
 
     @Override
     public void receiveQueuePurge(AMQShortString queue, boolean nowait) {
-        queueService.queuePurge(queue, nowait);
+        queueService.queuePurge(this, queue, nowait);
     }
 
     @Override
     public void receiveQueueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait) {
-        queueService.queueDelete(queue, ifUnused, ifEmpty, nowait);
+        queueService.queueDelete(this, queue, ifUnused, ifEmpty, nowait);
     }
 
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                    FieldTable arguments) {
-        queueService.queueUnbind(queue, exchange, bindingKey, arguments);
+        queueService.queueUnbind(this, queue, exchange, bindingKey, arguments);
     }
 
     @Override
@@ -227,7 +229,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             consumerTag1 = consumerTag.toString();
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                queueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
                         queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
@@ -281,7 +283,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 subscription = topic.createSubscription(defaultSubscription,
                     PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
             }
-            consumer = new AmqpConsumer(subscription, exclusive ? PulsarApi.CommandSubscribe.SubType.Exclusive :
+            consumer = new AmqpConsumer(queueContainer, subscription, exclusive
+                    ? PulsarApi.CommandSubscribe.SubType.Exclusive :
                 PulsarApi.CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
                 consumerTag, 0, connection.getServerCnx(), "", null,
                 false, PulsarApi.CommandSubscribe.InitialPosition.Latest,
@@ -317,7 +320,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     channelId, exchange, routingKey, mandatory, immediate);
         }
         if (isDefaultExchange(exchange)) {
-            CompletableFuture<AmqpExchange> completableFuture = ExchangeContainer.
+            CompletableFuture<AmqpExchange> completableFuture = exchangeContainer.
                     asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
                             AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
                             true, ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
@@ -328,7 +331,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 } else {
                     String queueName = routingKey.toString();
                     CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                            QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                            queueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
                                     queueName, false);
                     amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable1) -> {
                         if (throwable1 != null) {
@@ -370,7 +373,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicGet(AMQShortString queue, boolean noAck) {
         String queueName = AMQShortString.toString(queue);
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                QueueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
+                queueContainer.asyncGetQueue(connection.getPulsarService(), connection.getNamespaceName(),
                         queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
@@ -391,7 +394,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                 subscription = topic.createSubscription(defaultSubscription,
                                         PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
                             }
-                            consumer = new AmqpPullConsumer(subscription, PulsarApi.CommandSubscribe.SubType.Shared,
+                            consumer = new AmqpPullConsumer(queueContainer, subscription,
+                                    PulsarApi.CommandSubscribe.SubType.Shared,
                                     topic.getName(), 0, 0, "", 0,
                                     connection.getServerCnx(), "", null, false,
                                     PulsarApi.CommandSubscribe.InitialPosition.Latest, null, this,
@@ -546,7 +550,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             if (exchangeName == null || exchangeName.length() == 0) {
                 exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
             }
-            CompletableFuture<AmqpExchange> completableFuture = ExchangeContainer.
+            CompletableFuture<AmqpExchange> completableFuture = exchangeContainer.
                     asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(), exchangeName,
                             createIfMissing,
                             exchangeType);

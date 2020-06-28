@@ -17,15 +17,14 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.concurrent.DefaultEventExecutor;
+import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
-import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
-import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
-import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientChannel;
 import io.streamnative.pulsar.handlers.amqp.test.frame.AmqpClientMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.test.frame.ToClientByteBufferSender;
@@ -85,6 +84,7 @@ public abstract class AmqpProtocolTestBase {
     protected AmqpClientChannel clientChannel;
 
     protected AmqpTopicManager amqpTopicManager;
+    protected AmqpBrokerService amqpBrokerService;
 
     public static byte[] contentBytes = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
@@ -92,7 +92,9 @@ public abstract class AmqpProtocolTestBase {
     public void setup() throws Exception {
         mockPulsarService();
         mockBrokerService();
-        amqpTopicManager = new AmqpTopicManager(pulsarService);
+        ConnectionContainer connectionContainer = Mockito.mock(ConnectionContainer.class);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer);
+        amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.
         connection = new MockConnection();
@@ -155,20 +157,8 @@ public abstract class AmqpProtocolTestBase {
         String namespace = "vhost1";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
-//        addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
-//        addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
-//        addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
-//        addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
     }
 
-    private void addBuildInExchanges(NamespaceName namespaceName,
-                                     String exchangeName, AmqpExchange.Type exchangeType) {
-        String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-        Topic topic = amqpTopicManager.getOrCreateTopic(topicName, true);
-        ExchangeContainer.putExchange(namespaceName, exchangeName,
-                new PersistentExchange(exchangeName, exchangeType,
-                        (PersistentTopic) topic, false));
-    }
 
     private void initMockAmqpTopicManager(){
         CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
@@ -224,7 +214,7 @@ public abstract class AmqpProtocolTestBase {
         private MockChannel channelMethodProcessor;
 
         public MockConnection() throws PulsarServerException {
-            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class), amqpTopicManager);
+            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class), amqpBrokerService);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 
@@ -248,7 +238,7 @@ public abstract class AmqpProtocolTestBase {
     private class MockChannel extends AmqpChannel {
 
         public MockChannel(int channelId, AmqpConnection serverMethodProcessor) {
-            super(channelId, serverMethodProcessor, amqpTopicManager);
+            super(channelId, serverMethodProcessor, amqpBrokerService);
         }
 
         @Override

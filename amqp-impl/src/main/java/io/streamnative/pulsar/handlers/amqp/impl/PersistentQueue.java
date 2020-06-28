@@ -14,15 +14,16 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
+import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
-import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -36,7 +37,6 @@ import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.MessageImpl;
@@ -58,7 +58,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private ObjectMapper jsonMapper;
 
-    public PersistentQueue(String queueName, PersistentTopic indexTopic, long connectionId,
+    public PersistentQueue(String queueName, PersistentTopic indexTopic,
+                           long connectionId,
                            boolean exclusive, boolean autoDelete) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
@@ -107,7 +108,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return indexTopic;
     }
 
-    public void recoverRoutersFromQueueProperties(Map<String, String> properties, PulsarService pulsarService,
+    public void recoverRoutersFromQueueProperties(Map<String, String> properties, AmqpBrokerService amqpBrokerService,
                                                   NamespaceName namespaceName) {
         if (null == properties || properties.size() == 0) {
             return;
@@ -121,8 +122,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 String exchangeName = amqpQueueProperty.getExchangeName();
                 Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
                 Map<String, Object> arguments = amqpQueueProperty.getArguments();
-                CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = ExchangeContainer.
-                        asyncGetExchange(pulsarService, namespaceName, exchangeName, false, null);
+                CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = amqpBrokerService.
+                        getExchangeContainer().asyncGetExchange(amqpBrokerService.getPulsarService(),
+                        namespaceName, exchangeName, false, null);
                 amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                     AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
                             generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));

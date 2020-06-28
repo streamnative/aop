@@ -102,12 +102,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AtomicBoolean blocked = new AtomicBoolean();
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
-
-    @Getter
-    private final AmqpTopicManager amqpTopicManager;
+    private AmqpBrokerService amqpBrokerService;
 
     public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                          AmqpTopicManager amqpTopicManager) {
+                          AmqpBrokerService amqpBrokerService) {
         super(pulsarService, amqpConfig);
         this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
@@ -119,7 +117,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxFrameSize = amqpConfig.getAmqpMaxFrameSize();
         this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
-        this.amqpTopicManager = amqpTopicManager;
+        this.amqpBrokerService = amqpBrokerService;
     }
 
 
@@ -365,7 +363,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpTopicManager);
+            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpBrokerService);
             addChannel(channel);
 
             ChannelOpenOkBody response = getMethodRegistry().createChannelOpenOkBody();

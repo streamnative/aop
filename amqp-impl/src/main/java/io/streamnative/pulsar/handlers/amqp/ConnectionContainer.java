@@ -90,6 +90,9 @@ public class ConnectionContainer {
     }
 
     public static void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+        if (namespaceName == null) {
+            return;
+        }
         connectionMap.getOrDefault(namespaceName, Collections.emptySet()).remove(amqpConnection);
     }
 

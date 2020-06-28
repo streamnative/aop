@@ -23,6 +23,7 @@ import static com.rabbitmq.client.test.TestUtils.sendAndConsumeMessage;
 import static com.rabbitmq.client.test.TestUtils.waitAtMost;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;

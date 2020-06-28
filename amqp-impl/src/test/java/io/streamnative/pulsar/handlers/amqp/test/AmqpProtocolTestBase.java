@@ -66,6 +66,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 
@@ -75,15 +77,23 @@ import org.testng.annotations.BeforeMethod;
 @Log4j2
 public abstract class AmqpProtocolTestBase {
 
+    private BrokerService brokerService;
+    private PulsarService pulsarService;
     protected AmqpConnection connection;
     protected ByteBufferSender toServerSender;
     protected MethodRegistry methodRegistry;
     protected AmqpClientChannel clientChannel;
 
+    protected AmqpTopicManager amqpTopicManager;
+
     public static byte[] contentBytes = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
     @BeforeMethod
     public void setup() throws Exception {
+        mockPulsarService();
+        mockBrokerService();
+        amqpTopicManager = new AmqpTopicManager(pulsarService);
+
         // 1.Init AMQP connection for connection methods and channel methods tests.
         connection = new MockConnection();
         ChannelHandlerContext ctx = Mockito.mock(ChannelHandlerContext.class);
@@ -111,9 +121,33 @@ public abstract class AmqpProtocolTestBase {
         AmqpPulsarServerCnx serverCnx = new AmqpPulsarServerCnx(connection.getPulsarService(), ctx);
         connection.setPulsarServerCnx(serverCnx);
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
-        initMockAmqpTopicManager();
         initProtocol();
+        initMockAmqpTopicManager();
         initDefaultExchange();
+    }
+
+    private void mockPulsarService() throws PulsarServerException {
+        pulsarService = Mockito.mock(PulsarService.class);
+        PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
+        Namespaces namespaces = Mockito.mock(Namespaces.class);
+        ServiceConfiguration serviceConfiguration = Mockito.mock(ServiceConfiguration.class);
+        Mockito.when(pulsarService.getAdminClient()).thenReturn(adminClient);
+        Mockito.when(pulsarService.getAdminClient().namespaces()).thenReturn(namespaces);
+        Mockito.when(pulsarService.getBrokerService()).then(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                return brokerService;
+            }
+        });
+        Mockito.when(pulsarService.getConfiguration()).thenReturn(serviceConfiguration);
+        Mockito.when(pulsarService.getOrderedExecutor()).thenReturn(
+                OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
+    }
+
+    private void mockBrokerService() {
+        brokerService = Mockito.mock(BrokerService.class);
+        Mockito.when(brokerService.executor()).thenReturn(new DefaultEventExecutor());
+        Mockito.when(brokerService.pulsar()).thenReturn(pulsarService);
     }
 
     private void initDefaultExchange() {
@@ -130,17 +164,13 @@ public abstract class AmqpProtocolTestBase {
     private void addBuildInExchanges(NamespaceName namespaceName,
                                      String exchangeName, AmqpExchange.Type exchangeType) {
         String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-        Topic topic = AmqpTopicManager.
-                getOrCreateTopic(connection.getPulsarService(), topicName, true);
+        Topic topic = amqpTopicManager.getOrCreateTopic(topicName, true);
         ExchangeContainer.putExchange(namespaceName, exchangeName,
                 new PersistentExchange(exchangeName, exchangeType,
                         (PersistentTopic) topic, false));
     }
 
     private void initMockAmqpTopicManager(){
-        BrokerService brokerService = Mockito.mock(BrokerService.class);
-        Mockito.when(brokerService.executor()).thenReturn(new DefaultEventExecutor());
-
         CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
         PersistentTopic persistentTopic = Mockito.mock(PersistentTopic.class);
 
@@ -194,20 +224,7 @@ public abstract class AmqpProtocolTestBase {
         private MockChannel channelMethodProcessor;
 
         public MockConnection() throws PulsarServerException {
-            super(Mockito.mock(PulsarService.class), Mockito.mock(AmqpServiceConfiguration.class));
-
-            PulsarAdmin adminClient = Mockito.mock(PulsarAdmin.class);
-            Namespaces namespaces = Mockito.mock(Namespaces.class);
-            BrokerService brokerService = Mockito.mock(BrokerService.class);
-            ServiceConfiguration serviceConfiguration = Mockito.mock(ServiceConfiguration.class);
-            Mockito.when(getPulsarService().getAdminClient()).thenReturn(adminClient);
-            Mockito.when(getPulsarService().getAdminClient().namespaces()).thenReturn(namespaces);
-            Mockito.when(getPulsarService().getBrokerService()).thenReturn(brokerService);
-            Mockito.when(brokerService.pulsar()).thenReturn(getPulsarService());
-            Mockito.when(getPulsarService().getConfiguration()).thenReturn(serviceConfiguration);
-            Mockito.when(getPulsarService().getOrderedExecutor()).thenReturn(
-                    OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
-
+            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class), amqpTopicManager);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 
@@ -231,7 +248,7 @@ public abstract class AmqpProtocolTestBase {
     private class MockChannel extends AmqpChannel {
 
         public MockChannel(int channelId, AmqpConnection serverMethodProcessor) {
-            super(channelId, serverMethodProcessor);
+            super(channelId, serverMethodProcessor, amqpTopicManager);
         }
 
         @Override

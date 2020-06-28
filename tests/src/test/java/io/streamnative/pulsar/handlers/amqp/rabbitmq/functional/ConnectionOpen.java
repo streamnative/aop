@@ -18,6 +18,7 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.MalformedFrameException;

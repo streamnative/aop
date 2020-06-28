@@ -30,7 +30,6 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 
-
 /**
  * Container for all exchanges in the broker.
  */
@@ -38,6 +37,11 @@ import org.apache.pulsar.common.naming.NamespaceName;
 public class ExchangeContainer {
 
     private static Executor executor = Executors.newCachedThreadPool();
+    private AmqpTopicManager amqpTopicManager;
+
+    public ExchangeContainer(AmqpTopicManager amqpTopicManager) {
+        this.amqpTopicManager = amqpTopicManager;
+    }
 
     @Getter
     private static Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();

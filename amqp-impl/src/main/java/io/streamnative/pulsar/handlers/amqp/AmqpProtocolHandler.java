@@ -49,6 +49,10 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Getter
     private String bindAddress;
 
+    private AmqpTopicManager amqpTopicManager;
+    private ExchangeContainer exchangeContainer;
+    private QueueContainer queueContainer;
+    private ConnectionContainer connectionContainer;
 
     @Override
     public String protocolName() {
@@ -85,7 +89,11 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public void start(BrokerService service) {
         brokerService = service;
-        ConnectionContainer.init(brokerService.getPulsar());
+
+        this.amqpTopicManager = new AmqpTopicManager(brokerService.getPulsar());
+        this.exchangeContainer = new ExchangeContainer(this.amqpTopicManager);
+        this.queueContainer = new QueueContainer();
+        this.connectionContainer = new ConnectionContainer(brokerService.getPulsar(), this.exchangeContainer);
 
         if (amqpConfig.isAmqpProxyEnable()) {
             ProxyConfiguration proxyConfig = new ProxyConfiguration();
@@ -128,8 +136,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                 if (listener.startsWith(PLAINTEXT_PREFIX)) {
                     builder.put(
                         new InetSocketAddress(brokerService.pulsar().getBindAddress(), getListenerPort(listener)),
-                        new AmqpChannelInitializer(brokerService.pulsar(),
-                            amqpConfig));
+                        new AmqpChannelInitializer(brokerService.pulsar(), amqpConfig, amqpTopicManager));
                 } else {
                     log.error("Amqp listener {} not supported. supports {} and {}",
                         listener, PLAINTEXT_PREFIX, SSL_PREFIX);

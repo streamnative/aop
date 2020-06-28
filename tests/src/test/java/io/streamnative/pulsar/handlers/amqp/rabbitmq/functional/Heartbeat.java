@@ -18,6 +18,7 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.impl.recovery.AutorecoveringConnection;
 import com.rabbitmq.client.test.BrokerTestCase;

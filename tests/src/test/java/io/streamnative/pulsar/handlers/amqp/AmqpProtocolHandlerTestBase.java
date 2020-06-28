@@ -403,15 +403,15 @@ public abstract class AmqpProtocolHandlerTestBase {
         this.brokerCount = brokerCount;
     }
 
-    public String randExName() {
+    public static String randExName() {
         return randomName("ex-", 4);
     }
 
-    public String randQuName() {
+    public static String randQuName() {
         return randomName("qu-", 4);
     }
 
-    public String randomName(String prefix, int numChars) {
+    public static String randomName(String prefix, int numChars) {
         StringBuilder sb = new StringBuilder(prefix);
         for (int i = 0; i < numChars; i++) {
             sb.append((char) (ThreadLocalRandom.current().nextInt(26) + 'a'));

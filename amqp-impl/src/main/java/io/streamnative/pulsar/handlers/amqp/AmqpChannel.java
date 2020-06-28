@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.transport.util.Functions.hex;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -57,12 +58,16 @@ import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicNackBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ChannelFlowOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
+import org.apache.qpid.server.protocol.v0_8.transport.TxCommitOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.TxRollbackOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.TxSelectOkBody;
 import org.apache.qpid.server.txn.AsyncCommand;
 import org.apache.qpid.server.txn.ServerTransaction;
 
@@ -115,13 +120,16 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private ExchangeService exchangeService;
     private QueueService queueService;
 
-    public AmqpChannel(int channelId, AmqpConnection connection) {
+    private final AmqpTopicManager amqpTopicManager;
+
+    public AmqpChannel(int channelId, AmqpConnection connection, AmqpTopicManager amqpTopicManager) {
         this.channelId = channelId;
         this.connection = connection;
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
         this.creditManager = new AmqpFlowCreditManager(0, 0);
         this.exchangeService = new ExchangeServiceImpl(this);
         this.queueService = new QueueServiceImpl(this);
+        this.amqpTopicManager = amqpTopicManager;
     }
 
     @Override
@@ -405,12 +413,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveChannelFlow(boolean active) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ChannelFlow[active: {}]", channelId, active);
+        }
+        // TODO channelFlow process
+        ChannelFlowOkBody body = connection.getMethodRegistry().createChannelFlowOkBody(true);
+        connection.writeFrame(body.generateFrame(channelId));
     }
 
     @Override
     public void receiveChannelFlowOk(boolean active) {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ChannelFlowOk[active: {}]", channelId, active);
+        }
     }
 
     @Override
@@ -697,17 +712,32 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveTxSelect() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] TxSelect", channelId);
+        }
+        // TODO txSelect process
+        TxSelectOkBody txSelectOkBody = connection.getMethodRegistry().createTxSelectOkBody();
+        connection.writeFrame(txSelectOkBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveTxCommit() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] TxCommit", channelId);
+        }
+        // TODO txCommit process
+        TxCommitOkBody txCommitOkBody = connection.getMethodRegistry().createTxCommitOkBody();
+        connection.writeFrame(txCommitOkBody.generateFrame(channelId));
     }
 
     @Override
     public void receiveTxRollback() {
-
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] TxRollback", channelId);
+        }
+        // TODO txRollback process
+        TxRollbackOkBody txRollbackBody = connection.getMethodRegistry().createTxRollbackOkBody();
+        connection.writeFrame(txRollbackBody.generateFrame(channelId));
     }
 
     @Override

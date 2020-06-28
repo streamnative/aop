@@ -17,6 +17,7 @@ package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 import static com.rabbitmq.client.test.TestUtils.prepareForRecovery;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Address;

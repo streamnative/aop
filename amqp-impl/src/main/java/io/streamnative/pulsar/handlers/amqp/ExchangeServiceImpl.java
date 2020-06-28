@@ -73,11 +73,14 @@ public class ExchangeServiceImpl implements ExchangeService {
         final MethodRegistry methodRegistry = connection.getMethodRegistry();
         final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
         boolean createIfMissing = passive ? false : true;
-
+        String exchangeType = type.toString();
+        if (channel.isBuildInExchange(exchange)) {
+            createIfMissing = true;
+            exchangeType = channel.getExchangeType(exchange.toString());
+        }
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
                 exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
-                        exchangeName, createIfMissing,
-                        type.toString());
+                        exchangeName, createIfMissing, exchangeType);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());

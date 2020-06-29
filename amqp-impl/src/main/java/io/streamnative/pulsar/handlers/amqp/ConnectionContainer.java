@@ -30,7 +30,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class ConnectionContainer {
 
-    private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
+    private Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     public ConnectionContainer(PulsarService pulsarService,
                                ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
@@ -79,7 +79,7 @@ public class ConnectionContainer {
         });
     }
 
-    public static void addConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+    public void addConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
         connectionMap.compute(namespaceName, (ns, connectionSet) -> {
             if (connectionSet == null) {
                 connectionSet = Sets.newConcurrentHashSet();
@@ -89,7 +89,7 @@ public class ConnectionContainer {
         });
     }
 
-    public static void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+    public void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
         if (namespaceName == null) {
             return;
         }

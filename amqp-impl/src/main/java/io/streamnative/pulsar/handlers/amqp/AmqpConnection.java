@@ -135,7 +135,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         completeAndCloseAllChannels();
-        ConnectionContainer.removeConnection(namespaceName, this);
+        amqpBrokerService.getConnectionContainer().removeConnection(namespaceName, this);
         this.brokerDecoder.close();
     }
 
@@ -289,7 +289,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
-        ConnectionContainer.addConnection(namespaceName, this);
+        amqpBrokerService.getConnectionContainer().addConnection(namespaceName, this);
 //        } else {
 //            sendConnectionClose(ErrorCodes.NOT_FOUND,
 //                "Unknown virtual host: '" + virtualHostStr + "'", 0);

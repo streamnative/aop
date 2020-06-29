@@ -64,7 +64,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
         topicNameValidate();
-        jsonMapper = new ObjectMapper();
+        this.jsonMapper = new ObjectMapper();
     }
 
     @Override

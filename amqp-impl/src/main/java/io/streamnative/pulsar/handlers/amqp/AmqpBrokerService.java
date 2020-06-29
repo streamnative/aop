@@ -15,7 +15,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import lombok.Getter;
-import lombok.Setter;
 import org.apache.pulsar.broker.PulsarService;
 
 /**
@@ -33,7 +32,6 @@ public class AmqpBrokerService {
     @Getter
     private QueueService queueService;
     @Getter
-    @Setter
     private ConnectionContainer connectionContainer;
     @Getter
     private PulsarService pulsarService;

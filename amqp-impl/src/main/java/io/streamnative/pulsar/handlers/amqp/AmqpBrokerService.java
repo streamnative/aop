@@ -39,8 +39,8 @@ public class AmqpBrokerService {
     public AmqpBrokerService(PulsarService pulsarService) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(this);
-        this.queueContainer = new QueueContainer(this);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
@@ -49,8 +49,8 @@ public class AmqpBrokerService {
     public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(this);
-        this.queueContainer = new QueueContainer(this);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = connectionContainer;

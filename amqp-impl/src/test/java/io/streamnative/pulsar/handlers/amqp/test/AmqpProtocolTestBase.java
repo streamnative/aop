@@ -214,7 +214,7 @@ public abstract class AmqpProtocolTestBase {
         private MockChannel channelMethodProcessor;
 
         public MockConnection() throws PulsarServerException {
-            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class), amqpBrokerService);
+            super(Mockito.mock(AmqpServiceConfiguration.class), amqpBrokerService);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 

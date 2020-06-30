@@ -16,24 +16,17 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
-import lombok.Getter;
-import org.apache.pulsar.broker.PulsarService;
 
 /**
  * A channel initializer that initialize channels for amqp protocol.
  */
 public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
 
-    @Getter
-    private final PulsarService pulsarService;
-    @Getter
     private final AmqpServiceConfiguration amqpConfig;
     private final AmqpBrokerService amqpBrokerService;
 
-    public AmqpChannelInitializer(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                                  AmqpBrokerService amqpBrokerService) {
+    public AmqpChannelInitializer(AmqpServiceConfiguration amqpConfig, AmqpBrokerService amqpBrokerService) {
         super();
-        this.pulsarService = pulsarService;
         this.amqpConfig = amqpConfig;
         this.amqpBrokerService = amqpBrokerService;
     }
@@ -48,10 +41,8 @@ public class AmqpChannelInitializer extends ChannelInitializer<SocketChannel> {
         // octet   short      long       'size' octets   octet
 //        ch.pipeline().addLast("frameDecoder",
 //            new LengthFieldBasedFrameDecoder(MAX_FRAME_LENGTH, 3, 4, 1, 0));
-        ch.pipeline().addLast("frameEncoder",
-            new AmqpEncoder());
-        ch.pipeline().addLast("handler",
-            new AmqpConnection(pulsarService, amqpConfig, amqpBrokerService));
+        ch.pipeline().addLast("frameEncoder", new AmqpEncoder());
+        ch.pipeline().addLast("handler", new AmqpConnection(amqpConfig, amqpBrokerService));
     }
 
 }

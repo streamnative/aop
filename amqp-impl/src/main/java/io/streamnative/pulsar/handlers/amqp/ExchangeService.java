@@ -23,8 +23,7 @@ import org.apache.qpid.server.protocol.v0_8.FieldTable;
 public interface ExchangeService {
 
     void exchangeDeclare(AmqpChannel channel, AMQShortString exchange, AMQShortString type, boolean passive,
-                         boolean durable,
-                         boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments);
+                         boolean durable, boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments);
 
     void exchangeDelete(AmqpChannel channel, AMQShortString exchange, boolean ifUnused, boolean nowait);
 

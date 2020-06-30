@@ -54,7 +54,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                 replaceAll("\n", "").trim();
     }
 
-
+    @Override
     public void exchangeDeclare(AmqpChannel channel, AMQShortString exchange, AMQShortString type,
                                 boolean passive, boolean durable, boolean autoDelete,
                                 boolean internal, boolean nowait, FieldTable arguments) {
@@ -70,17 +70,16 @@ public class ExchangeServiceImpl implements ExchangeService {
         handleDefaultExchangeInExchangeDeclare(channel, exchange);
 
         String exchangeName = formatString(exchange.toString());
-        final MethodRegistry methodRegistry = connection.getMethodRegistry();
-        final AMQMethodBody declareOkBody = methodRegistry.createExchangeDeclareOkBody();
-        boolean createIfMissing = passive ? false : true;
+        final AMQMethodBody declareOkBody = connection.getMethodRegistry().createExchangeDeclareOkBody();
+        boolean createIfMissing = !passive;
         String exchangeType = type.toString();
         if (channel.isBuildInExchange(exchange)) {
             createIfMissing = true;
             exchangeType = channel.getExchangeType(exchange.toString());
         }
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
-                        exchangeName, createIfMissing, exchangeType);
+                exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName,
+                        createIfMissing, exchangeType);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
@@ -121,9 +120,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         } else {
             String exchangeName = formatString(exchange.toString());
             CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                    exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
-                            exchangeName, false,
-                            null);
+                    exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
             amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                 if (throwable != null) {
                     log.error("Get Topic error:{}", throwable.getMessage());
@@ -165,9 +162,7 @@ public class ExchangeServiceImpl implements ExchangeService {
 
         String exchangeName = formatString(exchange.toString());
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                exchangeContainer.asyncGetExchange(connection.getPulsarService(), connection.getNamespaceName(),
-                        exchangeName, false,
-                        null);
+                exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());

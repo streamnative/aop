@@ -35,7 +35,6 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -104,9 +103,9 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private ServerCnx pulsarServerCnx;
     private AmqpBrokerService amqpBrokerService;
 
-    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
+    public AmqpConnection(AmqpServiceConfiguration amqpConfig,
                           AmqpBrokerService amqpBrokerService) {
-        super(pulsarService, amqpConfig);
+        super(amqpBrokerService.getPulsarService(), amqpConfig);
         this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;

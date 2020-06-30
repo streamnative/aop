@@ -20,10 +20,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
-import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
+import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -108,7 +108,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return indexTopic;
     }
 
-    public void recoverRoutersFromQueueProperties(Map<String, String> properties, AmqpBrokerService amqpBrokerService,
+    public void recoverRoutersFromQueueProperties(Map<String, String> properties,
+                                                  ExchangeContainer exchangeContainer,
                                                   NamespaceName namespaceName) {
         if (null == properties || properties.size() == 0) {
             return;
@@ -122,9 +123,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 String exchangeName = amqpQueueProperty.getExchangeName();
                 Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
                 Map<String, Object> arguments = amqpQueueProperty.getArguments();
-                CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = amqpBrokerService.
-                        getExchangeContainer().asyncGetExchange(amqpBrokerService.getPulsarService(),
-                        namespaceName, exchangeName, false, null);
+                CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
+                        exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
                 amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                     AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
                             generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
@@ -136,7 +136,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 });
             });
         } catch (JsonProcessingException e) {
-            log.error("recoverRoutersFromQueueProperties -> Json decode error:{}", e.getMessage());
+            log.error("recoverRoutersFromQueueProperties -> Json decode error.", e);
         }
     }
 

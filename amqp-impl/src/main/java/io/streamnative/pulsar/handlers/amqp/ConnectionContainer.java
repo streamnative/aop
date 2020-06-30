@@ -32,8 +32,8 @@ public class ConnectionContainer {
 
     private Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
-    public ConnectionContainer(PulsarService pulsarService,
-                               ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
+    protected ConnectionContainer(PulsarService pulsarService,
+                                  ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
@@ -62,12 +62,10 @@ public class ConnectionContainer {
                 }
 
                 if (exchangeContainer.getExchangeMap().containsKey(namespaceName)) {
-                    exchangeContainer.getExchangeMap().get(namespaceName).clear();
                     exchangeContainer.getExchangeMap().remove(namespaceName);
                 }
 
                 if (queueContainer.getQueueMap().containsKey(namespaceName)) {
-                    queueContainer.getQueueMap().get(namespaceName).clear();
                     queueContainer.getQueueMap().remove(namespaceName);
                 }
             }

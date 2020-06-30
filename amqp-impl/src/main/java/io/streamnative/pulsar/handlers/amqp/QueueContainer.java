@@ -38,12 +38,14 @@ public class QueueContainer {
     private Executor executor = Executors.newCachedThreadPool();
 
     private AmqpTopicManager amqpTopicManager;
+    private PulsarService pulsarService;
+    private ExchangeContainer exchangeContainer;
 
-    private AmqpBrokerService amqpBrokerService;
-
-    public QueueContainer(AmqpBrokerService amqpBrokerService) {
-        this.amqpBrokerService = amqpBrokerService;
-        this.amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
+    protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
+                             ExchangeContainer exchangeContainer) {
+        this.amqpTopicManager = amqpTopicManager;
+        this.pulsarService = pulsarService;
+        this.exchangeContainer = exchangeContainer;
     }
 
     @Getter
@@ -60,23 +62,23 @@ public class QueueContainer {
         });
     }
 
-    public CompletableFuture<AmqpQueue> asyncGetQueue(PulsarService pulsarService, NamespaceName namespaceName,
-                                                      String queueName, boolean createIfMissing) {
+    public CompletableFuture<AmqpQueue> asyncGetQueue(NamespaceName namespaceName, String queueName,
+                                                      boolean createIfMissing) {
         CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
-        executor.execute(() -> {
-            if (namespaceName == null || StringUtils.isEmpty(queueName)) {
-                queueCompletableFuture.complete(null);
-            }
-            Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
-            if (map == null || map.getOrDefault(queueName, null) == null) {
-                // check pulsar topic
-                if (pulsarService.getState() != PulsarService.State.Started) {
-                    queueCompletableFuture.completeExceptionally(
-                            new PulsarServerException("PulsarService not start"));
-                }
-                String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
-                CompletableFuture<Topic> topicCompletableFuture =
-                        amqpTopicManager.getTopic(topicName, createIfMissing);
+        if (namespaceName == null || StringUtils.isEmpty(queueName)) {
+            log.error("Parameter error, namespaceName or queueName is empty.");
+            queueCompletableFuture.complete(null);
+        }
+        if (pulsarService.getState() != PulsarService.State.Started) {
+            log.error("Pulsar service not started.");
+            queueCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
+        }
+        Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
+        if (map == null || map.getOrDefault(queueName, null) == null) {
+            // check pulsar topic
+            String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
+            executor.execute(() -> {
+                CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
                 topicCompletableFuture.whenComplete((topic, throwable) -> {
                     if (throwable != null) {
                         log.error("Get topic error:{}", throwable.getMessage());
@@ -90,20 +92,19 @@ public class QueueContainer {
                             PersistentTopic persistentTopic = (PersistentTopic) topic;
                             Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
 
-                            PersistentQueue amqpQueue = new PersistentQueue(queueName,
-                                    persistentTopic,
+                            PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
                                     0, false, false);
-                            amqpQueue.recoverRoutersFromQueueProperties(properties, amqpBrokerService, namespaceName);
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer, namespaceName);
                             putQueue(namespaceName, queueName, amqpQueue);
                             queueCompletableFuture.complete(amqpQueue);
                         }
                     }
                 });
+            });
+        } else {
+            queueCompletableFuture.complete(map.getOrDefault(queueName, null));
+        }
 
-            } else {
-                queueCompletableFuture.complete(map.getOrDefault(queueName, null));
-            }
-        });
         return queueCompletableFuture;
     }
 

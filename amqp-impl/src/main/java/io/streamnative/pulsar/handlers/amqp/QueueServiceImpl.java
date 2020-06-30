@@ -59,9 +59,8 @@ public class QueueServiceImpl implements QueueService {
             queue = AMQShortString.createAMQShortString("tmp_" + UUID.randomUUID());
         }
         AMQShortString finalQueue = queue;
-        boolean createIfMissing = passive ? false : true;
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                queueContainer.asyncGetQueue(connection.getNamespaceName(), finalQueue.toString(), createIfMissing);
+                queueContainer.asyncGetQueue(connection.getNamespaceName(), finalQueue.toString(), !passive);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());

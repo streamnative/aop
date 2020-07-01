@@ -51,7 +51,7 @@ public class QueueContainer {
     @Getter
     private Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
 
-    public void putQueue(NamespaceName namespaceName, String queueName, AmqpQueue amqpQueue) {
+    private void putQueue(NamespaceName namespaceName, String queueName, AmqpQueue amqpQueue) {
         queueMap.compute(namespaceName, (ns, map) -> {
             Map<String, AmqpQueue> amqpQueueMap = map;
             if (amqpQueueMap == null) {
@@ -62,16 +62,27 @@ public class QueueContainer {
         });
     }
 
+    /**
+     * Get or create queue.
+     *
+     * @param namespaceName namespace in pulsar
+     * @param queueName name of queue
+     * @param createIfMissing true to create the queue if not existed
+     *                        false to get the queue and return null if not existed
+     * @return the completableFuture of get result
+     */
     public CompletableFuture<AmqpQueue> asyncGetQueue(NamespaceName namespaceName, String queueName,
                                                       boolean createIfMissing) {
         CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
         if (namespaceName == null || StringUtils.isEmpty(queueName)) {
             log.error("Parameter error, namespaceName or queueName is empty.");
             queueCompletableFuture.complete(null);
+            return queueCompletableFuture;
         }
         if (pulsarService.getState() != PulsarService.State.Started) {
             log.error("Pulsar service not started.");
             queueCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
+            return queueCompletableFuture;
         }
         Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
         if (map == null || map.getOrDefault(queueName, null) == null) {
@@ -119,6 +130,12 @@ public class QueueContainer {
         return map.getOrDefault(queueName, null);
     }
 
+    /**
+     * Delete the queue by namespace and exchange name.
+     *
+     * @param namespaceName namespace name in pulsar
+     * @param queueName name of queue
+     */
     public void deleteQueue(NamespaceName namespaceName, String queueName) {
         if (StringUtils.isEmpty(queueName)) {
             return;

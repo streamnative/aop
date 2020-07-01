@@ -220,7 +220,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] BasicConsume[queue:{} consumerTag:{} noLocal:{} noAck:{} exclusive:{} nowait:{}"
-                    + "arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
+                    + " arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
         }
         final String consumerTag1;
         if (consumerTag == null) {

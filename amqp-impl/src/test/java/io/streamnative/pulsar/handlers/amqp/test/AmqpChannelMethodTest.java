@@ -103,7 +103,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         Assert.assertEquals(accessRequestOkBody.getTicket(), 0);
     }
 
-//    @Test
+    @Test
     public void testExchangeDeclareFail() {
         Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Init);
         ExchangeDeclareBody cmd = methodRegistry

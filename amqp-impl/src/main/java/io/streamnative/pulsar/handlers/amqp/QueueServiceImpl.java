@@ -45,13 +45,11 @@ public class QueueServiceImpl implements QueueService {
 
     @Override
     public void queueDeclare(AmqpChannel channel, AMQShortString queue, boolean passive, boolean durable,
-                             boolean exclusive,
-                             boolean autoDelete, boolean nowait, FieldTable arguments) {
+                             boolean exclusive, boolean autoDelete, boolean nowait, FieldTable arguments) {
         int channelId = channel.getChannelId();
         AmqpConnection connection = channel.getConnection();
         if (log.isDebugEnabled()) {
-            log.debug(
-                    "RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
+            log.debug("RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
                             + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }

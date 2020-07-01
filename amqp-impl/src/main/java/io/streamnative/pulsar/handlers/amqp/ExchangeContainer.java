@@ -59,6 +59,16 @@ public class ExchangeContainer {
         });
     }
 
+    /**
+     * Get or create exchange.
+     *
+     * @param namespaceName namespace used in pulsar
+     * @param exchangeName name of exchange
+     * @param createIfMissing true to create the exchange if not existed, and exchangeType should be not null
+     *                        false to get the exchange and return null if not existed
+     * @param exchangeType type of exchange: direct,fanout,topic and headers
+     * @return the completableFuture of get result
+     */
     public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
                                                             String exchangeName,
                                                             boolean createIfMissing,
@@ -67,14 +77,17 @@ public class ExchangeContainer {
         if (StringUtils.isEmpty(exchangeType) && createIfMissing) {
             log.error("exchangeType should be set when createIfMissing is true");
             amqpExchangeCompletableFuture.complete(null);
+            return amqpExchangeCompletableFuture;
         }
         if (namespaceName == null || StringUtils.isEmpty(exchangeName)) {
             log.error("Parameter error, namespaceName or exchangeName is empty.");
             amqpExchangeCompletableFuture.complete(null);
+            return amqpExchangeCompletableFuture;
         }
         if (pulsarService.getState() != PulsarService.State.Started) {
             log.error("Pulsar service not started.");
             amqpExchangeCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
+            return amqpExchangeCompletableFuture;
         }
         Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
         if (map == null || map.getOrDefault(exchangeName, null) == null) {
@@ -120,6 +133,12 @@ public class ExchangeContainer {
         return amqpExchangeCompletableFuture;
     }
 
+    /**
+     * Delete the exchange by namespace and exchange name.
+     *
+     * @param namespaceName namespace name in pulsar
+     * @param exchangeName name of exchange
+     */
     public void deleteExchange(NamespaceName namespaceName, String exchangeName) {
         if (StringUtils.isEmpty(exchangeName)) {
             return;

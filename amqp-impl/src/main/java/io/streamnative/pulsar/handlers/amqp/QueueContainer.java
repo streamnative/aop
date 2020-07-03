@@ -14,15 +14,17 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import static org.apache.bookkeeper.mledger.util.SafeRun.safeRun;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Maps;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -35,17 +37,22 @@ import org.apache.pulsar.common.naming.NamespaceName;
  */
 @Slf4j
 public class QueueContainer {
-    private Executor executor = Executors.newCachedThreadPool();
 
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
     private ExchangeContainer exchangeContainer;
+    private OrderedExecutor orderedExecutor;
 
     protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
                              ExchangeContainer exchangeContainer) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.exchangeContainer = exchangeContainer;
+        this.orderedExecutor = OrderedExecutor.newBuilder()
+                // TODO make it configurable
+                .numThreads(100)
+                .name("exchange-container-workers")
+                .build();
     }
 
     @Getter
@@ -76,7 +83,8 @@ public class QueueContainer {
         CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
         if (namespaceName == null || StringUtils.isEmpty(queueName)) {
             log.error("Parameter error, namespaceName or queueName is empty.");
-            queueCompletableFuture.complete(null);
+            queueCompletableFuture.completeExceptionally(
+                    new IllegalArgumentException("NamespaceName or queueName is empty"));
             return queueCompletableFuture;
         }
         if (pulsarService.getState() != PulsarService.State.Started) {
@@ -86,32 +94,44 @@ public class QueueContainer {
         }
         Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
         if (map == null || map.getOrDefault(queueName, null) == null) {
-            // check pulsar topic
             String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
-            executor.execute(() -> {
-                CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
-                topicCompletableFuture.whenComplete((topic, throwable) -> {
-                    if (throwable != null) {
-                        log.error("Get topic error:{}", throwable.getMessage());
-                        queueCompletableFuture.complete(null);
-                    } else {
-                        if (null == topic) {
-                            log.error("Queue topic not existed, queueName:{}", queueName);
-                            queueCompletableFuture.complete(null);
+            orderedExecutor.executeOrdered(topicName, safeRun(() -> {
+                Map<String, AmqpQueue> innerMap = queueMap.getOrDefault(namespaceName, null);
+                if (innerMap == null || innerMap.getOrDefault(queueName, null) == null) {
+                    CompletableFuture<Topic> topicCompletableFuture =
+                            amqpTopicManager.getTopic(topicName, createIfMissing);
+                    topicCompletableFuture.whenComplete((topic, throwable) -> {
+                        if (throwable != null) {
+                            log.error("Failed to get topic from amqpTopicManager", throwable);
+                            queueCompletableFuture.completeExceptionally(throwable);
                         } else {
-                            // recover metadata if existed
-                            PersistentTopic persistentTopic = (PersistentTopic) topic;
-                            Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
+                            if (null == topic) {
+                                log.info("Queue topic not existed, queueName:{}", queueName);
+                                queueCompletableFuture.complete(null);
+                            } else {
+                                // recover metadata if existed
+                                PersistentTopic persistentTopic = (PersistentTopic) topic;
+                                Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
 
-                            PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
-                                    0, false, false);
-                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer, namespaceName);
-                            putQueue(namespaceName, queueName, amqpQueue);
-                            queueCompletableFuture.complete(amqpQueue);
+                                // TODO: reset connectionId, exclusive and autoDelete
+                                PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
+                                        0, false, false);
+                                try {
+                                    amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
+                                            namespaceName);
+                                } catch (JsonProcessingException e) {
+                                    log.error("Json decode error in queue recover from properties", e);
+                                    queueCompletableFuture.completeExceptionally(e);
+                                }
+                                putQueue(namespaceName, queueName, amqpQueue);
+                                queueCompletableFuture.complete(amqpQueue);
+                            }
                         }
-                    }
-                });
-            });
+                    });
+                } else {
+                    queueCompletableFuture.complete(innerMap.getOrDefault(queueName, null));
+                }
+            }));
         } else {
             queueCompletableFuture.complete(map.getOrDefault(queueName, null));
         }

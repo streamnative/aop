@@ -110,34 +110,30 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     public void recoverRoutersFromQueueProperties(Map<String, String> properties,
                                                   ExchangeContainer exchangeContainer,
-                                                  NamespaceName namespaceName) {
+                                                  NamespaceName namespaceName) throws JsonProcessingException {
         if (null == properties || properties.size() == 0) {
             return;
         }
-        try {
-            List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
-                    new TypeReference<List<AmqpQueueProperties>>() {
-                    });
-            amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
-                // recover exchange
-                String exchangeName = amqpQueueProperty.getExchangeName();
-                Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
-                Map<String, Object> arguments = amqpQueueProperty.getArguments();
-                CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                        exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
-                amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
-                    AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
-                            generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
-                    messageRouter.setQueue(this);
-                    messageRouter.setExchange(amqpExchange);
-                    messageRouter.setArguments(arguments);
-                    messageRouter.setBindingKeys(bindingKeys);
-                    routers.put(exchangeName, messageRouter);
+        List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
+                new TypeReference<List<AmqpQueueProperties>>() {
                 });
+        amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
+            // recover exchange
+            String exchangeName = amqpQueueProperty.getExchangeName();
+            Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
+            Map<String, Object> arguments = amqpQueueProperty.getArguments();
+            CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
+                    exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
+            amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
+                AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
+                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                messageRouter.setQueue(this);
+                messageRouter.setExchange(amqpExchange);
+                messageRouter.setArguments(arguments);
+                messageRouter.setBindingKeys(bindingKeys);
+                routers.put(exchangeName, messageRouter);
             });
-        } catch (JsonProcessingException e) {
-            log.error("recoverRoutersFromQueueProperties -> Json decode error.", e);
-        }
+        });
     }
 
     private void updateQueueProperties() {
@@ -146,7 +142,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
             properties.put(ROUTERS, jsonMapper.writeValueAsString(getQueueProperties(routers)));
             properties.put(QUEUE, queueName);
         } catch (JsonProcessingException e) {
-            log.error("[{}] covert map of routers to String error: {}", queueName, e.getMessage());
+            log.error("[{}] Failed to covert map of routers to String", queueName, e);
             return;
         }
         PulsarTopicMetadataUtils.updateMetaData(this.indexTopic, properties, queueName);
@@ -173,7 +169,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
 
-    public void topicNameValidate() {
+    private void topicNameValidate() {
         String[] nameArr = this.indexTopic.getName().split("/");
         checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + queueName),
                 "The queue topic name does not conform to the rules(%s%s).",

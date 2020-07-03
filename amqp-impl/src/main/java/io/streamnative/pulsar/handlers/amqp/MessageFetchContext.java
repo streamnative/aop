@@ -32,7 +32,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.BasicGetEmptyBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 
 /**
- * MessageFetchContext handling BasicGetRequest .
+ * MessageFetchContext handling BasicGetRequest.
  */
 @Slf4j
 public final class MessageFetchContext {

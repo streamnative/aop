@@ -61,8 +61,8 @@ public class QueueServiceImpl implements QueueService {
                 queueContainer.asyncGetQueue(connection.getNamespaceName(), finalQueue.toString(), !passive);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
-                log.error("Get Topic error:{}", throwable.getMessage());
-                channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                log.error("Failed to get topic from queue container", throwable);
+                channel.closeChannel(INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
             } else {
                 if (null == amqpQueue) {
                     channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + finalQueue);
@@ -96,8 +96,8 @@ public class QueueServiceImpl implements QueueService {
                     queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
             amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
                 if (throwable != null) {
-                    log.error("Get Topic error:{}", throwable.getMessage());
-                    channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                    log.error("Failed to get topic from queue container", throwable);
+                    channel.closeChannel(INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
                 } else {
                     if (null == amqpQueue) {
                         channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + queue.toString());
@@ -131,8 +131,8 @@ public class QueueServiceImpl implements QueueService {
             AMQShortString finalBindingKey = bindingKey;
             amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
                 if (throwable != null) {
-                    log.error("Get Topic error:{}", throwable.getMessage());
-                    channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                    log.error("Failed to get topic from queue container", throwable);
+                    channel.closeChannel(INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
                 } else {
                     if (amqpQueue == null) {
                         channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
@@ -162,8 +162,8 @@ public class QueueServiceImpl implements QueueService {
                 queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
-                log.error("Get Topic error:{}", throwable.getMessage());
-                channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                log.error("Failed to get topic from queue container", throwable);
+                channel.closeChannel(INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
             } else {
                 if (amqpQueue == null) {
                     channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
@@ -180,8 +180,8 @@ public class QueueServiceImpl implements QueueService {
                         exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
                 amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable1) -> {
                     if (throwable1 != null) {
-                        log.error("Get Topic error:{}", throwable1.getMessage());
-                        channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable1.getMessage());
+                        log.error("Failed to get topic from exchange container", throwable1);
+                        channel.closeChannel(INTERNAL_ERROR, "Failed to get exchange: " + throwable1.getMessage());
                     } else {
                         try {
                             amqpQueue.unbindExchange(amqpExchange);
@@ -208,11 +208,11 @@ public class QueueServiceImpl implements QueueService {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] QueuePurge[ queue: {}, nowait:{} ]", channelId, queue, nowait);
         }
-        // not support in first stage.
-        connection.sendConnectionClose(ErrorCodes.UNSUPPORTED_CLIENT_PROTOCOL_ERROR, "Not support yet.", channelId);
-        //        MethodRegistry methodRegistry = connection.getMethodRegistry();
-        //        AMQMethodBody responseBody = methodRegistry.createQueuePurgeOkBody(0);
-        //        connection.writeFrame(responseBody.generateFrame(channelId));
+        // TODO queue purge process
+
+        MethodRegistry methodRegistry = connection.getMethodRegistry();
+        AMQMethodBody responseBody = methodRegistry.createQueuePurgeOkBody(0);
+        connection.writeFrame(responseBody.generateFrame(channelId));
     }
 
     private void delete(AmqpChannel channel, AmqpQueue amqpQueue) {
@@ -223,22 +223,7 @@ public class QueueServiceImpl implements QueueService {
         } else {
             channel.checkExclusiveQueue(amqpQueue);
             queueContainer.deleteQueue(connection.getNamespaceName(), amqpQueue.getName());
-//            CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-//                    ExchangeContainer.asyncGetExchange(connection.getNamespaceName(),
-//                            AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
-//                            false, AbstractAmqpExchange.Type.Direct.toString());
-//            amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
-//                if (throwable != null) {
-//                    log.error("Get Topic error:{}", throwable.getMessage());
-//                    channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
-//                } else {
-//                    amqpQueue.unbindExchange(amqpExchange);
-//                    MethodRegistry methodRegistry = connection.getMethodRegistry();
-//                    QueueDeleteOkBody responseBody = methodRegistry.createQueueDeleteOkBody(0);
-//                    connection.writeFrame(responseBody.generateFrame(channelId));
-//                }
-//            });
-
+            // TODO delete the binding with the default exchange and delete the topic in pulsar.
 
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             QueueDeleteOkBody responseBody = methodRegistry.createQueueDeleteOkBody(0);
@@ -267,8 +252,8 @@ public class QueueServiceImpl implements QueueService {
                         createIfMissing, exchangeType);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {
-                log.error("Get Topic error:{}", throwable.getMessage());
-                channel.closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                log.error("Failed to get topic from exchange container", throwable);
+                channel.closeChannel(INTERNAL_ERROR, "Failed to get exchange: " + throwable.getMessage());
             } else {
                 AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.generateRouter(amqpExchange.getType());
                 if (messageRouter == null) {

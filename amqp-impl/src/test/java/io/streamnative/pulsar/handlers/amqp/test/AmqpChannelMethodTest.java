@@ -56,6 +56,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueuePurgeBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueuePurgeOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindOkBody;
 import org.mockito.Mockito;
@@ -251,7 +252,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
         AMQBody response = (AMQBody) clientChannel.poll();
-        Assert.assertTrue(response instanceof ConnectionCloseBody);
+        Assert.assertTrue(response instanceof QueuePurgeOkBody);
     }
 
     @Test

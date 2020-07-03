@@ -82,7 +82,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                         createIfMissing, exchangeType);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {
-                log.error("Get Topic error:{}", throwable.getMessage());
+                log.error("Failed to get topic from exchange container", throwable);
                 connection.sendConnectionClose(ErrorCodes.NOT_FOUND, "Unknown exchange: " + exchangeName, channelId);
             } else {
                 if (null == amqpExchange) {
@@ -95,7 +95,6 @@ public class ExchangeServiceImpl implements ExchangeService {
                                         + exchangeName + "' of type " + amqpExchange.getType()
                                         + " to " + type + ".", channelId);
                     } else if (!nowait) {
-                        channel.sync();
                         connection.writeFrame(declareOkBody.generateFrame(channelId));
                     }
                 }
@@ -123,7 +122,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                     exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
             amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                 if (throwable != null) {
-                    log.error("Get Topic error:{}", throwable.getMessage());
+                    log.error("Failed to get topic from exchange container", throwable);
                 } else {
                     if (null == amqpExchange) {
                         channel.closeChannel(ErrorCodes.NOT_FOUND, "Unknown exchange: '" + exchangeName + "'");
@@ -165,7 +164,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                 exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
         amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
             if (throwable != null) {
-                log.error("Get Topic error:{}", throwable.getMessage());
+                log.error("Failed to get topic from exchange container", throwable);
                 connection.sendConnectionClose(ErrorCodes.NOT_FOUND, "Unknown exchange: " + exchangeName, channelId);
             } else {
                 int replyCode;

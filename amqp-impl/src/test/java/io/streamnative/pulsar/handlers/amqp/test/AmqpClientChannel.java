@@ -11,27 +11,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.test.frame;
+package io.streamnative.pulsar.handlers.amqp.test;
 
-import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSenderImpl;
-import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Sender for the client send byte buffer to the server.
+ * Amqp client channel for receive responses from server.
  */
-public class ToServerByteBufferSender extends AmqpByteBufferSenderImpl {
+public class AmqpClientChannel {
 
-    public ToServerByteBufferSender(AmqpConnection connection) {
-        super(connection);
+    private final BlockingQueue<Object> responses;
+
+    public AmqpClientChannel() {
+        this.responses = new LinkedBlockingQueue<>();
     }
 
-    @Override
-    public void internalFlush() throws Exception {
-        connection.channelRead(connection.getCtx(), buf);
+    public void add(Object response) {
+        responses.add(response);
     }
 
-    @Override
-    public void close() {
-
+    public Object poll() {
+        return responses.poll();
     }
 }

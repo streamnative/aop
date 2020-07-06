@@ -37,17 +37,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 @Slf4j
 public final class MessageFetchContext {
 
-    private AmqpChannel channel;
-    private AmqpConsumer consumer;
-
-    // recycler and get for this object
-    public static MessageFetchContext get(AmqpChannel channel, AmqpConsumer consumer) {
-        MessageFetchContext context = RECYCLER.get();
-        context.channel = channel;
-        context.consumer = consumer;
-        return context;
-    }
-
     private final Handle<MessageFetchContext> recyclerHandle;
 
     private MessageFetchContext(Handle<MessageFetchContext> recyclerHandle) {
@@ -62,14 +51,13 @@ public final class MessageFetchContext {
         }
     };
 
-    public void recycle() {
-        channel = null;
-        consumer = null;
+    private void recycle() {
         recyclerHandle.recycle(this);
     }
 
     // handle request
-    public void handleFetch(boolean autoAck) {
+    public static void handleFetch(AmqpChannel channel, AmqpConsumer consumer, boolean autoAck) {
+        MessageFetchContext context = RECYCLER.get();
         if (!autoAck && !channel.getCreditManager().hasCredit()) {
             MethodRegistry methodRegistry = channel.getConnection().getMethodRegistry();
             BasicGetEmptyBody responseBody = methodRegistry.createBasicGetEmptyBody(null);
@@ -130,10 +118,12 @@ public final class MessageFetchContext {
                     msg.release();
                     index.release();
                     indexMessage.recycle();
+                    context.recycle();
                 });
             }
 
-            @Override public void readEntriesFailed(ManagedLedgerException e, Object o) {
+            @Override
+            public void readEntriesFailed(ManagedLedgerException e, Object o) {
                 message.complete(null);
             }
         }, null);

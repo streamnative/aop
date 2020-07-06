@@ -34,6 +34,7 @@ import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
@@ -265,7 +266,7 @@ public abstract class AmqpProtocolTestBase {
         ProtocolInitiation initiation = new ProtocolInitiation(ProtocolVersion.v0_91);
         initiation.writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ConnectionStartBody);
         ConnectionStartBody connectionStartBody = (ConnectionStartBody) response;
         Assert.assertEquals(connectionStartBody.getVersionMajor(), 0);

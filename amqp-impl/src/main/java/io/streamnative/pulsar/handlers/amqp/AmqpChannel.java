@@ -394,9 +394,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         }
                         return null;
                     });
-                    MessageFetchContext context = MessageFetchContext.get(this, amqpConsumer);
-                    context.handleFetch(noAck);
-                    context.recycle();
+                    MessageFetchContext.handleFetch(this, amqpConsumer, noAck);
                 }
             }
         });

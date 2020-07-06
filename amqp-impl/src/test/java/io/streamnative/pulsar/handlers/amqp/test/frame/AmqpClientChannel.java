@@ -15,10 +15,13 @@ package io.streamnative.pulsar.handlers.amqp.test.frame;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Amqp client channel for receive responses from server.
  */
+@Slf4j
 public class AmqpClientChannel {
 
     private final BlockingQueue<Object> responses;
@@ -29,6 +32,15 @@ public class AmqpClientChannel {
 
     public void add(Object response) {
         responses.add(response);
+    }
+
+    public Object poll(long timeout, TimeUnit unit) {
+        try {
+            return responses.poll(timeout, unit);
+        } catch (InterruptedException e) {
+            log.error("Failed to pull from channel", e);
+            return null;
+        }
     }
 
     public Object poll() {

@@ -11,17 +11,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.frame;
+package io.streamnative.pulsar.handlers.amqp.test;
 
-import io.streamnative.pulsar.handlers.amqp.frame.types.UnsignedShort;
+import io.streamnative.pulsar.handlers.amqp.AmqpByteBufferSenderImpl;
+import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 
 /**
- * Unknown Properties Exception.
+ * Sender for the client send byte buffer to the server.
  */
-public class UnknownPropertiesException extends Exception {
+public class ToServerByteBufferSender extends AmqpByteBufferSenderImpl {
 
-    public UnknownPropertiesException(UnsignedShort classId) {
-        super(String.format("Unknown / unsupported properties for class id '%s'", classId));
+    public ToServerByteBufferSender(AmqpConnection connection) {
+        super(connection);
     }
 
+    @Override
+    public void internalFlush() throws Exception {
+        connection.channelRead(connection.getCtx(), buf);
+    }
+
+    @Override
+    public void close() {
+
+    }
 }

@@ -71,6 +71,11 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     }
 
     @Override
+    public void setBindingKeys(Set<String> bindingKeys) {
+        this.bindingKeys = bindingKeys;
+    }
+
+    @Override
     public Set<String> getBindingKey() {
         return bindingKeys;
     }

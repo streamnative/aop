@@ -30,11 +30,10 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class ConnectionContainer {
 
-    private ExchangeContainer exchangeContainer;
-    private static Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
+    private Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
-    public ConnectionContainer(PulsarService pulsarService, ExchangeContainer exchangeContainer) {
-        this.exchangeContainer = exchangeContainer;
+    protected ConnectionContainer(PulsarService pulsarService,
+                                  ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
@@ -42,7 +41,6 @@ public class ConnectionContainer {
                         ? pulsarService.getBrokerListenPort().get() : 0;
                 log.info("ConnectionContainer [onLoad] namespaceBundle: {}, brokerPort: {}",
                         namespaceBundle, brokerPort);
-                ConnectionContainer.this.exchangeContainer.initBuildInExchange(namespaceBundle.getNamespaceObject());
             }
 
             @Override
@@ -63,14 +61,12 @@ public class ConnectionContainer {
                     connectionMap.remove(namespaceName);
                 }
 
-                if (ExchangeContainer.getExchangeMap().containsKey(namespaceName)) {
-                    ExchangeContainer.getExchangeMap().get(namespaceName).clear();
-                    ExchangeContainer.getExchangeMap().remove(namespaceName);
+                if (exchangeContainer.getExchangeMap().containsKey(namespaceName)) {
+                    exchangeContainer.getExchangeMap().remove(namespaceName);
                 }
 
-                if (QueueContainer.getQueueMap().containsKey(namespaceName)) {
-                    QueueContainer.getQueueMap().get(namespaceName).clear();
-                    QueueContainer.getQueueMap().remove(namespaceName);
+                if (queueContainer.getQueueMap().containsKey(namespaceName)) {
+                    queueContainer.getQueueMap().remove(namespaceName);
                 }
             }
 
@@ -81,7 +77,7 @@ public class ConnectionContainer {
         });
     }
 
-    public static void addConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+    public void addConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
         connectionMap.compute(namespaceName, (ns, connectionSet) -> {
             if (connectionSet == null) {
                 connectionSet = Sets.newConcurrentHashSet();
@@ -91,7 +87,7 @@ public class ConnectionContainer {
         });
     }
 
-    public static void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
+    public void removeConnection(NamespaceName namespaceName, AmqpConnection amqpConnection) {
         if (namespaceName == null) {
             return;
         }

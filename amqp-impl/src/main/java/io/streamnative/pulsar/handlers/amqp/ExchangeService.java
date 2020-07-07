@@ -1,0 +1,63 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.streamnative.pulsar.handlers.amqp;
+
+import org.apache.qpid.server.protocol.v0_8.AMQShortString;
+import org.apache.qpid.server.protocol.v0_8.FieldTable;
+
+/**
+ * Logic of exchange.
+ */
+public interface ExchangeService {
+
+    /**
+     * Declare a exchange.
+     *
+     * @param channel the channel used to do this action
+     * @param exchange the name of the exchange
+     * @param type the exchange type
+     * @param passive Declare a queue exchange; i.e., check if it exists. In AMQP
+     *             0-9-1, all arguments aside from nowait are ignored; and sending
+     *             nowait makes this method a no-op, so we default it to false.
+     * @param durable true if we are declaring a durable exchange (the exchange will survive a server restart)
+     * @param autoDelete true if the server should delete the exchange when it is no longer in use
+     * @param internal true if the exchange is internal, i.e. can't be directly published to by a client
+     * @param nowait set true will return nothing (as there will be no response from the server)
+     * @param arguments other properties (construction arguments) for the exchange
+     */
+    void exchangeDeclare(AmqpChannel channel, AMQShortString exchange, AMQShortString type, boolean passive,
+                         boolean durable, boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments);
+
+    /**
+     * Delete a exchange.
+     *
+     * @param channel the channel used to do this action
+     * @param exchange the name of the exchange
+     * @param ifUnused true to indicate that the exchange is only to be deleted if it is unused
+     * @param nowait set true will return nothing (as there will be no response from the server)
+     */
+    void exchangeDelete(AmqpChannel channel, AMQShortString exchange, boolean ifUnused, boolean nowait);
+
+    /**
+     * Judge the exchange and the queue whether had bound.
+     *
+     * @param channel the channel used to do this action
+     * @param exchange the name of the exchange
+     * @param routingKey the routing key to use for the binding
+     * @param queueName the name of the queue
+     */
+    void exchangeBound(AmqpChannel channel, AMQShortString exchange, AMQShortString routingKey,
+                       AMQShortString queueName);
+}

@@ -77,6 +77,13 @@ public interface AmqpMessageRouter {
     void addBindingKey(String bindingKey);
 
     /**
+     * bindingKeys is the value when create bind.
+     *
+     * @param bindingKeys bindingKeys
+     */
+    void setBindingKeys(Set<String> bindingKeys);
+
+    /**
      * Get binding keys.
      *
      * @return list of bindingKeys.

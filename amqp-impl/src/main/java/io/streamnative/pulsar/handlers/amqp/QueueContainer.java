@@ -14,44 +14,110 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import com.google.common.collect.Maps;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.broker.PulsarServerException;
+import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 
 /**
  * Container for all queues in the broker.
  */
+@Slf4j
 public class QueueContainer {
 
+    private AmqpTopicManager amqpTopicManager;
+    private PulsarService pulsarService;
+    private ExchangeContainer exchangeContainer;
+
+    protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
+                             ExchangeContainer exchangeContainer) {
+        this.amqpTopicManager = amqpTopicManager;
+        this.pulsarService = pulsarService;
+        this.exchangeContainer = exchangeContainer;
+    }
+
     @Getter
-    private static Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
+    private Map<NamespaceName, Map<String, CompletableFuture<AmqpQueue>>> queueMap = new ConcurrentHashMap<>();
 
-    public static void putQueue(NamespaceName namespaceName, String queueName, AmqpQueue amqpQueue) {
-        queueMap.compute(namespaceName, (ns, map) -> {
-            Map<String, AmqpQueue> amqpQueueMap = map;
-            if (amqpQueueMap == null) {
-                amqpQueueMap = Maps.newConcurrentMap();
-            }
-            amqpQueueMap.put(queueName, amqpQueue);
-            return amqpQueueMap;
-        });
-    }
-
-    public static AmqpQueue getQueue(NamespaceName namespaceName, String queueName) {
+    /**
+     * Get or create queue.
+     *
+     * @param namespaceName namespace in pulsar
+     * @param queueName name of queue
+     * @param createIfMissing true to create the queue if not existed
+     *                        false to get the queue and return null if not existed
+     * @return the completableFuture of get result
+     */
+    public CompletableFuture<AmqpQueue> asyncGetQueue(NamespaceName namespaceName, String queueName,
+                                                      boolean createIfMissing) {
+        CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
         if (namespaceName == null || StringUtils.isEmpty(queueName)) {
-            return null;
+            log.error("Parameter error, namespaceName or queueName is empty.");
+            queueCompletableFuture.completeExceptionally(
+                    new IllegalArgumentException("NamespaceName or queueName is empty"));
+            return queueCompletableFuture;
         }
-        Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
-        if (map == null) {
-            return null;
+        if (pulsarService.getState() != PulsarService.State.Started) {
+            log.error("Pulsar service not started.");
+            queueCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
+            return queueCompletableFuture;
         }
-        return map.getOrDefault(queueName, null);
+        queueMap.putIfAbsent(namespaceName, new ConcurrentHashMap<>());
+        CompletableFuture<AmqpQueue> existingAmqpExchangeFuture = queueMap.get(namespaceName).
+                putIfAbsent(queueName, queueCompletableFuture);
+        if (existingAmqpExchangeFuture != null) {
+            return existingAmqpExchangeFuture;
+        } else {
+            String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
+            CompletableFuture<Topic> topicCompletableFuture =
+                    amqpTopicManager.getTopic(topicName, createIfMissing);
+            topicCompletableFuture.whenComplete((topic, throwable) -> {
+                if (throwable != null) {
+                    log.error("Failed to get topic from amqpTopicManager", throwable);
+                    queueCompletableFuture.completeExceptionally(throwable);
+                } else {
+                    if (null == topic) {
+                        log.info("Queue topic not existed, queueName:{}", queueName);
+                        queueCompletableFuture.complete(null);
+                    } else {
+                        // recover metadata if existed
+                        PersistentTopic persistentTopic = (PersistentTopic) topic;
+                        Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
+
+                        // TODO: reset connectionId, exclusive and autoDelete
+                        PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
+                                0, false, false);
+                        try {
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
+                                    namespaceName);
+                        } catch (JsonProcessingException e) {
+                            log.error("Json decode error in queue recover from properties", e);
+                            queueCompletableFuture.completeExceptionally(e);
+                        }
+                        queueCompletableFuture.complete(amqpQueue);
+                    }
+                }
+            });
+        }
+        return queueCompletableFuture;
     }
 
-    public static void deleteQueue(NamespaceName namespaceName, String queueName) {
+    /**
+     * Delete the queue by namespace and exchange name.
+     *
+     * @param namespaceName namespace name in pulsar
+     * @param queueName name of queue
+     */
+    public void deleteQueue(NamespaceName namespaceName, String queueName) {
         if (StringUtils.isEmpty(queueName)) {
             return;
         }
@@ -59,4 +125,5 @@ public class QueueContainer {
             queueMap.get(namespaceName).remove(queueName);
         }
     }
+
 }

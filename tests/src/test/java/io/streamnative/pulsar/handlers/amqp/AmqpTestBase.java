@@ -14,18 +14,14 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Sets;
-import com.google.gson.JsonObject;
-import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfo;
-import org.junit.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -64,33 +60,10 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
                 admin.namespaces().createNamespace(ns, 1);
                 admin.lookups().lookupTopicAsync(TopicName.get(TopicDomain.persistent.value(),
                         NamespaceName.get(ns), "__lookup__").toString());
-                checkDefaultExchange(vhost);
             }
         }
 
         checkPulsarServiceState();
-    }
-
-    private void checkDefaultExchange(String vhost) {
-        Map<String, AmqpExchange.Type> map = ExchangeContainer.getBuildinExchangeNameMap();
-        for (String exchangeName : map.keySet()) {
-            String topicName = "persistent://public/" + vhost + "/" + PersistentExchange.TOPIC_PREFIX + exchangeName;
-
-            JsonObject jsonObject = null;
-            for (int i = 0; i < 30; i++) {
-                try {
-                    jsonObject = admin.topics().getInternalInfo(topicName);
-                    log.info("topic [{}] internalInfo: {}", topicName, jsonObject.toString());
-                    Thread.sleep(1000L);
-                    break;
-                } catch (Exception e) {
-                    log.info("Failed to get topic internalInfo. topicName: {}, errMsg: {}", topicName, e.getMessage());
-                }
-            }
-            if (jsonObject == null) {
-                Assert.fail("Default exchange init failed. topicName: " + topicName);
-            }
-        }
     }
 
     @AfterClass

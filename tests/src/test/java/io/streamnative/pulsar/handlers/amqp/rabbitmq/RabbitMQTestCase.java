@@ -131,6 +131,7 @@ public class RabbitMQTestCase {
                     countDownLatch.countDown();
                 }
             };
+            consumeChannel.setDefaultConsumer(consumer);
             try {
                 consumeChannel.basicConsume(queueName, false, consumer);
                 log.info("[{}] consume start. queueName: {}", testName, queueName);
@@ -190,6 +191,7 @@ public class RabbitMQTestCase {
                     countDownLatch.countDown();
                 }
             };
+            channel.setDefaultConsumer(consumer);
             channel.basicConsume(queueName, consumer);
         }
         countDownLatch.await();

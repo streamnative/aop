@@ -35,7 +35,6 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -102,13 +101,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AtomicBoolean blocked = new AtomicBoolean();
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
+    private AmqpBrokerService amqpBrokerService;
 
-    @Getter
-    private final AmqpTopicManager amqpTopicManager;
-
-    public AmqpConnection(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig,
-                          AmqpTopicManager amqpTopicManager) {
-        super(pulsarService, amqpConfig);
+    public AmqpConnection(AmqpServiceConfiguration amqpConfig,
+                          AmqpBrokerService amqpBrokerService) {
+        super(amqpBrokerService.getPulsarService(), amqpConfig);
         this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
@@ -119,7 +116,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.maxFrameSize = amqpConfig.getAmqpMaxFrameSize();
         this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
-        this.amqpTopicManager = amqpTopicManager;
+        this.amqpBrokerService = amqpBrokerService;
     }
 
 
@@ -137,7 +134,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         completeAndCloseAllChannels();
-        ConnectionContainer.removeConnection(namespaceName, this);
+        amqpBrokerService.getConnectionContainer().removeConnection(namespaceName, this);
         this.brokerDecoder.close();
     }
 
@@ -291,7 +288,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
-        ConnectionContainer.addConnection(namespaceName, this);
+        amqpBrokerService.getConnectionContainer().addConnection(namespaceName, this);
 //        } else {
 //            sendConnectionClose(ErrorCodes.NOT_FOUND,
 //                "Unknown virtual host: '" + virtualHostStr + "'", 0);
@@ -365,7 +362,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpTopicManager);
+            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpBrokerService);
             addChannel(channel);
 
             ChannelOpenOkBody response = getMethodRegistry().createChannelOpenOkBody();

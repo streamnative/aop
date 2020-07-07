@@ -17,21 +17,20 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.util.concurrent.DefaultEventExecutor;
-import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
-import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
-import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
-import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
@@ -52,7 +51,6 @@ import org.apache.pulsar.common.lookup.data.LookupData;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
-import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
@@ -83,6 +81,7 @@ public abstract class AmqpProtocolTestBase {
     protected AmqpClientChannel clientChannel;
 
     protected AmqpTopicManager amqpTopicManager;
+    protected AmqpBrokerService amqpBrokerService;
 
     public static byte[] contentBytes = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
@@ -90,7 +89,9 @@ public abstract class AmqpProtocolTestBase {
     public void setup() throws Exception {
         mockPulsarService();
         mockBrokerService();
-        amqpTopicManager = new AmqpTopicManager(pulsarService);
+        ConnectionContainer connectionContainer = Mockito.mock(ConnectionContainer.class);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer);
+        amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.
         connection = new MockConnection();
@@ -153,20 +154,8 @@ public abstract class AmqpProtocolTestBase {
         String namespace = "vhost1";
         NamespaceName namespaceName = NamespaceName.get(tenant, namespace);
         connection.setNamespaceName(namespaceName);
-        addBuildInExchanges(namespaceName, AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, AmqpExchange.Type.Direct);
-        addBuildInExchanges(namespaceName, ExchangeDefaults.DIRECT_EXCHANGE_NAME, AmqpExchange.Type.Direct);
-        addBuildInExchanges(namespaceName, ExchangeDefaults.FANOUT_EXCHANGE_NAME, AmqpExchange.Type.Fanout);
-        addBuildInExchanges(namespaceName, ExchangeDefaults.TOPIC_EXCHANGE_NAME, AmqpExchange.Type.Topic);
     }
 
-    private void addBuildInExchanges(NamespaceName namespaceName,
-                                     String exchangeName, AmqpExchange.Type exchangeType) {
-        String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-        Topic topic = amqpTopicManager.getOrCreateTopic(topicName, true);
-        ExchangeContainer.putExchange(namespaceName, exchangeName,
-                new PersistentExchange(exchangeName, exchangeType,
-                        (PersistentTopic) topic, false));
-    }
 
     private void initMockAmqpTopicManager(){
         CompletableFuture<Topic> completableFuture = new CompletableFuture<>();
@@ -181,6 +170,9 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
         Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
         Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
+        CompletableFuture deleteCpm = new CompletableFuture<>();
+        Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);
+        deleteCpm.complete(null);
 
         completableFuture.complete(persistentTopic);
         NamespaceService namespaceService = Mockito.mock(NamespaceService.class);
@@ -219,7 +211,7 @@ public abstract class AmqpProtocolTestBase {
         private MockChannel channelMethodProcessor;
 
         public MockConnection() throws PulsarServerException {
-            super(pulsarService, Mockito.mock(AmqpServiceConfiguration.class), amqpTopicManager);
+            super(Mockito.mock(AmqpServiceConfiguration.class), amqpBrokerService);
             this.channelMethodProcessor = new MockChannel(0, this);
         }
 
@@ -243,7 +235,7 @@ public abstract class AmqpProtocolTestBase {
     private class MockChannel extends AmqpChannel {
 
         public MockChannel(int channelId, AmqpConnection serverMethodProcessor) {
-            super(channelId, serverMethodProcessor, amqpTopicManager);
+            super(channelId, serverMethodProcessor, amqpBrokerService);
         }
 
         @Override
@@ -270,7 +262,7 @@ public abstract class AmqpProtocolTestBase {
         ProtocolInitiation initiation = new ProtocolInitiation(ProtocolVersion.v0_91);
         initiation.writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ConnectionStartBody);
         ConnectionStartBody connectionStartBody = (ConnectionStartBody) response;
         Assert.assertEquals(connectionStartBody.getVersionMajor(), 0);

@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.policies.data.Policies;
@@ -45,7 +46,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
             AMQShortString.createAMQShortString(""), new byte[0], AMQShortString.createAMQShortString("en_US"));
         cmd.generateFrame(0).writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ConnectionTuneBody);
     }
 
@@ -63,7 +64,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
 //        ConnectionSecureOkBody cmd = methodRegistry.createConnectionSecureOkBody("".getBytes());
 //        cmd.generateFrame(0).writePayload(toServerSender);
 //        toServerSender.flush();
-//        AMQBody response = (AMQBody) clientChannel.poll();
+//        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
 //        Assert.assertTrue(response instanceof ConnectionTuneBody);
 //        ConnectionTuneBody connectionTuneBody = (ConnectionTuneBody) response;
 //        Assert.assertTrue(connectionTuneBody.getChannelMax() == maxNoOfChannels);
@@ -95,7 +96,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
         ConnectionTuneOkBody cmd = methodRegistry.createConnectionTuneOkBody(maxNoOfChannels, maxFrameSize, heartBeat);
         cmd.generateFrame(0).writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ConnectionCloseBody);
     }
 
@@ -111,7 +112,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
             AMQShortString.createAMQShortString("123"), false);
         cmd.generateFrame(0).writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ConnectionOpenOkBody);
     }
 
@@ -121,7 +122,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
             AMQShortString.createAMQShortString("123"), 60, 30);
         cmd.generateFrame(0).writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ConnectionCloseOkBody);
     }
 
@@ -131,7 +132,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
         ChannelOpenBody cmd = methodRegistry.createChannelOpenBody(AMQShortString.createAMQShortString(""));
         cmd.generateFrame(1).writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ChannelOpenOkBody);
     }
 
@@ -142,7 +143,7 @@ public class AmqpConnectionMethodTest extends AmqpProtocolTestBase {
             AMQShortString.createAMQShortString("hi server,please close channel"), 60, 40);
         cmd.generateFrame(0).writePayload(toServerSender);
         toServerSender.flush();
-        AMQBody response = (AMQBody) clientChannel.poll();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
         Assert.assertTrue(response instanceof ChannelCloseOkBody);
     }
 

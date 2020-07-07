@@ -16,11 +16,14 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
+import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -29,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +43,6 @@ import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.common.util.ObjectMapperFactory;
 
 /**
  * Persistent queue.
@@ -53,13 +56,15 @@ public class PersistentQueue extends AbstractAmqpQueue {
     @Getter
     private PersistentTopic indexTopic;
 
-    private ObjectMapper jsonMapper = ObjectMapperFactory.create();
+    private ObjectMapper jsonMapper;
 
-    public PersistentQueue(String queueName, PersistentTopic indexTopic, long connectionId,
+    public PersistentQueue(String queueName, PersistentTopic indexTopic,
+                           long connectionId,
                            boolean exclusive, boolean autoDelete) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
         topicNameValidate();
+        this.jsonMapper = new ObjectMapper();
     }
 
     @Override
@@ -103,13 +108,41 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return indexTopic;
     }
 
+    public void recoverRoutersFromQueueProperties(Map<String, String> properties,
+                                                  ExchangeContainer exchangeContainer,
+                                                  NamespaceName namespaceName) throws JsonProcessingException {
+        if (null == properties || properties.size() == 0) {
+            return;
+        }
+        List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
+                new TypeReference<List<AmqpQueueProperties>>() {
+                });
+        amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
+            // recover exchange
+            String exchangeName = amqpQueueProperty.getExchangeName();
+            Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
+            Map<String, Object> arguments = amqpQueueProperty.getArguments();
+            CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
+                    exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
+            amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
+                AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
+                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                messageRouter.setQueue(this);
+                messageRouter.setExchange(amqpExchange);
+                messageRouter.setArguments(arguments);
+                messageRouter.setBindingKeys(bindingKeys);
+                routers.put(exchangeName, messageRouter);
+            });
+        });
+    }
+
     private void updateQueueProperties() {
         Map<String, String> properties = new HashMap<>();
         try {
             properties.put(ROUTERS, jsonMapper.writeValueAsString(getQueueProperties(routers)));
             properties.put(QUEUE, queueName);
         } catch (JsonProcessingException e) {
-            log.error("[{}] covert map of routers to String error: {}", queueName, e.getMessage());
+            log.error("[{}] Failed to covert map of routers to String", queueName, e);
             return;
         }
         PulsarTopicMetadataUtils.updateMetaData(this.indexTopic, properties, queueName);
@@ -136,7 +169,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
 
-    public void topicNameValidate() {
+    private void topicNameValidate() {
         String[] nameArr = this.indexTopic.getName().split("/");
         checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + queueName),
                 "The queue topic name does not conform to the rules(%s%s).",

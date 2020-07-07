@@ -26,14 +26,15 @@ import org.apache.pulsar.common.api.proto.PulsarApi;
 @Slf4j
 public class AmqpPullConsumer extends AmqpConsumer {
 
-    public AmqpPullConsumer(Subscription subscription,
+    public AmqpPullConsumer(QueueContainer queueContainer, Subscription subscription,
         PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
         String consumerName, int maxUnackedMessages, ServerCnx cnx, String appId,
         Map<String, String> metadata, boolean readCompacted,
         PulsarApi.CommandSubscribe.InitialPosition subscriptionInitialPosition,
         PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
-        super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
+        super(queueContainer, subscription, subType, topicName, consumerId, priorityLevel, consumerName,
+                maxUnackedMessages,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, channel,
             consumerTag, queueName, autoAck);
     }

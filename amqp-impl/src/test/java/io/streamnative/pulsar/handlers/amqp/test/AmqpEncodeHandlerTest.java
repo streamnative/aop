@@ -133,7 +133,7 @@ public class AmqpEncodeHandlerTest {
                 ByteBuf buffer = (ByteBuf) msg;
                 try {
                     clientDecoder.decodeBuffer(buffer.nioBuffer());
-                    AMQBody response = (AMQBody) clientChannel.poll();
+                    AMQBody response = (AMQBody) clientChannel.poll(1, SECONDS);
                     Assert.assertTrue(response instanceof ConnectionSecureBody);
                     latch.countDown();
                 } catch (Exception e) {

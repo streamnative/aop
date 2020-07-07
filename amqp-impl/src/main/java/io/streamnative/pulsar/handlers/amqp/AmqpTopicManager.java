@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.AbstractTopic;
 import org.apache.pulsar.broker.service.Topic;
@@ -40,7 +41,7 @@ public class AmqpTopicManager {
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
         if (null == pulsarService) {
             log.error("PulsarService is not set.");
-            topicCompletableFuture.completeExceptionally(new Exception("PulsarService is not set."));
+            topicCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService is not set."));
             return topicCompletableFuture;
         }
         // setup ownership of service unit to this broker

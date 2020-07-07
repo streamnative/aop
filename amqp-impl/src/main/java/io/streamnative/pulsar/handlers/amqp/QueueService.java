@@ -1,0 +1,86 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.streamnative.pulsar.handlers.amqp;
+
+import org.apache.qpid.server.protocol.v0_8.AMQShortString;
+import org.apache.qpid.server.protocol.v0_8.FieldTable;
+
+/**
+ * Logic of queue.
+ */
+public interface QueueService {
+
+    /**
+     *  Declare a queue.
+     *
+     * @param channel the channel used to do this action
+     * @param queue the name of the queue
+     * @param passive Declare a queue passively; i.e., check if it exists.  In AMQP
+     *       0-9-1, all arguments aside from nowait are ignored; and sending
+     *       nowait makes this method a no-op, so we default it to false.
+     * @param durable true if we are declaring a durable queue (the exchange will survive a server restart)
+     * @param exclusive true if we are declaring an exclusive queue (restricted to this connection)
+     * @param autoDelete true if the server should delete the queue when it is no longer in use
+     * @param nowait set true will return nothing (as there will be no response from the server)
+     * @param arguments other properties (construction arguments) for the queue
+     */
+    void queueDeclare(AmqpChannel channel, AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
+                      boolean autoDelete, boolean nowait, FieldTable arguments);
+
+    /**
+     *  Delete a queue.
+     *
+     * @param channel the channel used to do this action
+     * @param queue the name of the queue
+     * @param ifUnused true if the queue should be deleted only if not in use
+     * @param ifEmpty true if the queue should be deleted only if empty
+     * @param nowait set true will return nothing (as there will be no response from the server)
+     */
+    void queueDelete(AmqpChannel channel, AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait);
+
+    /**
+     * Bind a queue to an exchange.
+     *
+     * @param channel the channel used to do this action
+     * @param queue the name of the queue
+     * @param exchange the name of the exchange
+     * @param bindingKey the key to use for the binding
+     * @param nowait set true will return nothing (as there will be no response from the server)
+     * @param argumentsTable other properties (binding parameters)
+     */
+    void queueBind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+                   boolean nowait, FieldTable argumentsTable);
+
+    /**
+     * Unbinds a queue from an exchange.
+     *
+     * @param channel the channel used to do this action
+     * @param queue the name of the queue
+     * @param exchange the name of the exchange
+     * @param bindingKey the key to use for the binding
+     * @param arguments other properties (binding parameters)
+     */
+    void queueUnbind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+                     FieldTable arguments);
+
+    /**
+     * Purges the contents of the given queue.
+     *
+     * @param channel the channel used to do this action
+     * @param queue the name of the queue
+     * @param nowait set true will return nothing (as there will be no response from the server)
+     */
+    void queuePurge(AmqpChannel channel, AMQShortString queue, boolean nowait);
+}

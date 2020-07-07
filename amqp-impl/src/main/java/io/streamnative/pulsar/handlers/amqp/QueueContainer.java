@@ -14,17 +14,13 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import static org.apache.bookkeeper.mledger.util.SafeRun.safeRun;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.Maps;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -41,33 +37,16 @@ public class QueueContainer {
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
     private ExchangeContainer exchangeContainer;
-    private OrderedExecutor orderedExecutor;
 
     protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
                              ExchangeContainer exchangeContainer) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.exchangeContainer = exchangeContainer;
-        this.orderedExecutor = OrderedExecutor.newBuilder()
-                // TODO make it configurable
-                .numThreads(100)
-                .name("exchange-container-workers")
-                .build();
     }
 
     @Getter
-    private Map<NamespaceName, Map<String, AmqpQueue>> queueMap = new ConcurrentHashMap<>();
-
-    private void putQueue(NamespaceName namespaceName, String queueName, AmqpQueue amqpQueue) {
-        queueMap.compute(namespaceName, (ns, map) -> {
-            Map<String, AmqpQueue> amqpQueueMap = map;
-            if (amqpQueueMap == null) {
-                amqpQueueMap = Maps.newConcurrentMap();
-            }
-            amqpQueueMap.put(queueName, amqpQueue);
-            return amqpQueueMap;
-        });
-    }
+    private Map<NamespaceName, Map<String, CompletableFuture<AmqpQueue>>> queueMap = new ConcurrentHashMap<>();
 
     /**
      * Get or create queue.
@@ -92,62 +71,44 @@ public class QueueContainer {
             queueCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
             return queueCompletableFuture;
         }
-        Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
-        if (map == null || map.getOrDefault(queueName, null) == null) {
-            String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
-            orderedExecutor.executeOrdered(topicName, safeRun(() -> {
-                Map<String, AmqpQueue> innerMap = queueMap.getOrDefault(namespaceName, null);
-                if (innerMap == null || innerMap.getOrDefault(queueName, null) == null) {
-                    CompletableFuture<Topic> topicCompletableFuture =
-                            amqpTopicManager.getTopic(topicName, createIfMissing);
-                    topicCompletableFuture.whenComplete((topic, throwable) -> {
-                        if (throwable != null) {
-                            log.error("Failed to get topic from amqpTopicManager", throwable);
-                            queueCompletableFuture.completeExceptionally(throwable);
-                        } else {
-                            if (null == topic) {
-                                log.info("Queue topic not existed, queueName:{}", queueName);
-                                queueCompletableFuture.complete(null);
-                            } else {
-                                // recover metadata if existed
-                                PersistentTopic persistentTopic = (PersistentTopic) topic;
-                                Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
-
-                                // TODO: reset connectionId, exclusive and autoDelete
-                                PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
-                                        0, false, false);
-                                try {
-                                    amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
-                                            namespaceName);
-                                } catch (JsonProcessingException e) {
-                                    log.error("Json decode error in queue recover from properties", e);
-                                    queueCompletableFuture.completeExceptionally(e);
-                                }
-                                putQueue(namespaceName, queueName, amqpQueue);
-                                queueCompletableFuture.complete(amqpQueue);
-                            }
-                        }
-                    });
-                } else {
-                    queueCompletableFuture.complete(innerMap.getOrDefault(queueName, null));
-                }
-            }));
+        queueMap.putIfAbsent(namespaceName, new ConcurrentHashMap<>());
+        CompletableFuture<AmqpQueue> existingAmqpExchangeFuture = queueMap.get(namespaceName).
+                putIfAbsent(queueName, queueCompletableFuture);
+        if (existingAmqpExchangeFuture != null) {
+            return existingAmqpExchangeFuture;
         } else {
-            queueCompletableFuture.complete(map.getOrDefault(queueName, null));
-        }
+            String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
+            CompletableFuture<Topic> topicCompletableFuture =
+                    amqpTopicManager.getTopic(topicName, createIfMissing);
+            topicCompletableFuture.whenComplete((topic, throwable) -> {
+                if (throwable != null) {
+                    log.error("Failed to get topic from amqpTopicManager", throwable);
+                    queueCompletableFuture.completeExceptionally(throwable);
+                } else {
+                    if (null == topic) {
+                        log.info("Queue topic not existed, queueName:{}", queueName);
+                        queueCompletableFuture.complete(null);
+                    } else {
+                        // recover metadata if existed
+                        PersistentTopic persistentTopic = (PersistentTopic) topic;
+                        Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
 
+                        // TODO: reset connectionId, exclusive and autoDelete
+                        PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
+                                0, false, false);
+                        try {
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
+                                    namespaceName);
+                        } catch (JsonProcessingException e) {
+                            log.error("Json decode error in queue recover from properties", e);
+                            queueCompletableFuture.completeExceptionally(e);
+                        }
+                        queueCompletableFuture.complete(amqpQueue);
+                    }
+                }
+            });
+        }
         return queueCompletableFuture;
-    }
-
-    public AmqpQueue getQueue(NamespaceName namespaceName, String queueName) {
-        if (namespaceName == null || StringUtils.isEmpty(queueName)) {
-            return null;
-        }
-        Map<String, AmqpQueue> map = queueMap.getOrDefault(namespaceName, null);
-        if (map == null) {
-            return null;
-        }
-        return map.getOrDefault(queueName, null);
     }
 
     /**

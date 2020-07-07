@@ -88,7 +88,8 @@ public final class MessageFetchContext {
         });
 
         cursor.asyncReadEntries(1, new ReadEntriesCallback() {
-            @Override public void readEntriesComplete(List<Entry> list, Object o) {
+            @Override
+            public void readEntriesComplete(List<Entry> list, Object o) {
 
                 if (list.size() <= 0) {
                     message.complete(null);
@@ -100,25 +101,29 @@ public final class MessageFetchContext {
 //                    message.complete(Pair.of(index.getPosition(), null));
 //                    return;
 //                }
-                CompletableFuture<Entry> entryCompletableFuture = consumer.getQueue().readEntryAsync(
-                    indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId());
-                entryCompletableFuture.whenComplete((msg, ex) -> {
-                    if (ex == null) {
-                        try {
-                            message.complete(Pair.of(index.getPosition(), MessageConvertUtils.entryToAmqpBody(msg)));
-                        } catch (UnsupportedEncodingException e) {
-                            e.printStackTrace();
-                        }
-                        consumer.addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                            (PositionImpl) msg.getPosition());
-
-                    } else {
-                        message.complete(Pair.of(index.getPosition(), null));
-                    }
-                    msg.release();
-                    index.release();
-                    indexMessage.recycle();
-                    context.recycle();
+                consumer.asyncGetQueue().thenApply(amqpQueue -> amqpQueue.readEntryAsync(
+                        indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
+                        .whenComplete((msg, ex) -> {
+                            if (ex == null) {
+                                try {
+                                    message.complete(Pair.of(index.getPosition(),
+                                            MessageConvertUtils.entryToAmqpBody(msg)));
+                                } catch (UnsupportedEncodingException e) {
+                                    log.error("Failed to convert entry to AMQP body", e);
+                                }
+                                consumer.addUnAckMessages(indexMessage.getExchangeName(),
+                                        (PositionImpl) index.getPosition(), (PositionImpl) msg.getPosition());
+                            } else {
+                                message.complete(Pair.of(index.getPosition(), null));
+                            }
+                            msg.release();
+                            index.release();
+                            indexMessage.recycle();
+                            context.recycle();
+                        })
+                ).exceptionally(throwable -> {
+                    log.error("Failed to get queue from queue container", throwable);
+                    return null;
                 });
             }
 

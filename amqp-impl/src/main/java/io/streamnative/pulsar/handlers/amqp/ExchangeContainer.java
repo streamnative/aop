@@ -14,16 +14,12 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import static org.apache.bookkeeper.mledger.util.SafeRun.safeRun;
-
-import com.google.common.collect.Maps;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -39,31 +35,14 @@ public class ExchangeContainer {
 
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
-    private OrderedExecutor orderedExecutor;
 
     protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
-        this.orderedExecutor = OrderedExecutor.newBuilder()
-                // TODO make it configurable
-                .numThreads(100)
-                .name("queue-container-workers")
-                .build();
     }
 
     @Getter
-    private Map<NamespaceName, Map<String, AmqpExchange>> exchangeMap = new ConcurrentHashMap<>();
-
-    private void putExchange(NamespaceName namespaceName, String exchangeName, AmqpExchange amqpExchange) {
-        exchangeMap.compute(namespaceName, (name, map) -> {
-            Map<String, AmqpExchange> amqpExchangeMap = map;
-            if (amqpExchangeMap == null) {
-                amqpExchangeMap = Maps.newConcurrentMap();
-            }
-            amqpExchangeMap.put(exchangeName, amqpExchange);
-            return amqpExchangeMap;
-        });
-    }
+    private Map<NamespaceName, Map<String, CompletableFuture<AmqpExchange>>> exchangeMap = new ConcurrentHashMap<>();
 
     /**
      * Get or create exchange.
@@ -97,51 +76,43 @@ public class ExchangeContainer {
             amqpExchangeCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
             return amqpExchangeCompletableFuture;
         }
-        Map<String, AmqpExchange> map = exchangeMap.getOrDefault(namespaceName, null);
-        if (map == null || map.getOrDefault(exchangeName, null) == null) {
-            String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-            orderedExecutor.executeOrdered(topicName, safeRun(() -> {
-                Map<String, AmqpExchange> innerMap = exchangeMap.getOrDefault(namespaceName, null);
-                if (innerMap == null || innerMap.getOrDefault(exchangeName, null) == null) {
-                    CompletableFuture<Topic> topicCompletableFuture =
-                            amqpTopicManager.getTopic(topicName, createIfMissing);
-                    topicCompletableFuture.whenComplete((topic, throwable) -> {
-                        if (throwable != null) {
-                            log.error("Failed to get topic from amqpTopicManager", throwable);
-                            amqpExchangeCompletableFuture.completeExceptionally(throwable);
-                        } else {
-                            if (null == topic) {
-                                log.info("The exchange topic did not exist. namespace{}, exchangeName: {}",
-                                        namespaceName.toString(), exchangeName);
-                                amqpExchangeCompletableFuture.complete(null);
-                            } else {
-                                // recover metadata if existed
-                                PersistentTopic persistentTopic = (PersistentTopic) topic;
-                                Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
-                                AmqpExchange.Type amqpExchangeType;
-                                // if properties has type, ignore the exchangeType
-                                if (null != properties && properties.size() > 0
-                                        && null != properties.get(PersistentExchange.TYPE)) {
-                                    String type = properties.get(PersistentExchange.TYPE);
-                                    amqpExchangeType = AmqpExchange.Type.value(type);
-                                } else {
-                                    amqpExchangeType = AmqpExchange.Type.value(exchangeType);
-                                }
-                                PersistentExchange amqpExchange = new PersistentExchange(exchangeName,
-                                        amqpExchangeType, persistentTopic, false);
-                                putExchange(namespaceName, exchangeName, amqpExchange);
-                                amqpExchangeCompletableFuture.complete(amqpExchange);
-                            }
-                        }
-                    });
-                } else {
-                    amqpExchangeCompletableFuture.complete(innerMap.getOrDefault(exchangeName, null));
-                }
-            }));
+        exchangeMap.putIfAbsent(namespaceName, new ConcurrentHashMap<>());
+        CompletableFuture<AmqpExchange> existingAmqpExchangeFuture = exchangeMap.get(namespaceName).
+                putIfAbsent(exchangeName, amqpExchangeCompletableFuture);
+        if (existingAmqpExchangeFuture != null) {
+            return existingAmqpExchangeFuture;
         } else {
-            amqpExchangeCompletableFuture.complete(map.getOrDefault(exchangeName, null));
+            String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
+            CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
+            topicCompletableFuture.whenComplete((topic, throwable) -> {
+                if (throwable != null) {
+                    log.error("Failed to get topic from amqpTopicManager", throwable);
+                    amqpExchangeCompletableFuture.completeExceptionally(throwable);
+                } else {
+                    if (null == topic) {
+                        log.info("The exchange topic did not exist. namespace{}, exchangeName: {}",
+                                namespaceName.toString(), exchangeName);
+                        amqpExchangeCompletableFuture.complete(null);
+                    } else {
+                        // recover metadata if existed
+                        PersistentTopic persistentTopic = (PersistentTopic) topic;
+                        Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
+                        AmqpExchange.Type amqpExchangeType;
+                        // if properties has type, ignore the exchangeType
+                        if (null != properties && properties.size() > 0
+                                && null != properties.get(PersistentExchange.TYPE)) {
+                            String type = properties.get(PersistentExchange.TYPE);
+                            amqpExchangeType = AmqpExchange.Type.value(type);
+                        } else {
+                            amqpExchangeType = AmqpExchange.Type.value(exchangeType);
+                        }
+                        PersistentExchange amqpExchange = new PersistentExchange(exchangeName,
+                                amqpExchangeType, persistentTopic, false);
+                        amqpExchangeCompletableFuture.complete(amqpExchange);
+                    }
+                }
+            });
         }
-
         return amqpExchangeCompletableFuture;
     }
 

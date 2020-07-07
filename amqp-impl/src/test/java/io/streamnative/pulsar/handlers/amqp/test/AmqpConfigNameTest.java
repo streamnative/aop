@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
-import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
 import java.lang.reflect.Field;
 import lombok.extern.slf4j.Slf4j;
 import org.testng.Assert;
@@ -37,9 +36,6 @@ public class AmqpConfigNameTest {
 
         Class<AmqpServiceConfiguration> amqpServiceConfigurationClass = AmqpServiceConfiguration.class;
         checkConfigName(amqpServiceConfigurationClass);
-
-        Class<ProxyConfiguration> proxyConfigurationClass = ProxyConfiguration.class;
-        checkConfigName(proxyConfigurationClass);
     }
 
     private void checkConfigName(Class clazz) {
@@ -52,7 +48,6 @@ public class AmqpConfigNameTest {
                     valid, "The config name `" + field.getName() + "` should start with `"
                             + CATEGORY_NAME_PRE + "` or `" + FIELD_NAME_PRE + "`");
         }
-
     }
 
 }

@@ -81,8 +81,8 @@ public class ProxyService implements Closeable {
     private void configValid(ProxyConfiguration proxyConfig) {
         checkNotNull(proxyConfig);
         checkArgument(proxyConfig.getAmqpProxyPort() > 0);
-        checkNotNull(proxyConfig.getAdvertisedAddress());
-        checkNotNull(proxyConfig.getBrokerServicePort());
+        checkNotNull(proxyConfig.getAmqpTenant());
+        checkNotNull(proxyConfig.getBrokerServiceURL());
     }
 
     public void start() throws Exception {
@@ -97,9 +97,9 @@ public class ProxyService implements Closeable {
             throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getAmqpProxyPort(), e);
         }
 
-        String brokerServiceUrl = "pulsar://" + proxyConfig.getAdvertisedAddress() + ":"
-                + proxyConfig.getBrokerServicePort().get();
-        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder().serviceUrl(brokerServiceUrl).build();
+        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder()
+                .serviceUrl(proxyConfig.getBrokerServiceURL())
+                .build();
 
         this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
     }

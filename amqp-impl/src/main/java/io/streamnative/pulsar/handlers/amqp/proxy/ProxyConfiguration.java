@@ -13,11 +13,43 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
-import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
+import lombok.Getter;
+import lombok.Setter;
+import org.apache.pulsar.common.configuration.Category;
+import org.apache.pulsar.common.configuration.FieldContext;
 
 /**
  * Configuration for AMQP proxy service.
  */
-public class ProxyConfiguration extends AmqpServiceConfiguration {
+@Getter
+@Setter
+public class ProxyConfiguration {
+
+    @Category
+    private static final String CATEGORY_AMQP = "AMQP on Pulsar";
+    @Category
+    private static final String CATEGORY_AMQP_PROXY = "AMQP Proxy";
+    @Category
+    private static final String CATEGORY_BROKER_DISCOVERY = "Broker Discovery";
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = true,
+            doc = "Amqp on Pulsar Broker tenant"
+    )
+    private String amqpTenant = "public";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_PROXY,
+            required = false,
+            doc = "The amqp proxy port"
+    )
+    private int amqpProxyPort = 5682;
+
+    @FieldContext(
+            category = CATEGORY_BROKER_DISCOVERY,
+            doc = "The service url points to the broker cluster"
+    )
+    private String brokerServiceURL;
 
 }

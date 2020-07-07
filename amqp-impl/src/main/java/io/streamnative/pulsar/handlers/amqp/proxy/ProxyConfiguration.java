@@ -40,6 +40,27 @@ public class ProxyConfiguration {
     private String amqpTenant = "public";
 
     @FieldContext(
+            category = CATEGORY_AMQP,
+            required = true,
+            doc = "The maximum number of channels which can exist concurrently on a connection."
+    )
+    private int amqpMaxNoOfChannels = 64;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = true,
+            doc = "The maximum frame size on a connection."
+    )
+    private int amqpMaxFrameSize = 4 * 1024 * 1024;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = true,
+            doc = "The default heartbeat timeout on broker"
+    )
+    private int amqpHeartBeat = 60 * 1000;
+
+    @FieldContext(
             category = CATEGORY_AMQP_PROXY,
             required = false,
             doc = "The amqp proxy port"

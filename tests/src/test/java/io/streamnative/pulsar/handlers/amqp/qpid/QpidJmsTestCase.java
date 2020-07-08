@@ -60,7 +60,7 @@ public class QpidJmsTestCase {
         MessageConsumer messageConsumer = session.createConsumer(queue);
         MessageProducer messageProducer = session.createProducer(queue);
 
-        int messageCnt = 1000;
+        int messageCnt = 10;
         for (int i = 0; i < messageCnt; i++) {
             TextMessage message = session.createTextMessage("Hello world!");
             messageProducer.send(message);

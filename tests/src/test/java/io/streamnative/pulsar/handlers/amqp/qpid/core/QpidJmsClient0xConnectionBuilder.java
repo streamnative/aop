@@ -1,33 +1,18 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-
 package io.streamnative.pulsar.handlers.amqp.qpid.core;
 
-import lombok.extern.slf4j.Slf4j;
-
-import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
-import javax.jms.JMSException;
-import javax.naming.Context;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +22,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
+import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
+import javax.jms.JMSException;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import lombok.extern.slf4j.Slf4j;
 
+/**
+ * QpidJmsClient0xConnectionBuilder.
+ */
 @Slf4j
 public class QpidJmsClient0xConnectionBuilder implements ConnectionBuilder
 {
@@ -46,7 +41,7 @@ public class QpidJmsClient0xConnectionBuilder implements ConnectionBuilder
     private String _clientId = "clientid";
     private String _username = USERNAME;
     private String _password = PASSWORD;
-    private String _virtualHost;
+    private String _virtualHost = "vhost1";
     private boolean _enableTls;
     private boolean _enableFailover;
     private final Map<String, Object> _options = new TreeMap<>();
@@ -261,13 +256,18 @@ public class QpidJmsClient0xConnectionBuilder implements ConnectionBuilder
     @Override
     public Connection build() throws JMSException, NamingException
     {
-        return buildConnectionFactory().createConnection(_username, _password);
+        if (_username == null || _password == null) {
+            return buildConnectionFactory().createConnection();
+        } else {
+            return buildConnectionFactory().createConnection(_username, _password);
+        }
     }
 
     @Override
     public ConnectionFactory buildConnectionFactory() throws NamingException
     {
         String connectionUrl = buildConnectionURL();
+        connectionUrl = "amqp://guest:guest@clientid/vhost1?brokerlist='tcp://127.0.0.1:" + _port + "'";
         log.info("connectionUrl: {}", connectionUrl);
 
         System.setProperty("qpid.amqp.version", "0-9-1");

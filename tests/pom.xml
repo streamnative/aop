@@ -53,16 +53,47 @@
       <version>${rabbitmq.version}</version>
     </dependency>
 
+    <!-- jms test -->
     <dependency>
       <groupId>org.apache.qpid</groupId>
       <artifactId>qpid-client</artifactId>
-      <version>6.4.0</version>
+      <version>${qpid-client-version}</version>
     </dependency>
+
     <dependency>
       <groupId>org.apache.geronimo.specs</groupId>
       <artifactId>geronimo-jms_1.1_spec</artifactId>
-      <version>1.1.1</version>
+      <version>${geronimo-jms-version}</version>
     </dependency>
+
+    <dependency>
+      <groupId>org.apache.qpid</groupId>
+      <artifactId>qpid-test-utils</artifactId>
+      <version>${qpid-protocol-plugin.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest</artifactId>
+      <version>${hamcrest-version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-core</artifactId>
+      <version>${hamcrest-version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-library</artifactId>
+      <version>${hamcrest-version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- jms test -->
 
   </dependencies>
 

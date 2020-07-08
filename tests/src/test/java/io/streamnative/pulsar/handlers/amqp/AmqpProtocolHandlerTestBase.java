@@ -97,7 +97,7 @@ public abstract class AmqpProtocolHandlerTestBase {
     @Getter
     private List<Integer> amqpBrokerPortList = new ArrayList<>();
     @Getter
-    private List<Integer> proxyPortList = new ArrayList<>();
+    private List<Integer> aopProxyPortList = new ArrayList<>();
 
     public AmqpProtocolHandlerTestBase() {
         resetConfig();
@@ -221,8 +221,9 @@ public abstract class AmqpProtocolHandlerTestBase {
         brokerPortList.clear();
         brokerWebservicePortList.clear();
         brokerWebServicePortTlsList.clear();
-        proxyPortList.clear();
+        aopProxyPortList.clear();
         pulsarServiceList.clear();
+        amqpBrokerPortList.clear();
     }
 
     public void stopBroker(int brokerIndex) throws Exception {
@@ -231,7 +232,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         brokerPortList.remove(brokerIndex);
         brokerWebservicePortList.remove(brokerIndex);
         brokerWebServicePortTlsList.remove(brokerIndex);
-        proxyPortList.remove(brokerIndex);
+        aopProxyPortList.remove(brokerIndex);
         pulsarServiceList.remove(brokerIndex);
     }
 
@@ -244,8 +245,8 @@ public abstract class AmqpProtocolHandlerTestBase {
             int amqpBrokerPort = PortManager.nextFreePort();
             amqpBrokerPortList.add(amqpBrokerPort);
 
-            int proxyPort = PortManager.nextFreePort();
-            proxyPortList.add(proxyPort);
+            int aopProxyPort = PortManager.nextFreePort();
+            aopProxyPortList.add(aopProxyPort);
 
             int brokerWebServicePort = PortManager.nextFreePort();
             brokerWebservicePortList.add(brokerWebServicePort);
@@ -255,13 +256,13 @@ public abstract class AmqpProtocolHandlerTestBase {
 
             conf.setBrokerServicePort(Optional.of(brokerPort));
             ((AmqpServiceConfiguration) conf).setAmqpListeners("amqp://127.0.0.1:" + amqpBrokerPort);
-            ((AmqpServiceConfiguration) conf).setAmqpProxyPort(proxyPort);
+            ((AmqpServiceConfiguration) conf).setAmqpProxyPort(aopProxyPort);
             ((AmqpServiceConfiguration) conf).setAmqpProxyEnable(true);
             conf.setWebServicePort(Optional.of(brokerWebServicePort));
             conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
 
-            log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, proxyPort: {}",
-                    i, brokerPort, amqpBrokerPort, proxyPort);
+            log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, aopProxyPort: {}",
+                    i, brokerPort, amqpBrokerPort, aopProxyPort);
             this.pulsarServiceList.add(startBroker(conf));
         }
     }
@@ -394,7 +395,7 @@ public abstract class AmqpProtocolHandlerTestBase {
      * @return random proxy port
      */
     public int getProxyPort() {
-        return getProxyPortList().get(RandomUtils.nextInt(0, getProxyPortList().size()));
+        return getAopProxyPortList().get(RandomUtils.nextInt(0, getAopProxyPortList().size()));
     }
 
     /**

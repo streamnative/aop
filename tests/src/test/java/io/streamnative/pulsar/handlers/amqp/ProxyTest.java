@@ -13,7 +13,6 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import io.streamnative.pulsar.handlers.amqp.qpid.QpidJmsTestCase;
 import io.streamnative.pulsar.handlers.amqp.rabbitmq.RabbitMQTestCase;
 import java.util.concurrent.CountDownLatch;
 import lombok.extern.slf4j.Slf4j;
@@ -87,12 +86,6 @@ public class ProxyTest extends AmqpTestBase {
                 "vhost2", true, 2);
         rabbitMQTestCase.basicFanoutTest(proxyPort, "unload-bundle-test3",
                 "vhost3", true, 2);
-    }
-
-    @Test
-    public void qpidJmsClientTest() throws Exception {
-        QpidJmsTestCase qpidJmsTestCase = new QpidJmsTestCase();
-        qpidJmsTestCase.basicPubSubTest(getProxyPort());
     }
 
 }

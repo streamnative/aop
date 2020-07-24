@@ -1,4 +1,4 @@
-name: aop mvn build check and ut
+name: aop qpid-jms test
 
 on:
   pull_request:

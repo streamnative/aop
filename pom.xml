@@ -79,6 +79,7 @@
   <modules>
     <module>amqp-impl</module>
     <module>tests</module>
+    <module>tests-qpid-jms-client</module>
   </modules>
 
   <!-- dependency definitions -->

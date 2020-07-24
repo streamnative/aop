@@ -43,7 +43,10 @@ jobs:
       run: mvn spotbugs:check
 
     - name: test after build
-      run: mvn test -DfailIfNoTests=false
+      run: mvn test -DfailIfNoTests=false -Dexclude='io/streamnative/pulsar/handlers/amqp/qpid/jms_1_1/**/*.java'
+
+    - name: test jms_1_1
+      run: mvn test -DfailIfNoTests=false -Dinclude='io/streamnative/pulsar/handlers/amqp/qpid/jms_1_1/**/*.java'
 
     - name: package surefire artifacts
       if: failure()

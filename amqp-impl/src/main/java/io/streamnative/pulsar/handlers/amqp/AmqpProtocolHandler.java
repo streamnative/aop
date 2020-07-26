@@ -25,6 +25,7 @@ import java.net.InetSocketAddress;
 import java.util.Map;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.ServiceConfigurationUtils;
 import org.apache.pulsar.broker.protocol.ProtocolHandler;
@@ -89,9 +90,13 @@ public class AmqpProtocolHandler implements ProtocolHandler {
         amqpBrokerService = new AmqpBrokerService(service.getPulsar());
         if (amqpConfig.isAmqpProxyEnable()) {
             ProxyConfiguration proxyConfig = new ProxyConfiguration();
+            proxyConfig.setAmqpTenant(amqpConfig.getAmqpTenant());
+            proxyConfig.setAmqpMaxNoOfChannels(amqpConfig.getAmqpMaxNoOfChannels());
+            proxyConfig.setAmqpMaxFrameSize(amqpConfig.getAmqpMaxFrameSize());
+            proxyConfig.setAmqpHeartBeat(amqpConfig.getAmqpHeartBeat());
             proxyConfig.setAmqpProxyPort(amqpConfig.getAmqpProxyPort());
-            proxyConfig.setAdvertisedAddress(amqpConfig.getAdvertisedAddress());
-            proxyConfig.setBrokerServicePort(amqpConfig.getBrokerServicePort());
+            proxyConfig.setBrokerServiceURL("pulsar://" + PulsarService.advertisedAddress(amqpConfig) + ":"
+                    + amqpConfig.getBrokerServicePort().get());
             ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
             try {
                 proxyService.start();

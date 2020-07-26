@@ -35,6 +35,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
     @BeforeClass
     @Override
     public void setup() throws Exception {
+        resetConfig();
         super.internalSetup();
         log.info("success internal setup");
 

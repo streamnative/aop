@@ -33,6 +33,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
+
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +77,7 @@ public class RecoverTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testMessageOrderForClientAcknowledge() throws Exception
     {
         Queue queue = createQueue(getTestName());

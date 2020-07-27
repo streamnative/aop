@@ -27,6 +27,8 @@ import javax.jms.TextMessage;
 import javax.jms.Topic;
 import javax.jms.TopicConnection;
 import javax.jms.TopicSubscriber;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -35,6 +37,7 @@ import org.junit.Test;
 public class TimeToLiveTest extends JmsTestBase
 {
     @Test
+    @Ignore
     public void testPassiveTTL() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -103,6 +106,7 @@ public class TimeToLiveTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testPassiveTTLWithDurableSubscription() throws Exception
     {
         long timeToLiveMillis = getReceiveTimeout() * 2;
@@ -141,6 +145,7 @@ public class TimeToLiveTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testActiveTTLWithDurableSubscription() throws Exception
     {
         long timeToLiveMillis = getReceiveTimeout();

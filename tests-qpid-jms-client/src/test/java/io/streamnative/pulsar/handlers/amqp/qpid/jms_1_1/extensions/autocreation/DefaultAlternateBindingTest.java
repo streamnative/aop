@@ -34,6 +34,7 @@ import javax.jms.Session;
 import org.apache.qpid.server.virtualhost.NodeAutoCreationPolicy;
 import org.apache.qpid.server.virtualhost.QueueManagingVirtualHost;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -55,6 +56,7 @@ public class DefaultAlternateBindingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testDefaultAlternateBinding() throws Exception
     {
         createAndBindQueueWithMaxDeliveryAttempts();

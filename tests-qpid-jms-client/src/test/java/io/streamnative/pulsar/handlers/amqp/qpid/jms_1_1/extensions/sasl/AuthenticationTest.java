@@ -69,11 +69,13 @@ import org.hamcrest.Matchers;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * AuthenticationTest.
  */
+@Ignore
 public class AuthenticationTest extends JmsTestBase
 {
     @ClassRule

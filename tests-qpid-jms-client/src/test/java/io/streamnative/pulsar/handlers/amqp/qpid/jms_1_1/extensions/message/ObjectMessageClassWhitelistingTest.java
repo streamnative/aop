@@ -31,6 +31,8 @@ import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -71,6 +73,7 @@ public class ObjectMessageClassWhitelistingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testNotWhiteListedByConnectionUrlObjectMessage() throws Exception
     {
         Queue destination = createQueue(getTestName());
@@ -133,6 +136,7 @@ public class ObjectMessageClassWhitelistingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testBlackListedClassByConnectionUrlObjectMessage() throws Exception
     {
         Queue destination = createQueue(getTestName());
@@ -185,6 +189,7 @@ public class ObjectMessageClassWhitelistingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testBlackListedAnonymousClassByConnectionUrlObjectMessage() throws Exception
     {
         final Connection c = getConnectionBuilder()
@@ -218,6 +223,7 @@ public class ObjectMessageClassWhitelistingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testBlackListedNestedClassByConnectionUrlObjectMessage() throws Exception
     {
         final Connection c = getConnectionBuilder()

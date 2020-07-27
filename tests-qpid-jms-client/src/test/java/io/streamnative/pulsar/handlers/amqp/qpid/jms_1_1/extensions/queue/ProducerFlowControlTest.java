@@ -52,11 +52,13 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import org.apache.qpid.server.model.OverflowPolicy;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * ProducerFlowControlTest.
  */
+@Ignore
 public class ProducerFlowControlTest extends OverflowPolicyTestBase
 {
 

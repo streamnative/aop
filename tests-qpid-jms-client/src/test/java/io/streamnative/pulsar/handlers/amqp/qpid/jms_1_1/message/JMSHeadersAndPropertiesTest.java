@@ -36,6 +36,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -74,6 +76,7 @@ public class JMSHeadersAndPropertiesTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void redelivered() throws Exception
     {
         Queue queue = createQueue(getTestName());

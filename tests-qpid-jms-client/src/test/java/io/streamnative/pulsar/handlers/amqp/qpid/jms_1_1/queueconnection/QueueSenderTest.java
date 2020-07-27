@@ -22,11 +22,14 @@ import javax.jms.QueueConnection;
 import javax.jms.QueueSender;
 import javax.jms.QueueSession;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * QueueSenderTest.
  */
+@Ignore
 public class QueueSenderTest extends JmsTestBase
 {
     @Test

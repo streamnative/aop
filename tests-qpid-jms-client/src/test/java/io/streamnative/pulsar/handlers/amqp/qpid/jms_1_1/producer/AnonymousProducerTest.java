@@ -33,6 +33,7 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.jms.Topic;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -42,6 +43,7 @@ public class AnonymousProducerTest extends JmsTestBase
 {
 
     @Test
+    @Ignore
     public void testPublishIntoDestinationBoundWithNotMatchingFilter() throws Exception
     {
         Topic topic = createTopic(getTestName());
@@ -74,6 +76,7 @@ public class AnonymousProducerTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testPublishIntoNonExistingTopic() throws Exception
     {
         final Topic topic = createTopic(getTestName());

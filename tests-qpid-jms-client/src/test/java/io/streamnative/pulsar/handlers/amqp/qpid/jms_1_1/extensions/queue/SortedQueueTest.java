@@ -40,6 +40,7 @@ import javax.jms.TextMessage;
 import javax.naming.NamingException;
 import org.apache.qpid.server.model.Protocol;
 import org.apache.qpid.server.queue.SortedQueue;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ import org.slf4j.LoggerFactory;
 /**
  * SortedQueueTest.
  */
+@Ignore
 public class SortedQueueTest extends JmsTestBase
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SortedQueueTest.class);

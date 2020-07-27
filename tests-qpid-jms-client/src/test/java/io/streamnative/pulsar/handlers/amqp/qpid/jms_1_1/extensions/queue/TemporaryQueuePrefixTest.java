@@ -22,6 +22,7 @@ import javax.jms.Connection;
 import javax.jms.Session;
 import javax.jms.TemporaryQueue;
 import org.apache.qpid.server.virtualhost.QueueManagingVirtualHost;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -49,6 +50,7 @@ public class TemporaryQueuePrefixTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testEmptyPrefix() throws Exception
     {
         updateGlobalAddressDomains("[]");
@@ -69,6 +71,7 @@ public class TemporaryQueuePrefixTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testTwoDomains() throws Exception
     {
         final String primaryPrefix = "/testPrefix";
@@ -92,6 +95,7 @@ public class TemporaryQueuePrefixTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testPrefix() throws Exception
     {
         String prefix = "/testPrefix";

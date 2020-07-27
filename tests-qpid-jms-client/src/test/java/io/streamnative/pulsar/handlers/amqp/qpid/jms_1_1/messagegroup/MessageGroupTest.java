@@ -37,6 +37,7 @@ import javax.jms.MessageProducer;
 import javax.jms.Session;
 import org.apache.qpid.server.model.ConfiguredObject;
 import org.apache.qpid.server.queue.MessageGroupType;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,7 @@ import org.slf4j.LoggerFactory;
 /**
  * MessageGroupTest.
  */
+@Ignore
 public class MessageGroupTest extends JmsTestBase
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(MessageGroupTest.class);

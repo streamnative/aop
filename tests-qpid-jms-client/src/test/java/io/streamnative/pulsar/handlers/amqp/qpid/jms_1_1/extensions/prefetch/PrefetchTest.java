@@ -34,11 +34,13 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.naming.NamingException;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * PrefetchTest.
  */
+@Ignore
 public class PrefetchTest extends JmsTestBase
 {
     private static final EnumSet<Protocol> PRE_010_PROTOCOLS = EnumSet.of(AMQP_0_8, AMQP_0_9, AMQP_0_9_1);

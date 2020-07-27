@@ -29,6 +29,8 @@ import javax.jms.TopicConnection;
 import javax.jms.TopicPublisher;
 import javax.jms.TopicSession;
 import javax.jms.TopicSubscriber;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -103,6 +105,7 @@ public class TopicSubscriberTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void selector() throws Exception
     {
         Topic topic = createTopic(getTestName());
@@ -131,6 +134,7 @@ public class TopicSubscriberTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void noLocal() throws Exception
     {
         Topic topic = createTopic(getTestName());

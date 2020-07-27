@@ -43,11 +43,13 @@ import javax.jms.Queue;
 import javax.jms.QueueBrowser;
 import javax.jms.Session;
 import org.apache.qpid.server.model.AlternateBinding;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * MaxDeliveryTest.
  */
+@Ignore
 public class MaxDeliveryTest extends JmsTestBase
 {
     private static final int MAX_DELIVERY_ATTEMPTS = 2;

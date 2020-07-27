@@ -34,6 +34,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
+
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,7 @@ public class CommitRollbackTest extends JmsTestBase
     private static final Logger LOGGER = LoggerFactory.getLogger(CommitRollbackTest.class);
 
     @Test
+    @Ignore
     public void produceMessageAndAbortTransactionByClosingConnection() throws Exception
     {
         final Queue queue = createQueue(getTestName());
@@ -82,6 +85,7 @@ public class CommitRollbackTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void produceMessageAndAbortTransactionByClosingSession() throws Exception
     {
         final Queue queue = createQueue(getTestName());
@@ -110,6 +114,7 @@ public class CommitRollbackTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void produceMessageAndRollbackTransaction() throws Exception
     {
         final Queue queue = createQueue(getTestName());
@@ -415,6 +420,7 @@ public class CommitRollbackTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void transactionSharedByConsumers() throws Exception
     {
         final Queue queue1 = createQueue("Q1");
@@ -571,6 +577,7 @@ public class CommitRollbackTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void exhaustedPrefetchInTransaction() throws Exception
     {
         final int maxPrefetch = 2;
@@ -614,6 +621,7 @@ public class CommitRollbackTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testMessageOrder() throws Exception
     {
         final int messageNumber = 4;

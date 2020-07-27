@@ -25,6 +25,8 @@ import javax.jms.QueueConnection;
 import javax.jms.QueueReceiver;
 import javax.jms.QueueSession;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -34,6 +36,7 @@ public class QueueReceiverTest extends JmsTestBase
 {
 
     @Test
+    @Ignore
     public void createReceiver() throws Exception
     {
         Queue queue = createQueue(getTestName());

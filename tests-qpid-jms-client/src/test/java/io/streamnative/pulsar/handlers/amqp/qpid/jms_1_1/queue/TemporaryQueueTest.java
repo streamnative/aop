@@ -27,6 +27,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Session;
 import javax.jms.TemporaryQueue;
 import javax.jms.TextMessage;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -218,6 +220,7 @@ public class TemporaryQueueTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testExplicitTemporaryQueueDeletion() throws Exception
     {
         int numberOfQueuesBeforeTest = getQueueCount();

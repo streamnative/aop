@@ -25,11 +25,14 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * DefaultFiltersTest.
  */
+@Ignore
 public class DefaultFiltersTest extends JmsTestBase
 {
     @Test

@@ -53,11 +53,13 @@ import org.apache.qpid.server.model.Exchange;
 import org.apache.qpid.server.model.Protocol;
 import org.apache.qpid.server.virtualhost.NodeAutoCreationPolicy;
 import org.apache.qpid.server.virtualhost.QueueManagingVirtualHost;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * NodeAutoCreationPolicyTest.
  */
+@Ignore
 public class NodeAutoCreationPolicyTest extends JmsTestBase
 {
     private static final String DEAD_LETTER_QUEUE_SUFFIX = "_DLQ";

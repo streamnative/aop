@@ -28,11 +28,13 @@ import javax.jms.Destination;
 import javax.jms.Session;
 import org.apache.qpid.server.model.Binding;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * ExchangeRoutingTest.
  */
+@Ignore
 public class ExchangeRoutingTest extends JmsTestBase
 {
 

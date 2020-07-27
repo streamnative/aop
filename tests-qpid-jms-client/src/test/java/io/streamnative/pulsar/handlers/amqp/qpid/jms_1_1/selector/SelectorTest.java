@@ -28,6 +28,8 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -72,6 +74,7 @@ public class SelectorTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void runtimeSelectorError() throws Exception
     {
         Connection connection = getConnection();
@@ -107,6 +110,7 @@ public class SelectorTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void selectorWithJMSMessageID() throws Exception
     {
         Connection connection = getConnection();
@@ -139,6 +143,7 @@ public class SelectorTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void selectorWithJMSDeliveryMode() throws Exception
     {
         Connection connection = getConnection();

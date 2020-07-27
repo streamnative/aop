@@ -27,12 +27,14 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.naming.NamingException;
 import org.apache.qpid.server.model.OverflowPolicy;
+import org.junit.Ignore;
 import org.junit.Test;
 
 
 /**
  * RejectOverflowPolicyTest.
  */
+@Ignore
 public class RejectOverflowPolicyTest extends OverflowPolicyTestBase
 {
 

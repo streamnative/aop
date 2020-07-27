@@ -27,6 +27,7 @@ import javax.jms.Connection;
 import javax.jms.Queue;
 import javax.jms.Session;
 import org.apache.qpid.server.model.AlternateBinding;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -35,6 +36,7 @@ import org.junit.Test;
 public class AlternateBindingRoutingTest extends JmsTestBase
 {
     @Test
+    @Ignore
     public void testFanoutExchangeAsAlternateBinding() throws Exception
     {
         String queueName = getTestName();

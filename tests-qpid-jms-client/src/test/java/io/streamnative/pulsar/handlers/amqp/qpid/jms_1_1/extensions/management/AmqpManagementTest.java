@@ -55,11 +55,13 @@ import org.apache.qpid.server.queue.PriorityQueue;
 import org.apache.qpid.test.utils.tls.TlsResource;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * AmqpManagementTest.
  */
+@Ignore
 public class AmqpManagementTest extends JmsTestBase
 {
     @ClassRule

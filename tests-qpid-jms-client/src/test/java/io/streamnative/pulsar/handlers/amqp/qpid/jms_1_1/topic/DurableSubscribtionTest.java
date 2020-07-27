@@ -38,6 +38,7 @@ import javax.jms.TopicPublisher;
 import javax.jms.TopicSession;
 import javax.jms.TopicSubscriber;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -46,6 +47,7 @@ import org.junit.Test;
 public class DurableSubscribtionTest extends JmsTestBase
 {
     @Test
+    @Ignore
     public void publishedMessagesAreSavedAfterSubscriberClose() throws Exception
     {
         Topic topic = createTopic(getTestName());
@@ -123,6 +125,7 @@ public class DurableSubscribtionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testUnsubscribe() throws Exception
     {
         Topic topic = createTopic(getTestName());
@@ -197,6 +200,7 @@ public class DurableSubscribtionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void unsubscribeTwice() throws Exception
     {
         Topic topic = createTopic(getTestName());
@@ -250,6 +254,7 @@ public class DurableSubscribtionTest extends JmsTestBase
      * QPID-2418
      */
     @Test
+    @Ignore
     public void multipleSubscribersWithTheSameName() throws Exception
     {
         String subscriptionName = getTestName() + "_sub";
@@ -316,6 +321,7 @@ public class DurableSubscribtionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void noLocalMessagesNotDelivered() throws Exception
     {
         String noLocalSubscriptionName = getTestName() + "_no_local_sub";
@@ -397,6 +403,7 @@ public class DurableSubscribtionTest extends JmsTestBase
      * the use of durable subscriber with no-local on the first connection.
      */
     @Test
+    @Ignore
     public void testNoLocalSubscriberAndSubscriberOnSeparateConnection() throws Exception
     {
         String noLocalSubscriptionName = getTestName() + "_no_local_sub";
@@ -466,6 +473,7 @@ public class DurableSubscribtionTest extends JmsTestBase
 
 
     @Test
+    @Ignore
     public void testResubscribeWithChangedNoLocal() throws Exception
     {
         assumeThat("QPID-8068", getProtocol(), is(equalTo(Protocol.AMQP_1_0)));
@@ -534,6 +542,7 @@ public class DurableSubscribtionTest extends JmsTestBase
      * recreate the durable subscriber and check we receive the 5 expected messages
      */
     @Test
+    @Ignore
     public void testMessageSelectorRecoveredOnBrokerRestart() throws Exception
     {
         assumeThat(getBrokerAdmin().supportsRestart(), is(true));
@@ -618,6 +627,7 @@ public class DurableSubscribtionTest extends JmsTestBase
      * verify only the matching messages are received
      */
     @Test
+    @Ignore
     public void testChangeSubscriberToHaveSelector() throws Exception
     {
         assumeThat(getBrokerAdmin().supportsRestart(), is(true));
@@ -745,6 +755,7 @@ public class DurableSubscribtionTest extends JmsTestBase
      * verify ALL the sent messages are received
      */
     @Test
+    @Ignore
     public void testChangeSubscriberToHaveNoSelector() throws Exception
     {
         assumeThat(getBrokerAdmin().supportsRestart(), is(true));
@@ -853,6 +864,7 @@ public class DurableSubscribtionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testResubscribeWithChangedSelector() throws Exception
     {
         assumeThat(getBrokerAdmin().supportsRestart(), is(true));

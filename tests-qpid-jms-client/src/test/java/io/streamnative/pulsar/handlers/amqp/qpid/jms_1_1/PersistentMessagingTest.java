@@ -35,6 +35,7 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -53,6 +54,7 @@ public class PersistentMessagingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void committedPersistentMessagesSurviveBrokerRestart() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -113,6 +115,7 @@ public class PersistentMessagingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void transactedAcknowledgementPersistence() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -145,6 +148,7 @@ public class PersistentMessagingTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void clientAckAcknowledgementPersistence() throws Exception
     {
         Queue queue = createQueue(getTestName());

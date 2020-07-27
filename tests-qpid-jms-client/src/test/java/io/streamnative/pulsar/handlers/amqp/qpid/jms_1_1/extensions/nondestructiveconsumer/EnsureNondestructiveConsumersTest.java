@@ -27,11 +27,14 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * EnsureNondestructiveConsumersTest.
  */
+@Ignore
 public class EnsureNondestructiveConsumersTest extends JmsTestBase
 {
 

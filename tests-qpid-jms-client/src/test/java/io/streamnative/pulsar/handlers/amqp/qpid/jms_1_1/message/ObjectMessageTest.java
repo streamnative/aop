@@ -32,6 +32,8 @@ import javax.jms.MessageProducer;
 import javax.jms.ObjectMessage;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -225,6 +227,7 @@ public class ObjectMessageTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testSetObjectPropertyForBoolean() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -255,6 +258,7 @@ public class ObjectMessageTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testSetObjectPropertyForByte() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -285,6 +289,7 @@ public class ObjectMessageTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testSetObjectPropertyForShort() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -314,6 +319,7 @@ public class ObjectMessageTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testSetObjectPropertyForInteger() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -344,6 +350,7 @@ public class ObjectMessageTest extends JmsTestBase
 
 
     @Test
+    @Ignore
     public void testSetObjectPropertyForDouble() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -374,6 +381,7 @@ public class ObjectMessageTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testSetObjectPropertyForFloat() throws Exception
     {
         Queue queue = createQueue(getTestName());

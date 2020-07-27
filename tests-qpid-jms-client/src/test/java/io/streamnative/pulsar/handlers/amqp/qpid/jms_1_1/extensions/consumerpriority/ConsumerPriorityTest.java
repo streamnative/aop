@@ -32,6 +32,7 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -81,6 +82,7 @@ public class ConsumerPriorityTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testLowPriorityConsumerDoesNotReceiveMessagesIfHigherPriorityConsumerAvailable() throws Exception
     {
         assumeThat("Only legacy client implements this feature", getProtocol(), is(not(equalTo(Protocol.AMQP_1_0))));
@@ -91,6 +93,7 @@ public class ConsumerPriorityTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testLowPriorityConsumerDoesNotReceiveMessagesIfHigherPriorityConsumerAvailableUsingADDR()
             throws Exception
     {
@@ -159,6 +162,7 @@ public class ConsumerPriorityTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testLowPriorityConsumerReceiveMessagesIfHigherPriorityConsumerHasNoCredit() throws Exception
     {
         assumeThat("Only legacy client implements this feature", getProtocol(), is(not(equalTo(Protocol.AMQP_1_0))));
@@ -222,6 +226,7 @@ public class ConsumerPriorityTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testLowPriorityConsumerReceiveMessagesIfHigherPriorityConsumerDoesNotSelect() throws Exception
     {
         assumeThat("Only legacy client implements this feature", getProtocol(), is(not(equalTo(Protocol.AMQP_1_0))));

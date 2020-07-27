@@ -28,6 +28,7 @@ import javax.jms.IllegalStateException;
 import javax.jms.JMSException;
 import javax.jms.JMSSecurityException;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -44,6 +45,7 @@ public class ConnectionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void badPassword() throws Exception
     {
         Connection con = null;
@@ -72,6 +74,7 @@ public class ConnectionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void unresolvableHost() throws Exception
     {
         Connection con = null;
@@ -97,6 +100,7 @@ public class ConnectionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void unknownVirtualHost() throws Exception
     {
         Connection con = null;
@@ -120,6 +124,7 @@ public class ConnectionTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void connectionFactorySuppliedClientIdImmutable() throws Exception
     {
         final String clientId = UUID.randomUUID().toString();

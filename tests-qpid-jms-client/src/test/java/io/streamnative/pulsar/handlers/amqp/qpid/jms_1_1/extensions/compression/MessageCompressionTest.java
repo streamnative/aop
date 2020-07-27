@@ -34,11 +34,13 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import org.apache.qpid.server.model.Protocol;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * MessageCompressionTest.
  */
+@Ignore
 public class MessageCompressionTest extends JmsTestBase
 {
     private static final int MIN_MESSAGE_PAYLOAD_SIZE = 2048 * 1024;

@@ -26,6 +26,8 @@ import javax.jms.Connection;
 import javax.jms.MessageConsumer;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -34,6 +36,7 @@ import org.junit.Test;
 public class ConnectionStartTest extends JmsTestBase
 {
     @Test
+    @Ignore
     public void testConsumerCanReceiveMessageAfterConnectionStart() throws Exception
     {
         Queue queue = createQueue(getTestName());

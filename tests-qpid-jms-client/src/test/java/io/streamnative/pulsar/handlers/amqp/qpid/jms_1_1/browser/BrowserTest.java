@@ -32,6 +32,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.QueueBrowser;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -42,6 +44,7 @@ public class BrowserTest extends JmsTestBase
     private static final String INDEX = "index";
 
     @Test
+    @Ignore
     public void emptyQueue() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -61,6 +64,7 @@ public class BrowserTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void browser() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -95,6 +99,7 @@ public class BrowserTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void browserWithSelector() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -129,6 +134,7 @@ public class BrowserTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void browserIsNonDestructive() throws Exception
     {
         Queue queue = createQueue(getTestName());

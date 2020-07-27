@@ -34,11 +34,13 @@ import javax.jms.Session;
 import javax.jms.TextMessage;
 import org.apache.qpid.server.model.Protocol;
 import org.apache.qpid.server.store.MessageDurability;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * QueueMessageDurabilityTest.
  */
+@Ignore
 public class QueueMessageDurabilityTest extends JmsTestBase
 {
     private static final String DURABLE_ALWAYS_PERSIST_NAME = "DURABLE_QUEUE_ALWAYS_PERSIST";

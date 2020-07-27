@@ -36,6 +36,7 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.naming.NamingException;
 import org.apache.qpid.server.queue.LastValueQueue;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * LastValueQueueTest.
  */
+@Ignore
 public class LastValueQueueTest extends JmsTestBase
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(LastValueQueueTest.class);

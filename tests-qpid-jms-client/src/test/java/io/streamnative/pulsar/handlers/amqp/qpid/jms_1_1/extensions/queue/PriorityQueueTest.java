@@ -51,6 +51,7 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import org.apache.qpid.server.queue.PriorityQueue;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,7 @@ import org.slf4j.LoggerFactory;
 /**
  * PriorityQueueTest.
  */
+@Ignore
 public class PriorityQueueTest extends JmsTestBase
 {
     private static final int MSG_COUNT = 50;

@@ -37,6 +37,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import javax.naming.NamingException;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -65,6 +67,7 @@ public class AcknowledgeTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void sessionTransactedAcknowledgement() throws Exception
     {
         doMessageListenerAcknowledgementTest(Session.SESSION_TRANSACTED);
@@ -77,12 +80,14 @@ public class AcknowledgeTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void clientAcknowledgementMessageListener() throws Exception
     {
         doMessageListenerAcknowledgementTest(Session.CLIENT_ACKNOWLEDGE);
     }
 
     @Test
+    @Ignore
     public void sessionTransactedAcknowledgementMessageListener() throws Exception
     {
         doMessageListenerAcknowledgementTest(Session.SESSION_TRANSACTED);

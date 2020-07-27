@@ -33,11 +33,13 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import org.apache.qpid.server.model.Protocol;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * ArrivalTimeFilterTest.
  */
+@Ignore
 public class ArrivalTimeFilterTest extends JmsTestBase
 {
     private static final String LEGACY_BINDING_URL = "direct://amq.direct/%s/%s?x-qpid-replay-period='%d'";

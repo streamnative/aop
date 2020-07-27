@@ -55,11 +55,13 @@ import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import org.apache.qpid.server.model.OverflowPolicy;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * QueuePolicyTest.
  */
+@Ignore
 public class QueuePolicyTest extends JmsTestBase
 {
 

@@ -30,6 +30,8 @@ import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.Topic;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -39,6 +41,7 @@ public class JMSDestinationTest extends JmsTestBase
 {
 
     @Test
+    @Ignore
     public void messageSentToQueueComesBackWithTheSameJMSDestination() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -101,6 +104,7 @@ public class JMSDestinationTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void messageSentToQueueComesBackWithTheSameJMSDestinationWhenReceivedAsynchronously() throws Exception
     {
         Queue queue = createQueue(getTestName());
@@ -139,6 +143,7 @@ public class JMSDestinationTest extends JmsTestBase
     }
 
     @Test
+    @Ignore
     public void testReceiveResend() throws Exception
     {
         Queue queue = createQueue(getTestName());

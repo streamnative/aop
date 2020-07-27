@@ -42,11 +42,13 @@ import org.apache.qpid.test.utils.tls.TlsResource;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * TlsTest.
  */
+@Ignore
 public class TlsTest extends JmsTestBase
 {
     @ClassRule

@@ -27,11 +27,14 @@ import javax.jms.MessageConsumer;
 import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * LimitLiveConsumersTest.
  */
+@Ignore
 public class LimitLiveConsumersTest extends JmsTestBase
 {
 

@@ -15,9 +15,12 @@ package io.streamnative.pulsar.handlers.amqp.qpid.core;
 
 import org.junit.Rule;
 import org.junit.rules.TestName;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * BrokerAdminUsingTestBase.
@@ -28,6 +31,8 @@ public abstract class BrokerAdminUsingTestBase
     private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminUsingTestBase.class);
     @Rule
     public final TestName _testName = new TestName();
+    @Rule
+    public final Timeout timeout = new Timeout(30, TimeUnit.SECONDS);
 
     private BrokerAdmin _brokerAdmin;
 

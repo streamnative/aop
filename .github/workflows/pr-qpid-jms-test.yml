@@ -1,4 +1,4 @@
-name: aop mvn build check and ut
+name: aop qpid-jms test
 
 on:
   pull_request:
@@ -42,8 +42,8 @@ jobs:
     - name: Spotbugs check
       run: mvn spotbugs:check
 
-    - name: test after build
-      run: mvn test -DfailIfNoTests=false -pl tests
+    - name: test jms_1_1
+      run: mvn test -DfailIfNoTests=false -pl tests-qpid-jms-client
 
     - name: package surefire artifacts
       if: failure()

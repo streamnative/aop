@@ -11,22 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.qpid;
+package io.streamnative.pulsar.handlers.amqp.qpid.core;
 
-import io.streamnative.pulsar.handlers.amqp.AmqpTestBase;
-import lombok.extern.slf4j.Slf4j;
-import org.testng.annotations.Test;
+import java.net.URI;
 
 /**
- * Qpid-JMS client test.
+ * GenericConnectionListener.
  */
-@Slf4j
-public class QpidJmsTest extends AmqpTestBase {
-
-    @Test
-    public void basicTest() throws Exception {
-        QpidJmsTestCase qpidJmsTestCase = new QpidJmsTestCase();
-        qpidJmsTestCase.basicPubSubTest(getAmqpBrokerPortList().get(0));
-    }
-
+public interface GenericConnectionListener
+{
+    void onConnectionRestored(URI uri);
+    void onConnectionInterrupted(URI uri);
 }

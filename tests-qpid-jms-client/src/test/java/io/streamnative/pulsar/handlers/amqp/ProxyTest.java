@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.streamnative.pulsar.handlers.amqp.qpid.QpidJmsTestCase;
 import lombok.extern.slf4j.Slf4j;
+import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
 
 /**
@@ -23,6 +24,7 @@ import org.testng.annotations.Test;
 @Slf4j
 public class ProxyTest extends AmqpTestBase {
 
+    @Ignore
     @Test
     public void qpidJmsClientTest() throws Exception {
         QpidJmsTestCase qpidJmsTestCase = new QpidJmsTestCase();

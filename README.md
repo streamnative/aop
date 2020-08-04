@@ -114,7 +114,7 @@ bin/pulsar standalone
 
 In Pulsar [log4j2.yaml config file](https://github.com/apache/pulsar/blob/master/conf/log4j2.yaml), you can set AoP log level.
 
-The  following is an example.
+The following is an example.
 ```
     Logger:
       - name: io.streamnative.pulsar.handlers.amqp

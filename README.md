@@ -26,10 +26,14 @@
 
 AoP stands for AMQP on Pulsar. AoP broker supports AMQP0-9-1 protocol, and is backed by Pulsar.
 
-AoP is implemented as a Pulsar [ProtocolHandler](https://github.com/apache/pulsar/blob/master/pulsar-broker/src/main/java/org/apache/pulsar/broker/protocol/ProtocolHandler.java) with protocol name "amqp"
-ProtocolHandler is built as a `nar` file, and will be loaded when Pulsar Broker starting.
+AoP is implemented as a Pulsar [ProtocolHandler](https://github.com/apache/pulsar/blob/master/pulsar-broker/src/main/java/org/apache/pulsar/broker/protocol/ProtocolHandler.java) with protocol name "amqp". ProtocolHandler is built as a `nar` file, and is loaded when Pulsar Broker starts.
 
-## Limitations for AoP
+## Limitations
+AoP is implemented based on Pulsar features. However, the methods of using Pulsar and using AMQP are different. The following are some limitations of AoP.
+
+- Currently, the AoP protocol handler supports AMQP0-9-1 protocol and only supports durable exchange and durable queue.
+- A Vhost is backed by a namespace which can only have one bundle. You need to create a namespace in advance for the Vhost.
+- AoP is supported on Pulsar 2.6.0 or later releases.
 
 ## Get started
 
@@ -39,27 +43,22 @@ In this guide, you will learn how to use the Pulsar broker to serve requests fro
 
 Download [Pulsar 2.6.0](https://github.com/streamnative/pulsar/releases/download/v2.6.0/apache-pulsar-2.6.0-bin.tar.gz) binary package `apache-pulsar-2.6.0-bin.tar.gz`. and unzip it.
 
-### Download or Build AoP Plugin
+### Download and Build AoP Plugin
+You can download aop nar file from the [AoP releases](https://github.com/streamnative/aop/releases).
 
-#### Download
-This link contains all the AoP releases, please download aop nar file from this link:
-https://github.com/streamnative/aop/releases
-
-#### Build from code
-
-1. clone this project from GitHub to your local.
+To build from code, complete the following steps:
+1. Clone the project from GitHub to your local.
 
 ```bash
 git clone https://github.com/streamnative/aop.git
 cd aop
 ```
 
-2. build the project.
+2. Build the project.
 ```bash
 mvn clean install -DskipTests
 ```
-
-3. the nar file can be found at this location.
+You can find the nar file in the following directory.
 ```bash
 ./amqp-impl/target/pulsar-protocol-handler-amqp-${version}.nar
 ```
@@ -68,24 +67,23 @@ mvn clean install -DskipTests
 
 |Name|Description|Default|
 |---|---|---|
-amqpTenant|AMQP on pulsar broker tenant|public
+amqpTenant|AMQP on Pulsar broker tenant|public
 amqpListeners|AMQP service port|amqp://127.0.0.1:5672
 amqpMaxNoOfChannels|The maximum number of channels which can exist concurrently on a connection|64
 amqpMaxFrameSize|The maximum frame size on a connection|4194304 (4MB)
-amqpHeartBeat|The aop connection default heartbeat timeout|60 (s)
+amqpHeartBeat|The default heartbeat timeout of AoP connection|60 (s)
 amqpProxyPort|The AMQP proxy service port|5682
 amqpProxyEnable|Whether to start proxy service|false
 
-### Config Pulsar broker to run AoP protocol handler as Plugin
+### Configure Pulsar broker to run AoP protocol handler as Plugin
 
-As mentioned above, AoP module is loaded along with Pulsar broker. You need to add configs in Pulsar's config file, such as `broker.conf` or `standalone.conf`.
+As mentioned above, AoP module is loaded with Pulsar broker. You need to add configs in Pulsar's config file, such as `broker.conf` or `standalone.conf`.
 
-1. Protocol handler's config
+1. Protocol handler configuration
 
-You need to add `messagingProtocols`(default value is null) and  `protocolHandlerDirectory` ( default value is "./protocols"), in Pulsar's config file, such as `broker.conf` or `standalone.conf`
-For AoP, value for `messagingProtocols` is `amqp`; value for `protocolHandlerDirectory` is the place of AoP nar file.
+You need to add `messagingProtocols`(the default value is `null`) and  `protocolHandlerDirectory` (the default value is "./protocols"), in Pulsar configuration files, such as `broker.conf` or `standalone.conf`. For AoP, the value for `messagingProtocols` is `amqp`; the value for `protocolHandlerDirectory` is the directory of AoP nar file.
 
-e.g.
+The following is an example.
 ```access transformers
 messagingProtocols=amqp
 protocolHandlerDirectory=./protocols
@@ -93,34 +91,30 @@ protocolHandlerDirectory=./protocols
 
 2. Set AMQP service listeners
 
-Set AMQP service `listeners`. Note that the hostname value in listeners should be the same as Pulsar broker's `advertisedAddress`.
+Set AMQP service `listeners`. Note that the hostname value in listeners is the same as Pulsar broker's `advertisedAddress`.
 
-e.g.
+The following is an example.
 ```
 amqpListeners=amqp://127.0.0.1:5672
 advertisedAddress=127.0.0.1
 ```
 
-### Run Pulsar broker.
+### Run Pulsar broker
 
-With above 2 configs, you can start your Pulsar broker. You can follow Pulsar's [Get started page](http://pulsar.apache.org/docs/en/standalone/) for more details
+With the above configuration, you can start your Pulsar broker. For details, refer to [Pulsar Get started guides](http://pulsar.apache.org/docs/en/standalone/).
 
 ```access transformers
 cd apache-pulsar-2.5.0
 bin/pulsar standalone
 ```
 
-### Run AMQP Client to verify.
+### Run AMQP Client to verify
 
+### Log level configuration
 
+In Pulsar [log4j2.yaml config file](https://github.com/apache/pulsar/blob/master/conf/log4j2.yaml), you can set AoP log level.
 
-### Other configs.
-
-#### log level config
-
-In Pulsar's [log4j2.yaml config file](https://github.com/apache/pulsar/blob/master/conf/log4j2.yaml), you can set AoP's log level.
-
-e.g.
+The following is an example.
 ```
     Logger:
       - name: io.streamnative.pulsar.handlers.amqp
@@ -130,16 +124,15 @@ e.g.
           - ref: Console
 ``` 
 
-#### all the AoP configs.
+### AoP configuration
 
 There is also other configs that can be changed and placed into Pulsar broker config file.
-
-
+<!what's the "other configs"?>
 
 ## Contribute
-If you want to make contributions to AMQP on Pulsar, follow the steps below.
+### Prerequisite ###
 
-### Prerequisite
+If you want to make contributions to AMQP on Pulsar, follow the following steps.
 
 1. Install system dependency.
 
@@ -161,82 +154,125 @@ Maven | https://maven.apache.org/
 
 ### Contribution workflow
 
-currently this repo disabled fork, developer all work on this repo.
+#### Step 1: Fork
 
-1. Sync you code remote repository.
+1. Visit https://github.com/streamnative/aop
+2. Click `Fork` button (top right) to establish a cloud-based fork.
 
-    ```bash
-    git checkout master
-    git pull origin master
-    ```
+#### Step 2: Clone fork to local machine
 
-2. Checkout new branch for each PR, Do your change, Commit code changes.
+Create your clone.
 
-   Because this repo disabled fork, It is recommend that you use a prefix of {your_id} before your_branch.
+```sh
+$ cd $working_dir
+$ git clone https://github.com/$user/aop
+```
 
-    ```bash
-    git checkout -b ${your_id}/your_branch
-    ## ... do the changes ...
-    git add [your change files]
-    git commit -m "what is done for this change"
-    git push origin ${your_id}/your_branch
-    ```
+Set your clone to track upstream repository.
 
-3. do the local tests and checks before create an PR in github.
+```sh
+$ cd $working_dir/aop
+$ git remote add upstream https://github.com/streamnative/aop.git
+```
 
-    ```bash
-    ## build
-    mvn install -DskipTests 
-    ## run local check
-    mvn checkstyle:check && mvn license:check && mvn spotbugs:check
-    ## run tests locally
-    mvn test
-    ```
-    
-    If you want to run only part of your tests, try command like this.
-    
-    ```bash
-    ## run all tests of a module: ampq-impl/tests
-    mvn test -pl amqp-impl
-    ## run all tests in test class
-    mvn test -pl amqp-impl -Dtest=WantedTestClass
-    ## run a specific test method
-    mvn test -pl amqp-impl -Dtest=WantedTestClass#wantedTestMethod 
-    ```
+Use the `git remote -v` command, you find the output looks as follows:
 
-4. make sure, pushed your latest change, and then create a PR.
-  
-    ```bash
-    git push origin ${your_id}/your_branch 
-    ```
-  
-  Go back to the main page: https://github.com/streamnative/aop, you should find a reminder in yellow, click it to create a PR.
-  
-  Or you could go to the link directly like: 
-  https://github.com/streamnative/aop/pull/new/${your_id}/your_branch
+```
+origin    https://github.com/$user/aop.git (fetch)
+origin    https://github.com/$user/aop.git (push)
+upstream  https://github.com/streamnative/aop (fetch)
+upstream  https://github.com/streamnative/aop (push)
+```
 
-### Usage Standalone
+#### Step 3: Keep your branch in sync
 
-1. clone this project from GitHub to your local.
+Get your local master up to date.
+
+```sh
+$ cd $working_dir/aop
+$ git checkout master
+$ git fetch upstream
+$ git rebase upstream/master
+$ git push origin master 
+```
+
+#### Step 4: Create your branch
+
+Branch from master.
+
+```sh
+$ git checkout -b myfeature
+```
+
+#### Step 5: Edit the code
+
+You can now edit the code on the `myfeature` branch.
+
+
+#### Step 6: Commit
+
+Commit your changes.
+
+```sh
+$ git add <filename>
+$ git commit -m "$add a comment"
+```
+
+Likely you'll go back and edit-build-test in a few cycles. 
+
+The following commands might be helpful for you.
+
+```sh
+$ git add <filename> (used to add one file)
+git add -A (add all changes, including new/delete/modified files)
+git add -a -m "$add a comment" (add and commit modified and deleted files)
+git add -u (add modified and deleted files, not include new files)
+git add . (add new and modified files, not including deleted files)
+```
+
+#### Step 7: Push
+
+When your commit is ready for review (or just to establish an offsite backup of your work), push your branch to your fork on `github.com`:
+
+```sh
+$ git push origin myfeature
+```
+
+#### Step 8: Create a pull request
+
+1. Visit your fork at https://github.com/$user/aop (replace `$user` obviously).
+2. Click the `Compare & pull request` button next to your `myfeature` branch.
+
+#### Step 9: Get a code review
+
+Once you open your pull request, at least two reviewers will participate in reviewing. Those reviewers will conduct a thorough code review, looking for correctness, bugs, opportunities for improvement, documentation and comments, and style.
+
+Commit changes made in response to review comments to the same branch on your fork.
+
+Very small PRs are easy to review. Very large PRs are very difficult to review.
+
+### How to use Pulsar standalone
+
+1. Clone this project from GitHub to your local.
 
     ```bash
     git clone https://github.com/streamnative/aop.git
     cd aop
     ```
 
-2. build the project.
+2. Build the project.
 
     ```bash
     mvn clean install -DskipTests
     ```
 
-3. copy the nar package to pulsar protocols directory.
+3. Copy the nar package to Pulsar protocols directory.
 
     ```bash
     cp ./amqp-impl/target/pulsar-protocol-handler-amqp-${version}.nar $PULSAR_HOME/protocols/pulsar-protocol-handler-amqp-${version}.nar
     ```
 
-4. modify pulsar standalone conf
+4. Modify Pulsar standalone configuration
 
     ```
     # conf file: $PULSAR_HOME/conf/standalone.conf
@@ -249,13 +285,13 @@ currently this repo disabled fork, developer all work on this repo.
     advertisedAddress=127.0.0.1
     ```
 
-5. start pulsar use standalone mode
+5. Start Pulsar in standalone mode.
 
     ```
     $PULSAR_HOME/bin/pulsar standalone
     ```
 
-6. add namespace for vhost
+6. Add namespace for vhost.
 
     ```
     # for example, the vhost name is `vhost1`
@@ -264,7 +300,7 @@ currently this repo disabled fork, developer all work on this repo.
     bin/pulsar-admin namespaces set-retention -s 100M -t 2d public/vhost1
     ```
 
-7. use RabbitMQ client test
+7. Use RabbitMQ client test
 
     ```
     # add RabbitMQ client dependency in your project
@@ -317,19 +353,19 @@ currently this repo disabled fork, developer all work on this repo.
     connection.close();
     ```
 
-### Proxy Usage
+### How to use Proxy
 
-Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/deploy-bare-metal/)
+To use proxy, complete the following steps. If you do not know some detailed steps, refer to [Deploy a cluster on bare metal](http://pulsar.apache.org/docs/en/deploy-bare-metal/).
 
-1. Prepare zookeeper cluster (refer to cluster deploy doc)
+1. Prepare ZooKeeper cluster.
 
-2. Initialize cluster metadata (refer to cluster deploy doc)
+2. Initialize cluster metadata.
 
-3. Prepare bookkeeper cluster (refer to cluster deploy doc)
+3. Prepare bookkeeper cluster.
 
-4. copy the `pulsar-protocol-handler-amqp-${version}.nar` to the `$PULSAR_HOME/protocols` directory
+4. Copy the `pulsar-protocol-handler-amqp-${version}.nar` to the `$PULSAR_HOME/protocols` directory.
 
-5. start broker
+5. Start broker.
 
     broker config
 
@@ -343,7 +379,7 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     amqpProxyPort=5682
     ```
 
-6. reset the number of the namespace public/default to 1
+6. Reset the number of the namespace public/default to `1`.
 
     ```shell script
     $PULSAR_HOME/bin/pulsar-admin namespaces delete public/default
@@ -351,7 +387,7 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     $PULSAR_HOME/bin/pulsar-admin namespaces set-retention -s 100M -t 3d public/default
     ``` 
 
-7. prepare exchange and queue for test
+7. Prepare exchange and queue for test.
 
     ```
     ConnectionFactory connectionFactory = new ConnectionFactory();
@@ -369,7 +405,7 @@ Refer to `Deploy a cluster on bare metal` (http://pulsar.apache.org/docs/en/depl
     connection.close();
     ```
 
-7. download RabbitMQ perf tool and test 
+7. Download RabbitMQ perf tool and test. 
 
     (https://bintray.com/rabbitmq/java-tools/download_file?file_path=perf-test%2F2.11.0%2Frabbitmq-perf-test-2.11.0-bin.tar.gz)
 

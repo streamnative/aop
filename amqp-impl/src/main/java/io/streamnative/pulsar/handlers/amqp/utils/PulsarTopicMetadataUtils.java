@@ -36,17 +36,17 @@ public class PulsarTopicMetadataUtils {
             log.error("name:{}, topic is null.", name);
             return;
         }
-        topic.getManagedLedger().asyncSetProperties(properties, new AsyncCallbacks.SetPropertiesCallback() {
+        topic.getManagedLedger().asyncSetProperties(properties, new AsyncCallbacks.UpdatePropertiesCallback() {
             @Override
-            public void setPropertiesComplete(Map<String, String> map, Object o) {
+            public void updatePropertiesComplete(Map<String, String> map, Object o) {
                 if (log.isDebugEnabled()) {
-                    log.debug("[{}] set properties succeed, properties:{}", name, properties);
+                    log.debug("[{}] update properties succeed, properties:{}", name, properties);
                 }
             }
 
             @Override
-            public void setPropertiesFailed(ManagedLedgerException e, Object o) {
-                log.error("[{}] set properties failed message: {}, properties:{}",
+            public void updatePropertiesFailed(ManagedLedgerException e, Object o) {
+                log.error("[{}] update properties failed message: {}, properties:{}",
                         name, e.getMessage(), properties);
             }
         }, null);

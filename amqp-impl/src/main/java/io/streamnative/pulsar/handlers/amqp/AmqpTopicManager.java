@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.AbstractTopic;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.common.naming.TopicName;
@@ -45,7 +46,8 @@ public class AmqpTopicManager {
             return topicCompletableFuture;
         }
         // setup ownership of service unit to this broker
-        pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), true).
+        LookupOptions lookupOptions = LookupOptions.builder().authoritative(true).build();
+        pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), lookupOptions).
                 whenComplete((addr, th) -> {
                     log.info("Find getBrokerServiceUrl {}, return Topic: {}", addr, topicName);
                     if (th != null || addr == null || addr.get() == null) {

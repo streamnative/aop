@@ -237,7 +237,8 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public void asyncSetProperty(String s, String s1, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback, Object o) {
+    public void asyncSetProperty(String s, String s1, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback,
+                                 Object o) {
 
     }
 
@@ -247,7 +248,8 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public void asyncDeleteProperty(String s, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback, Object o) {
+    public void asyncDeleteProperty(String s, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback,
+                                    Object o) {
 
     }
 
@@ -257,7 +259,8 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public void asyncSetProperties(Map<String, String> map, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback, Object o) {
+    public void asyncSetProperties(Map<String, String> map,
+                                   AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback, Object o) {
 
     }
 

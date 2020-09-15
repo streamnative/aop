@@ -33,7 +33,7 @@ AoP is implemented based on Pulsar features. However, the methods of using Pulsa
 
 - Currently, the AoP protocol handler supports AMQP0-9-1 protocol and only supports durable exchange and durable queue.
 - A Vhost is backed by a namespace which can only have one bundle. You need to create a namespace in advance for the Vhost.
-- AoP is supported on Pulsar 2.6.0 or later releases.
+- AoP is supported on Pulsar 2.6.1 or later releases.
 
 ## Get started
 
@@ -41,7 +41,7 @@ In this guide, you will learn how to use the Pulsar broker to serve requests fro
 
 ### Download Pulsar 
 
-Download [Pulsar 2.6.0](https://github.com/streamnative/pulsar/releases/download/v2.6.0/apache-pulsar-2.6.0-bin.tar.gz) binary package `apache-pulsar-2.6.0-bin.tar.gz`. and unzip it.
+Download [Pulsar 2.6.1](https://github.com/streamnative/pulsar/releases/download/v2.6.1/apache-pulsar-2.6.1-bin.tar.gz) binary package `apache-pulsar-2.6.1-bin.tar.gz`. and unzip it.
 
 ### Download and Build AoP Plugin
 You can download aop nar file from the [AoP releases](https://github.com/streamnative/aop/releases).
@@ -104,7 +104,7 @@ advertisedAddress=127.0.0.1
 With the above configuration, you can start your Pulsar broker. For details, refer to [Pulsar Get started guides](http://pulsar.apache.org/docs/en/standalone/).
 
 ```access transformers
-cd apache-pulsar-2.5.0
+cd apache-pulsar-2.6.1
 bin/pulsar standalone
 ```
 

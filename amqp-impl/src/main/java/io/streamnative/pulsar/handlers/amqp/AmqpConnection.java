@@ -35,6 +35,7 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -278,7 +279,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             // avoid the namespace public/default is not owned in standalone mode
             TopicName topic = TopicName.get(TopicDomain.persistent.value(),
                     namespaceName, "__lookup__");
-            getPulsarService().getNamespaceService().getBrokerServiceUrlAsync(topic, true);
+            LookupOptions lookupOptions = LookupOptions.builder().authoritative(true).build();
+            getPulsarService().getNamespaceService().getBrokerServiceUrlAsync(topic, lookupOptions);
         }
         // Policies policies = getPolicies(namespaceName);
 //        if (policies != null) {

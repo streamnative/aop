@@ -40,6 +40,7 @@ import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.lookup.LookupResult;
+import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.namespace.NamespaceService;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.Subscription;
@@ -182,7 +183,7 @@ public abstract class AmqpProtocolTestBase {
         lookupCompletableFuture.complete(Optional.of(lookupResult));
         Mockito.when(connection.getPulsarService().getNamespaceService()).thenReturn(namespaceService);
         Mockito.when(namespaceService.getBrokerServiceUrlAsync(Mockito.any(TopicName.class),
-                Mockito.anyBoolean())).then(invocationOnMock -> {
+                Mockito.any(LookupOptions.class))).then(invocationOnMock -> {
             Object[] args = invocationOnMock.getArguments();
             Mockito.when(persistentTopic.getName()).thenReturn(args[0].toString());
             return lookupCompletableFuture;

@@ -232,13 +232,35 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
+    public void setProperty(String s, String s1) throws InterruptedException, ManagedLedgerException {
+
+    }
+
+    @Override
+    public void asyncSetProperty(String s, String s1, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback,
+                                 Object o) {
+
+    }
+
+    @Override
+    public void deleteProperty(String s) throws InterruptedException, ManagedLedgerException {
+
+    }
+
+    @Override
+    public void asyncDeleteProperty(String s, AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback,
+                                    Object o) {
+
+    }
+
+    @Override
     public void setProperties(Map<String, String> map) throws InterruptedException {
 
     }
 
     @Override
     public void asyncSetProperties(Map<String, String> map,
-                                   AsyncCallbacks.SetPropertiesCallback setPropertiesCallback, Object o) {
+                                   AsyncCallbacks.UpdatePropertiesCallback updatePropertiesCallback, Object o) {
 
     }
 

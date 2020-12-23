@@ -273,4 +273,11 @@ public class MockManagedLedger implements ManagedLedger {
     public void rollCurrentLedgerIfFull() {
 
     }
+
+    @Override
+    public ManagedCursor newNonDurableCursor(Position position, String s,
+                                             PulsarApi.CommandSubscribe.InitialPosition initialPosition)
+            throws ManagedLedgerException {
+        return null;
+    }
 }

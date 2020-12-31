@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.intercept.BrokerInterceptor;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Dispatcher;
@@ -156,6 +157,11 @@ public class MockSubscription implements Subscription {
 
     @Override
     public CompletableFuture<Void> endTxn(long l, long l1, int i) {
+        return null;
+    }
+
+    @Override
+    public BrokerInterceptor interceptor() {
         return null;
     }
 }

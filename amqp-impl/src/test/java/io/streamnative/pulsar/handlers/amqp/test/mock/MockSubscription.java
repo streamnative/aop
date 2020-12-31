@@ -33,8 +33,6 @@ import org.apache.pulsar.common.api.proto.PulsarApi;
  */
 public class MockSubscription implements Subscription {
 
-
-
     @Override public Topic getTopic() {
         return null;
     }
@@ -154,5 +152,10 @@ public class MockSubscription implements Subscription {
 
     @Override public void addUnAckedMessages(int unAckMessages) {
 
+    }
+
+    @Override
+    public CompletableFuture<Void> endTxn(long l, long l1, int i) {
+        return null;
     }
 }

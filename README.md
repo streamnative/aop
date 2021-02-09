@@ -414,7 +414,7 @@ To use proxy, complete the following steps. If you do not know some detailed ste
     ```
 
 ## Project Maintainer
-@wangshaojie4039
-@zhanghaou
-@codelipenghui
-@gaoran10
+[@wangshaojie4039](https://github.com/wangshaojie4039)
+[@zhanghaou](https://github.com/wangshaojie4039/zhanghaou)
+[@codelipenghui](https://github.com/codelipenghui)
+[@gaoran10](https://github.com/gaoran10)

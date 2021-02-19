@@ -123,8 +123,13 @@ public class MockSubscription implements Subscription {
         return null;
     }
 
-    @Override public void expireMessages(int messageTTLInSeconds) {
+    @Override public boolean expireMessages(int messageTTLInSeconds) {
+        return false;
+    }
 
+    @Override
+    public boolean expireMessages(Position position) {
+        return false;
     }
 
     @Override public void redeliverUnacknowledgedMessages(Consumer consumer) {

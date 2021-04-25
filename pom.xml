@@ -112,42 +112,42 @@
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-websocket</artifactId>
       <version>${pulsar.version}</version>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-broker</artifactId>
       <version>${pulsar.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.pulsar</groupId>
-      <artifactId>testmocks</artifactId>
-      <version>${pulsar.version}</version>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-broker-common</artifactId>
       <version>${pulsar.version}</version>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-original</artifactId>
       <version>${pulsar.version}</version>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-admin-original</artifactId>
       <version>${pulsar.version}</version>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-zookeeper-utils</artifactId>
       <version>${pulsar.version}</version>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
@@ -246,6 +246,12 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.apache.pulsar</groupId>
+      <artifactId>testmocks</artifactId>
+      <version>${pulsar.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

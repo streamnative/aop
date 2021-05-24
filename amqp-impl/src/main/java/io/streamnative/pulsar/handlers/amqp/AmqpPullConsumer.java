@@ -18,7 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.api.proto.KeySharedMeta;
 
 /**
  * Amqp consumer Used to return pull messages.
@@ -27,11 +28,11 @@ import org.apache.pulsar.common.api.proto.PulsarApi;
 public class AmqpPullConsumer extends AmqpConsumer {
 
     public AmqpPullConsumer(QueueContainer queueContainer, Subscription subscription,
-        PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
+        CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
         String consumerName, int maxUnackedMessages, ServerCnx cnx, String appId,
         Map<String, String> metadata, boolean readCompacted,
-        PulsarApi.CommandSubscribe.InitialPosition subscriptionInitialPosition,
-        PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
+        CommandSubscribe.InitialPosition subscriptionInitialPosition,
+        KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
         super(queueContainer, subscription, subType, topicName, consumerId, priorityLevel, consumerName,
                 maxUnackedMessages,

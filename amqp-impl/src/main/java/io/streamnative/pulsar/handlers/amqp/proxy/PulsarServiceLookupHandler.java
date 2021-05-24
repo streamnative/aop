@@ -108,6 +108,7 @@ public class PulsarServiceLookupHandler implements LookupHandler {
                     lookupResult.completeExceptionally(t);
                     return;
                 }
+                boolean match = false;
                 for (CompletableFuture<Optional<ServiceLookupData>> future : futureList) {
                     Optional<ServiceLookupData> optionalServiceLookupData = future.join();
                     if (!optionalServiceLookupData.isPresent()) {
@@ -134,12 +135,14 @@ public class PulsarServiceLookupHandler implements LookupHandler {
                     String port = splits[splits.length - 1];
                     int amqpBrokerPort = Integer.parseInt(port);
                     lookupResult.complete(Pair.of(hostName, amqpBrokerPort));
-                    return;
+                    match = true;
                 }
 
-                // no matching lookup data in all matchBrokers.
-                lookupResult.completeExceptionally(new ProxyException(
-                        String.format("Not able to search %s in all child of zk://loadbalance", pair.getLeft())));
+                if (!match) {
+                    // no matching lookup data in all matchBrokers.
+                    lookupResult.completeExceptionally(new ProxyException(
+                            String.format("Not able to search %s in all child of zk://loadbalance", pair.getLeft())));
+                }
             });
 
         });
@@ -147,7 +150,7 @@ public class PulsarServiceLookupHandler implements LookupHandler {
         return lookupResult;
     }
 
-    static boolean lookupDataContainsAddress(ServiceLookupData data, String hostAndPort) {
+    private static boolean lookupDataContainsAddress(ServiceLookupData data, String hostAndPort) {
         return (data.getPulsarServiceUrl() != null && data.getPulsarServiceUrl().contains(hostAndPort))
                 || (data.getPulsarServiceUrlTls() != null && data.getPulsarServiceUrlTls().contains(hostAndPort))
                 || (data.getWebServiceUrl() != null && data.getWebServiceUrl().contains(hostAndPort))

@@ -299,13 +299,13 @@ public class MockManagedLedger implements ManagedLedger {
     @Override
     public void asyncAddEntry(byte[] data, int numberOfMessages, int offset, int length,
                               AsyncCallbacks.AddEntryCallback callback, Object ctx) {
-
+        // nothing
     }
 
     @Override
     public void asyncAddEntry(ByteBuf buffer, int numberOfMessages,
                               AsyncCallbacks.AddEntryCallback callback, Object ctx) {
-
+        // nothing
     }
 
     @Override

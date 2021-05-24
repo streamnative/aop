@@ -13,13 +13,12 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
+import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-
-import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;

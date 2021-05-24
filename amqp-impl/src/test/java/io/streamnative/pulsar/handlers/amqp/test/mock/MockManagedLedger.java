@@ -291,17 +291,20 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public Position addEntry(byte[] data, int numberOfMessages, int offset, int length) throws InterruptedException, ManagedLedgerException {
+    public Position addEntry(byte[] data, int numberOfMessages, int offset, int length)
+            throws InterruptedException, ManagedLedgerException {
         return null;
     }
 
     @Override
-    public void asyncAddEntry(byte[] data, int numberOfMessages, int offset, int length, AsyncCallbacks.AddEntryCallback callback, Object ctx) {
+    public void asyncAddEntry(byte[] data, int numberOfMessages, int offset, int length,
+                              AsyncCallbacks.AddEntryCallback callback, Object ctx) {
 
     }
 
     @Override
-    public void asyncAddEntry(ByteBuf buffer, int numberOfMessages, AsyncCallbacks.AddEntryCallback callback, Object ctx) {
+    public void asyncAddEntry(ByteBuf buffer, int numberOfMessages,
+                              AsyncCallbacks.AddEntryCallback callback, Object ctx) {
 
     }
 

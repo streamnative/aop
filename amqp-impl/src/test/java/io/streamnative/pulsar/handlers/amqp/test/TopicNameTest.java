@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import static org.mockito.Mockito.mock;
+
 import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
@@ -25,8 +27,6 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.junit.Assert;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
-
-import static org.mockito.Mockito.mock;
 
 /**
  * Exchange and queue topic name validation test.

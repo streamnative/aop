@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import static org.mockito.Mockito.mock;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -67,8 +69,6 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
-
-import static org.mockito.Mockito.mock;
 
 /**
  * Base test for AMQP protocol tests.

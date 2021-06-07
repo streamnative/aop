@@ -24,7 +24,7 @@ import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
 
 /**
  * exchange topic and queue cursor manager.
@@ -71,7 +71,7 @@ public class AmqpTopicCursorManager implements Closeable {
                 }
                 ManagedCursor newCursor;
                 try {
-                    newCursor = ledger.openCursor(name, PulsarApi.CommandSubscribe.InitialPosition.Latest);
+                    newCursor = ledger.openCursor(name, CommandSubscribe.InitialPosition.Latest);
                 } catch (ManagedLedgerException | InterruptedException e) {
                     log.error("Error new cursor for topic {} - {}. will cause fetch data error.",
                         topic.getName(), e);

@@ -30,6 +30,7 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.loadbalance.LoadManager;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.pulsar.metadata.api.MetadataCache;
 import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
 import org.apache.pulsar.zookeeper.ZooKeeperCache;
 
@@ -85,6 +86,8 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
 
         // advertised data is write in  /loadbalance/brokers/advertisedAddress:webServicePort
         // here we get the broker url, need to find related webServiceUrl.
+        MetadataCache<ServiceLookupData> serviceLookupDataCache =
+                pulsarService.getLocalMetadataStore().getMetadataCache(ServiceLookupData.class);
         ZooKeeperCache zkCache = pulsarService.getLocalZkCache();
         zkCache.getChildrenAsync(LoadManager.LOADBALANCE_BROKERS_ROOT, zkCache)
                 .whenComplete((set, throwable) -> {
@@ -112,10 +115,8 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
                     // Get a list of ServiceLookupData for each matchBroker.
                     List<CompletableFuture<Optional<ServiceLookupData>>> list = matchBrokers.stream()
                             .map(matchBroker ->
-                                    zkCache.getDataAsync(
-                                            String.format("%s/%s", LoadManager.LOADBALANCE_BROKERS_ROOT, matchBroker),
-                                            (ZooKeeperCache.Deserializer<ServiceLookupData>)
-                                                    pulsarService.getLoadManager().get().getLoadReportDeserializer()))
+                                    serviceLookupDataCache.get(
+                                            String.format("%s/%s", LoadManager.LOADBALANCE_BROKERS_ROOT, matchBroker)))
                             .collect(Collectors.toList());
 
                     FutureUtil.waitForAll(list)

@@ -16,11 +16,13 @@ package io.streamnative.pulsar.handlers.amqp;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.netty.channel.EventLoopGroup;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.EnsemblePlacementPolicy;
 import org.apache.bookkeeper.client.PulsarMockBookKeeper;
+import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -33,6 +35,7 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.compaction.Compactor;
+import org.apache.pulsar.metadata.impl.ZKMetadataStore;
 import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
 import org.apache.pulsar.zookeeper.ZookeeperClientFactoryImpl;
 import org.apache.zookeeper.CreateMode;
@@ -84,7 +87,7 @@ public abstract class AmqpProtocolHandlerTestBase {
     protected final String configClusterName = "test";
 
     private SameThreadOrderedSafeExecutor sameThreadOrderedSafeExecutor;
-    private ExecutorService bkExecutor;
+    private OrderedExecutor bkExecutor;
 
     private int brokerCount = 1;
     @Getter
@@ -157,13 +160,10 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     protected final void init() throws Exception {
         sameThreadOrderedSafeExecutor = new SameThreadOrderedSafeExecutor();
-        bkExecutor = Executors.newSingleThreadExecutor(
-            new ThreadFactoryBuilder().setNameFormat("mock-pulsar-bk")
-                .setUncaughtExceptionHandler((thread, ex) -> log.info("Uncaught exception", ex))
-                .build());
+        bkExecutor = OrderedExecutor.newBuilder().numThreads(1).name("mock-pulsar-bk").build();
 
         mockZooKeeper = createMockZooKeeper();
-        mockBookKeeper = createMockBookKeeper(mockZooKeeper, bkExecutor);
+        mockBookKeeper = createMockBookKeeper(bkExecutor);
 
         startBroker();
 
@@ -284,6 +284,8 @@ public abstract class AmqpProtocolHandlerTestBase {
         // Override default providers with mocked ones
         doReturn(mockZooKeeperClientFactory).when(pulsar).getZooKeeperClientFactory();
         doReturn(mockBookKeeperClientFactory).when(pulsar).newBookKeeperClientFactory();
+        doReturn(new ZKMetadataStore(mockZooKeeper)).when(pulsar).createLocalMetadataStore();
+        doReturn(new ZKMetadataStore(mockZooKeeper)).when(pulsar).createConfigurationMetadataStore();
 
         Supplier<NamespaceService> namespaceServiceSupplier = () -> spy(new NamespaceService(pulsar));
         doReturn(namespaceServiceSupplier).when(pulsar).getNamespaceServiceProvider();
@@ -305,9 +307,8 @@ public abstract class AmqpProtocolHandlerTestBase {
         return zk;
     }
 
-    public static NonClosableMockBookKeeper createMockBookKeeper(ZooKeeper zookeeper,
-                                                                 ExecutorService executor) throws Exception {
-        return spy(new NonClosableMockBookKeeper(zookeeper, executor));
+    public static NonClosableMockBookKeeper createMockBookKeeper(OrderedExecutor executor) throws Exception {
+        return spy(new NonClosableMockBookKeeper(executor));
     }
 
     /**
@@ -315,8 +316,8 @@ public abstract class AmqpProtocolHandlerTestBase {
      */
     public static class NonClosableMockBookKeeper extends PulsarMockBookKeeper {
 
-        public NonClosableMockBookKeeper(ZooKeeper zk, ExecutorService executor) throws Exception {
-            super(zk, executor);
+        public NonClosableMockBookKeeper(OrderedExecutor executor) throws Exception {
+            super(executor);
         }
 
         @Override
@@ -348,10 +349,12 @@ public abstract class AmqpProtocolHandlerTestBase {
     private BookKeeperClientFactory mockBookKeeperClientFactory = new BookKeeperClientFactory() {
 
         @Override
-        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient,
-                                 Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
-                                 Map<String, Object> properties) {
-            // Always return the same instance (so that we don't loose the mock BK content on broker restart
+        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup, Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass, Map<String, Object> ensemblePlacementPolicyProperties) throws IOException {
+            return mockBookKeeper;
+        }
+
+        @Override
+        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup, Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass, Map<String, Object> ensemblePlacementPolicyProperties, StatsLogger statsLogger) throws IOException {
             return mockBookKeeper;
         }
 
@@ -360,12 +363,6 @@ public abstract class AmqpProtocolHandlerTestBase {
             // no-op
         }
 
-        @Override
-        public BookKeeper create(ServiceConfiguration serviceConfiguration, ZooKeeper zooKeeper,
-                                 Optional<Class<? extends EnsemblePlacementPolicy>> optional,
-                                 Map<String, Object> map, StatsLogger statsLogger) throws IOException {
-            return mockBookKeeper;
-        }
     };
 
     public static void retryStrategically(Predicate<Void> predicate, int retryCount, long intSleepTimeInMillis)

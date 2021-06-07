@@ -21,12 +21,14 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.intercept.BrokerInterceptor;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Dispatcher;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandAck;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
 
 /**
  * Subscription mock test.
@@ -41,10 +43,6 @@ public class MockSubscription implements Subscription {
         return null;
     }
 
-    @Override public void addConsumer(Consumer consumer) throws BrokerServiceException {
-
-    }
-
     @Override public void removeConsumer(Consumer consumer, boolean isResetCursor) throws BrokerServiceException {
 
     }
@@ -53,7 +51,7 @@ public class MockSubscription implements Subscription {
 
     }
 
-    @Override public void acknowledgeMessage(List<Position> positions, PulsarApi.CommandAck.AckType ackType,
+    @Override public void acknowledgeMessage(List<Position> positions, CommandAck.AckType ackType,
         Map<String, Long> properties) {
 
     }
@@ -122,10 +120,6 @@ public class MockSubscription implements Subscription {
         return null;
     }
 
-    @Override public void expireMessages(int messageTTLInSeconds) {
-
-    }
-
     @Override public void redeliverUnacknowledgedMessages(Consumer consumer) {
 
     }
@@ -142,7 +136,7 @@ public class MockSubscription implements Subscription {
         return 0;
     }
 
-    @Override public PulsarApi.CommandSubscribe.SubType getType() {
+    @Override public CommandSubscribe.SubType getType() {
         return null;
     }
 
@@ -155,7 +149,27 @@ public class MockSubscription implements Subscription {
     }
 
     @Override
-    public CompletableFuture<Void> endTxn(long l, long l1, int i) {
+    public BrokerInterceptor interceptor() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> addConsumer(Consumer consumer) {
+        return null;
+    }
+
+    @Override
+    public boolean expireMessages(int messageTTLInSeconds) {
+        return false;
+    }
+
+    @Override
+    public boolean expireMessages(Position position) {
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<Void> endTxn(long txnidMostBits, long txnidLeastBits, int txnAction, long lowWaterMark) {
         return null;
     }
 }

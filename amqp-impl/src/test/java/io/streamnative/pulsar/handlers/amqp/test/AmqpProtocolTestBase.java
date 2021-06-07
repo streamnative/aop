@@ -16,7 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
-import io.netty.util.concurrent.DefaultEventExecutor;
+import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
@@ -67,6 +67,8 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
+
+import static org.mockito.Mockito.mock;
 
 /**
  * Base test for AMQP protocol tests.
@@ -146,7 +148,7 @@ public abstract class AmqpProtocolTestBase {
 
     private void mockBrokerService() {
         brokerService = Mockito.mock(BrokerService.class);
-        Mockito.when(brokerService.executor()).thenReturn(new DefaultEventExecutor());
+        Mockito.when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
         Mockito.when(brokerService.pulsar()).thenReturn(pulsarService);
     }
 

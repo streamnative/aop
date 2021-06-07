@@ -42,6 +42,9 @@ jobs:
     - name: Spotbugs check
       run: mvn spotbugs:check
 
+    - name: amqp-impl tests
+      run: mvn test -DfailIfNoTests=false -pl amqp-impl
+
     - name: test after build
       run: mvn test -DfailIfNoTests=false -pl tests
 

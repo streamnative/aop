@@ -18,6 +18,7 @@ import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
+import io.netty.channel.EventLoopGroup;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -33,8 +34,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-
-import io.netty.channel.EventLoopGroup;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -346,12 +345,17 @@ public abstract class AmqpProtocolHandlerTestBase {
     private BookKeeperClientFactory mockBookKeeperClientFactory = new BookKeeperClientFactory() {
 
         @Override
-        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup, Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass, Map<String, Object> ensemblePlacementPolicyProperties) throws IOException {
+        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup,
+                                 Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
+                                 Map<String, Object> ensemblePlacementPolicyProperties) throws IOException {
             return mockBookKeeper;
         }
 
         @Override
-        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup, Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass, Map<String, Object> ensemblePlacementPolicyProperties, StatsLogger statsLogger) throws IOException {
+        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup,
+                                 Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
+                                 Map<String, Object> ensemblePlacementPolicyProperties, StatsLogger statsLogger)
+                throws IOException {
             return mockBookKeeper;
         }
 

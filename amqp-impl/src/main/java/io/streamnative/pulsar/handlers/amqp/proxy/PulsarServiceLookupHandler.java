@@ -27,6 +27,7 @@ import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.metadata.api.MetadataCache;
+import org.apache.pulsar.policies.data.loadbalancer.LocalBrokerData;
 import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
 
 /**
@@ -39,12 +40,12 @@ public class PulsarServiceLookupHandler implements LookupHandler {
 
     private PulsarClientImpl pulsarClient;
 
-    private MetadataCache<ServiceLookupData> serviceLookupDataCache;
+    private MetadataCache<LocalBrokerData> serviceLookupDataCache;
 
     public PulsarServiceLookupHandler(PulsarService pulsarService, PulsarClientImpl pulsarClient) {
         this.pulsarService = pulsarService;
         this.pulsarClient = pulsarClient;
-        this.serviceLookupDataCache = pulsarService.getLocalMetadataStore().getMetadataCache(ServiceLookupData.class);
+        this.serviceLookupDataCache = pulsarService.getLocalMetadataStore().getMetadataCache(LocalBrokerData.class);
     }
 
     @Override
@@ -73,7 +74,7 @@ public class PulsarServiceLookupHandler implements LookupHandler {
                 }
             }
 
-            List<CompletableFuture<Optional<ServiceLookupData>>> futureList = new ArrayList<>();
+            List<CompletableFuture<Optional<LocalBrokerData>>> futureList = new ArrayList<>();
             for (String webService : matchWebUri) {
                 String path = LoadManager.LOADBALANCE_BROKERS_ROOT + "/" + webService;
                 futureList.add(serviceLookupDataCache.get(path));
@@ -109,8 +110,8 @@ public class PulsarServiceLookupHandler implements LookupHandler {
                     return;
                 }
                 boolean match = false;
-                for (CompletableFuture<Optional<ServiceLookupData>> future : futureList) {
-                    Optional<ServiceLookupData> optionalServiceLookupData = future.join();
+                for (CompletableFuture<Optional<LocalBrokerData>> future : futureList) {
+                    Optional<LocalBrokerData> optionalServiceLookupData = future.join();
                     if (!optionalServiceLookupData.isPresent()) {
                         log.warn("Service lookup data is null.");
                         continue;

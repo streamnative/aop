@@ -71,6 +71,12 @@
       <artifactId>qpid-test-utils</artifactId>
       <version>${qpid-protocol-plugin.version}</version>
       <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>

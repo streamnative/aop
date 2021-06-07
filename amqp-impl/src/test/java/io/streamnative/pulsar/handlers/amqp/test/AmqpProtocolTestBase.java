@@ -144,6 +144,7 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(pulsarService.getConfiguration()).thenReturn(serviceConfiguration);
         Mockito.when(pulsarService.getOrderedExecutor()).thenReturn(
                 OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
+        Mockito.when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());
     }
 
     private void mockBrokerService() {

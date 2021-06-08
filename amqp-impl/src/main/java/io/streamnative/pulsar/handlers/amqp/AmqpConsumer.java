@@ -37,7 +37,9 @@ import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandAck;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.api.proto.KeySharedMeta;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**
@@ -70,11 +72,11 @@ public class AmqpConsumer extends Consumer {
     private final int maxPermits = 1000;
 
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
-        PulsarApi.CommandSubscribe.SubType subType, String topicName, long consumerId,
+        CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
         String appId, Map<String, String> metadata, boolean readCompacted,
-        PulsarApi.CommandSubscribe.InitialPosition subscriptionInitialPosition,
-        PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
+        CommandSubscribe.InitialPosition subscriptionInitialPosition,
+        KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta);
@@ -167,7 +169,7 @@ public class AmqpConsumer extends Consumer {
         incrementPermits(position.size());
         ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
         Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
-        getSubscription().acknowledgeMessage(position, PulsarApi.CommandAck.AckType.Individual, Collections.EMPTY_MAP);
+        getSubscription().acknowledgeMessage(position, CommandAck.AckType.Individual, Collections.EMPTY_MAP);
         if (!cursor.getMarkDeletedPosition().equals(previousMarkDeletePosition)) {
             asyncGetQueue().whenComplete((amqpQueue, throwable) -> {
                 if (throwable != null) {

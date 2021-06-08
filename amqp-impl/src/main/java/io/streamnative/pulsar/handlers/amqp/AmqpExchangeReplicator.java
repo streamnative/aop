@@ -29,7 +29,7 @@ import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.Backoff;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
 
 /**
  * Amqp exchange replicator, read entries from BookKeeper and process entries.
@@ -107,7 +107,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         log.info("{} Replicator is starting.", name);
 
         topic.getManagedLedger().asyncOpenCursor(cursorNamePre + persistentExchange.getName(),
-                PulsarApi.CommandSubscribe.InitialPosition.Earliest,
+                CommandSubscribe.InitialPosition.Earliest,
                 new AsyncCallbacks.OpenCursorCallback() {
                     @Override
                     public void openCursorComplete(ManagedCursor managedCursor, Object o) {
@@ -161,7 +161,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
                 if (log.isDebugEnabled()) {
                     log.debug("{} Schedule read of {} messages.", name, availablePermits);
                 }
-                cursor.asyncReadEntriesOrWait(availablePermits, defaultReadMaxSizeBytes, this, null);
+                cursor.asyncReadEntriesOrWait(availablePermits, defaultReadMaxSizeBytes, this, null, null);
             } else {
                 if (log.isDebugEnabled()) {
                     log.debug("{} Not schedule read due to pending read. Messages to read {}.",

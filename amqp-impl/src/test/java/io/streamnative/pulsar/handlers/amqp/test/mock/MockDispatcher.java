@@ -22,7 +22,8 @@ import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Dispatcher;
 import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.api.proto.MessageMetadata;
 import org.apache.pulsar.common.policies.data.Policies;
 
 /**
@@ -83,7 +84,7 @@ public class MockDispatcher implements Dispatcher {
 
     }
 
-    @Override public PulsarApi.CommandSubscribe.SubType getType() {
+    @Override public CommandSubscribe.SubType getType() {
         return null;
     }
 
@@ -114,7 +115,7 @@ public class MockDispatcher implements Dispatcher {
     }
 
     @Override
-    public boolean trackDelayedDelivery(long ledgerId, long entryId, PulsarApi.MessageMetadata msgMetadata) {
+    public boolean trackDelayedDelivery(long ledgerId, long entryId, MessageMetadata msgMetadata) {
         return false;
     }
 

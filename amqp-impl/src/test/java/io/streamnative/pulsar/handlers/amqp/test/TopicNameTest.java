@@ -13,7 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
-import io.netty.util.concurrent.DefaultEventExecutor;
+import static org.mockito.Mockito.mock;
+
+import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
@@ -39,8 +41,7 @@ public class TopicNameTest {
         ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
 
         BrokerService brokerService = Mockito.mock(BrokerService.class);
-        Mockito.when(brokerService.executor()).thenReturn(new DefaultEventExecutor());
-
+        Mockito.when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
         PersistentTopic exchangeTopic1 = Mockito.mock(PersistentTopic.class);
         Mockito.when(exchangeTopic1.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + exchangeName);
         Mockito.when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);

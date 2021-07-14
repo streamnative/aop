@@ -14,17 +14,22 @@
 
 package io.streamnative.pulsar.handlers.amqp.test.mock;
 
+import com.google.common.base.Predicate;
 import io.netty.buffer.ByteBuf;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
+import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.ManagedLedgerConfig;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.ManagedLedgerMXBean;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.bookkeeper.mledger.intercept.ManagedLedgerInterceptor;
+import org.apache.bookkeeper.mledger.proto.MLDataFormats;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
 
 /**
  * ManagedLedger mock test.
@@ -67,13 +72,13 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public ManagedCursor openCursor(String s, PulsarApi.CommandSubscribe.InitialPosition initialPosition)
+    public ManagedCursor openCursor(String s, CommandSubscribe.InitialPosition initialPosition)
             throws InterruptedException, ManagedLedgerException {
         return null;
     }
 
     @Override
-    public ManagedCursor openCursor(String s, PulsarApi.CommandSubscribe.InitialPosition initialPosition,
+    public ManagedCursor openCursor(String s, CommandSubscribe.InitialPosition initialPosition,
                                     Map<String, Long> map)
             throws InterruptedException, ManagedLedgerException {
         return null;
@@ -105,13 +110,13 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public void asyncOpenCursor(String s, PulsarApi.CommandSubscribe.InitialPosition initialPosition,
+    public void asyncOpenCursor(String s, CommandSubscribe.InitialPosition initialPosition,
                                 AsyncCallbacks.OpenCursorCallback openCursorCallback, Object o) {
 
     }
 
     @Override
-    public void asyncOpenCursor(String s, PulsarApi.CommandSubscribe.InitialPosition initialPosition,
+    public void asyncOpenCursor(String s, CommandSubscribe.InitialPosition initialPosition,
                                 Map<String, Long> map, AsyncCallbacks.OpenCursorCallback openCursorCallback, Object o) {
 
     }
@@ -276,8 +281,56 @@ public class MockManagedLedger implements ManagedLedger {
 
     @Override
     public ManagedCursor newNonDurableCursor(Position position, String s,
-                                             PulsarApi.CommandSubscribe.InitialPosition initialPosition)
+                                             CommandSubscribe.InitialPosition initialPosition)
             throws ManagedLedgerException {
+        return null;
+    }
+
+    @Override
+    public Position addEntry(byte[] data, int numberOfMessages) throws InterruptedException, ManagedLedgerException {
+        return null;
+    }
+
+    @Override
+    public Position addEntry(byte[] data, int numberOfMessages, int offset, int length)
+            throws InterruptedException, ManagedLedgerException {
+        return null;
+    }
+
+    @Override
+    public void asyncAddEntry(byte[] data, int numberOfMessages, int offset, int length,
+                              AsyncCallbacks.AddEntryCallback callback, Object ctx) {
+        // nothing
+    }
+
+    @Override
+    public void asyncAddEntry(ByteBuf buffer, int numberOfMessages,
+                              AsyncCallbacks.AddEntryCallback callback, Object ctx) {
+        // nothing
+    }
+
+    @Override
+    public CompletableFuture<Position> asyncFindPosition(Predicate<Entry> predicate) {
+        return null;
+    }
+
+    @Override
+    public ManagedLedgerInterceptor getManagedLedgerInterceptor() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<MLDataFormats.ManagedLedgerInfo.LedgerInfo> getLedgerInfo(long ledgerId) {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> asyncTruncate() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<ManagedLedgerInternalStats> getManagedLedgerInternalStats(boolean includeLedgerMetadata) {
         return null;
     }
 }

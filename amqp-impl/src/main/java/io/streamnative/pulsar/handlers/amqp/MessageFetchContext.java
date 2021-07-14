@@ -131,7 +131,7 @@ public final class MessageFetchContext {
             public void readEntriesFailed(ManagedLedgerException e, Object o) {
                 message.complete(null);
             }
-        }, null);
+        }, null, null);
 
     }
 

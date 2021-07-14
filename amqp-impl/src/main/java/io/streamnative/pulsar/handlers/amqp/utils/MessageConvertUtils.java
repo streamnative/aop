@@ -37,7 +37,8 @@ import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.api.TypedMessageBuilder;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.client.impl.TypedMessageBuilderImpl;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.KeyValue;
+import org.apache.pulsar.common.api.proto.MessageMetadata;
 import org.apache.pulsar.common.compression.CompressionCodecProvider;
 import org.apache.pulsar.common.protocol.Commands;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -162,40 +163,36 @@ public final class MessageConvertUtils {
         checkArgument(message instanceof MessageImpl);
 
         MessageImpl<byte[]> msg = (MessageImpl<byte[]>) message;
-        PulsarApi.MessageMetadata.Builder msgMetadataBuilder = msg.getMessageBuilder();
+        MessageMetadata msgMetadata = msg.getMessageBuilder();
         ByteBuf payload = msg.getDataBuffer();
 
         // filled in required fields
-        if (!msgMetadataBuilder.hasSequenceId()) {
-            msgMetadataBuilder.setSequenceId(-1);
+        if (!msgMetadata.hasSequenceId()) {
+            msgMetadata.setSequenceId(-1);
         }
-        if (!msgMetadataBuilder.hasPublishTime()) {
-            msgMetadataBuilder.setPublishTime(clock.millis());
+        if (!msgMetadata.hasPublishTime()) {
+            msgMetadata.setPublishTime(clock.millis());
         }
-        if (!msgMetadataBuilder.hasProducerName()) {
-            msgMetadataBuilder.setProducerName(FAKE_AMQP_PRODUCER_NAME);
+        if (!msgMetadata.hasProducerName()) {
+            msgMetadata.setProducerName(FAKE_AMQP_PRODUCER_NAME);
         }
 
-        msgMetadataBuilder.setCompression(
+        msgMetadata.setCompression(
                 CompressionCodecProvider.convertToWireProtocol(CompressionType.NONE));
-        msgMetadataBuilder.setUncompressedSize(payload.readableBytes());
-        PulsarApi.MessageMetadata msgMetadata = msgMetadataBuilder.build();
+        msgMetadata.setUncompressedSize(payload.readableBytes());
 
         ByteBuf buf = Commands.serializeMetadataAndPayload(Commands.ChecksumType.Crc32c, msgMetadata, payload);
-
-        msgMetadataBuilder.recycle();
-        msgMetadata.recycle();
-
+        msgMetadata.clear();
         return buf;
     }
 
     public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
-                                List<PulsarApi.KeyValue> propertiesList) throws UnsupportedEncodingException {
+                                List<KeyValue> propertiesList) throws UnsupportedEncodingException {
         BasicContentHeaderProperties props = new BasicContentHeaderProperties();
         Map<String, Object> headers = new HashMap<>();
         MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
 
-        for (PulsarApi.KeyValue keyValue : propertiesList) {
+        for (KeyValue keyValue : propertiesList) {
             switch (keyValue.getKey()) {
                 case PROP_CONTENT_TYPE:
                     props.setContentType(keyValue.getValue());
@@ -267,7 +264,7 @@ public final class MessageConvertUtils {
         for (Entry entry : entries) {
             // each entry is a batched message
             ByteBuf metadataAndPayload = entry.getDataBuffer();
-            PulsarApi.MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
+            MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
             int numMessages = msgMetadata.getNumMessagesInBatch();
             boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
             ByteBuf payload = metadataAndPayload.retain();
@@ -307,7 +304,7 @@ public final class MessageConvertUtils {
         //  then assemble deliver body with ContentHeaderBody and ContentBody
 
         ByteBuf metadataAndPayload = entry.getDataBuffer();
-        PulsarApi.MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
+        MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
         int numMessages = msgMetadata.getNumMessagesInBatch();
         boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
         ByteBuf payload = metadataAndPayload.retain();

@@ -44,7 +44,7 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.impl.MessageImpl;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -86,7 +86,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                     try {
                         MessageImpl<byte[]> message = MessageImpl.deserialize(entry.getDataBuffer());
                         props = message.getMessageBuilder().getPropertiesList().stream()
-                                .collect(Collectors.toMap(PulsarApi.KeyValue::getKey, PulsarApi.KeyValue::getValue));
+                                .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
                     } catch (IOException e) {
                         log.error("Deserialize entry dataBuffer failed. exchangeName: {}", exchangeName, e);
                         return FutureUtil.failedFuture(e);
@@ -245,7 +245,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             }
             ManagedCursor newCursor;
             try {
-                //newCursor = ledger.openCursor(name, PulsarApi.CommandSubscribe.InitialPosition.Latest);
+                //newCursor = ledger.openCursor(name, CommandSubscribe.InitialPosition.Latest);
                 newCursor = ledger.newNonDurableCursor(ledger.getLastConfirmedEntry(), name);
             } catch (ManagedLedgerException e) {
                 log.error("Error new cursor for topic {} - {}. will cause fetch data error.",

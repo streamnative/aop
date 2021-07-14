@@ -39,7 +39,7 @@ import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
-import org.apache.pulsar.common.api.proto.PulsarApi;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;
@@ -270,13 +270,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         try {
             if (subscription == null) {
                 subscription = topic.createSubscription(defaultSubscription,
-                    PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
+                    CommandSubscribe.InitialPosition.Earliest, false).get();
             }
             consumer = new AmqpConsumer(queueContainer, subscription, exclusive
-                    ? PulsarApi.CommandSubscribe.SubType.Exclusive :
-                PulsarApi.CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
+                    ? CommandSubscribe.SubType.Exclusive :
+                CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
                 consumerTag, 0, connection.getServerCnx(), "", null,
-                false, PulsarApi.CommandSubscribe.InitialPosition.Latest,
+                false, CommandSubscribe.InitialPosition.Latest,
                 null, this, consumerTag, queueName, ack);
             subscription.addConsumer(consumer);
             consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
@@ -378,13 +378,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         try {
                             if (subscription == null) {
                                 subscription = topic.createSubscription(defaultSubscription,
-                                        PulsarApi.CommandSubscribe.InitialPosition.Earliest, false).get();
+                                        CommandSubscribe.InitialPosition.Earliest, false).get();
                             }
                             consumer = new AmqpPullConsumer(queueContainer, subscription,
-                                    PulsarApi.CommandSubscribe.SubType.Shared,
+                                    CommandSubscribe.SubType.Shared,
                                     topic.getName(), 0, 0, "", 0,
                                     connection.getServerCnx(), "", null, false,
-                                    PulsarApi.CommandSubscribe.InitialPosition.Latest, null, this,
+                                    CommandSubscribe.InitialPosition.Latest, null, this,
                                     "", queueName, noAck);
                             subscription.addConsumer(consumer);
                             consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);

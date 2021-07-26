@@ -77,7 +77,7 @@ public class AmqpConsumer extends Consumer {
         PulsarApi.KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
-            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta);
+            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null);
         this.channel = channel;
         this.queueContainer = queueContainer;
         this.autoAck = autoAck;

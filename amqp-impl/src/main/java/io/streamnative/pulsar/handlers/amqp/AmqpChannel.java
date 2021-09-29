@@ -249,8 +249,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
         exceptionFuture.whenComplete((ignored, e) -> {
-            closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
-            log.error("BasicConsume error queue:{} consumerTag:{} ex {}", queueName, finalConsumerTag, e.getMessage());
+            if (e != null) {
+                closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
+                log.error("BasicConsume error queue:{} consumerTag:{} ex {}",
+                        queueName, finalConsumerTag, e.getMessage());
+            }
         });
 
         if (tag2ConsumersMap.containsKey(consumerTag)) {

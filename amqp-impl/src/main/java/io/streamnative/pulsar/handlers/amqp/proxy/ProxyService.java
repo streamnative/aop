@@ -29,7 +29,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
@@ -97,9 +96,7 @@ public class ProxyService implements Closeable {
             throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getAmqpProxyPort(), e);
         }
 
-        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder()
-                .serviceUrl(proxyConfig.getBrokerServiceURL())
-                .build();
+        this.pulsarClient = (PulsarClientImpl) this.pulsarService.getClient();
 
         this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
     }

@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
@@ -235,56 +234,61 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
                 } else {
                     PersistentTopic indexTopic = ((PersistentQueue) amqpQueue).getIndexTopic();
-                    try {
-                        AmqpConsumer consumer = subscribe(consumerTag1, queue.toString(), indexTopic,
-                                noAck, exclusive);
-                        if (!nowait) {
-                            MethodRegistry methodRegistry = connection.getMethodRegistry();
-                            AMQMethodBody responseBody = methodRegistry.
-                                    createBasicConsumeOkBody(AMQShortString.
-                                            createAMQShortString(consumer.getConsumerTag()));
-                            connection.writeFrame(responseBody.generateFrame(channelId));
-                        }
-                    } catch (Exception e) {
-                        closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
-                        log.error("BasicConsume error queue:{} consumerTag:{} ex {}",
-                                queue, consumerTag, e.getMessage());
-                    }
+                    subscribe(consumerTag1, queue.toString(), indexTopic, noAck, exclusive, nowait);
                 }
             }
         });
     }
 
-    private AmqpConsumer subscribe(String consumerTag, String queueName, Topic topic,
-        boolean ack, boolean exclusive) throws ConsumerTagInUseException,
-        InterruptedException, ExecutionException, BrokerServiceException {
+    private void subscribe(String consumerTag, String queueName, Topic topic,
+                           boolean ack, boolean exclusive, boolean nowait){
         if (consumerTag == null) {
             consumerTag = "consumerTag_" + getNextConsumerTag();
         }
+        final String finalConsumerTag = consumerTag;
+
+        CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
+        exceptionFuture.whenComplete((ignored, e) -> {
+            if (e != null) {
+                closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
+                log.error("BasicConsume error queue:{} consumerTag:{} ex {}",
+                        queueName, finalConsumerTag, e.getMessage());
+            }
+        });
 
         if (tag2ConsumersMap.containsKey(consumerTag)) {
-            throw new ConsumerTagInUseException("Consumer already exists with same consumerTag: " + consumerTag);
+            exceptionFuture.completeExceptionally(
+                    new ConsumerTagInUseException("Consumer already exists with same consumerTag: " + consumerTag));
         }
-        Subscription subscription = topic.getSubscription(defaultSubscription);
-        AmqpConsumer consumer;
-        try {
-            if (subscription == null) {
-                subscription = topic.createSubscription(defaultSubscription,
-                    CommandSubscribe.InitialPosition.Earliest, false).get();
+
+        CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
+                defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false);
+        subscriptionFuture.thenAccept(subscription -> {
+            AmqpConsumer consumer = null;
+            try {
+                consumer = new AmqpConsumer(queueContainer, subscription, exclusive
+                        ? CommandSubscribe.SubType.Exclusive :
+                        CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
+                        finalConsumerTag, 0, connection.getServerCnx(), "", null,
+                        false, CommandSubscribe.InitialPosition.Latest,
+                        null, this, finalConsumerTag, queueName, ack);
+            } catch (BrokerServiceException e) {
+                exceptionFuture.completeExceptionally(e);
+                return;
             }
-            consumer = new AmqpConsumer(queueContainer, subscription, exclusive
-                    ? CommandSubscribe.SubType.Exclusive :
-                CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
-                consumerTag, 0, connection.getServerCnx(), "", null,
-                false, CommandSubscribe.InitialPosition.Latest,
-                null, this, consumerTag, queueName, ack);
             subscription.addConsumer(consumer);
             consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
-            tag2ConsumersMap.put(consumerTag, consumer);
-        } catch (Exception e) {
-            throw e;
-        }
-        return consumer;
+            tag2ConsumersMap.put(finalConsumerTag, consumer);
+
+            if (!nowait) {
+                MethodRegistry methodRegistry = connection.getMethodRegistry();
+                AMQMethodBody responseBody = methodRegistry.
+                        createBasicConsumeOkBody(AMQShortString.
+                                createAMQShortString(consumer.getConsumerTag()));
+                connection.writeFrame(responseBody.generateFrame(channelId));
+            }
+            exceptionFuture.complete(null);
+        });
     }
 
     @Override

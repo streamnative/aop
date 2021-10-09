@@ -51,9 +51,9 @@ import org.testng.annotations.Test;
 public class RabbitMQMessagingTest extends AmqpTestBase {
 
     @Test(timeOut = 1000 * 5)
-    public void basic_consume_case_with_unknown_vhost() throws Exception {
-        String unknownVhost = "vhost_unknown";
-        Connection unknownConn = getConnection(unknownVhost, false);
+    public void basicConsumeCaseWithNewAddedHost() throws Exception {
+        String newAddedVhost = "vhost_new_added";
+        Connection unknownConn = getConnection(newAddedVhost, false);
         Channel unknownChannel = unknownConn.createChannel();
 
         try {
@@ -63,17 +63,17 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
             log.info("ignored errors");
         }
 
-        admin.namespaces().createNamespace("public/" + unknownVhost);
+        admin.namespaces().createNamespace("public/" + newAddedVhost);
         unknownConn.close();
-        basic_consume(unknownVhost);
+        basicConsume(newAddedVhost);
     }
 
     @Test(timeOut = 1000 * 5)
-    public void basic_consume_case() throws Exception {
-        basic_consume("vhost1");
+    public void basicConsumeCase() throws Exception {
+        basicConsume("vhost1");
     }
 
-    private void basic_consume(String vhost) throws Exception {
+    private void basicConsume(String vhost) throws Exception {
         String exchangeName = randExName();
         String routingKey = "test.key";
         String queueName = randQuName();
@@ -116,7 +116,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
     }
 
     @Test(timeOut = 1000 * 5)
-    void basic_consume_nack_case() throws IOException, TimeoutException, InterruptedException {
+    void basicConsumeNackCase() throws IOException, TimeoutException, InterruptedException {
         String exchangeName = randExName();
         String routingKey = "test.key";
         String queueName = randQuName();
@@ -164,7 +164,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
     }
 
     @Test(timeOut = 1000 * 5)
-    void redelivered_message_should_have_redelivery_marked_as_true() throws IOException, TimeoutException,
+    void redeliveredMessageShouldHaveRedeliveryMarkedAsTrue() throws IOException, TimeoutException,
         InterruptedException {
         String exchangeName = randExName();
         String routingKey = "test.key";

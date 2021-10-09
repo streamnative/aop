@@ -87,12 +87,12 @@ public class ExchangeContainer {
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     log.error("Failed to get topic from amqpTopicManager", throwable);
-                    amqpExchangeCompletableFuture.completeExceptionally(throwable);
+                    exchangeMap.get(namespaceName).remove(exchangeName).completeExceptionally(throwable);
                 } else {
                     if (null == topic) {
-                        log.info("The exchange topic did not exist. namespace{}, exchangeName: {}",
+                        log.warn("The exchange topic did not exist. namespace{}, exchangeName: {}",
                                 namespaceName.toString(), exchangeName);
-                        amqpExchangeCompletableFuture.complete(null);
+                        exchangeMap.get(namespaceName).remove(exchangeName).complete(null);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;

@@ -83,11 +83,11 @@ public class QueueContainer {
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     log.error("Failed to get topic from amqpTopicManager", throwable);
-                    queueCompletableFuture.completeExceptionally(throwable);
+                    queueMap.get(namespaceName).remove(queueName).completeExceptionally(throwable);
                 } else {
                     if (null == topic) {
                         log.info("Queue topic not existed, queueName:{}", queueName);
-                        queueCompletableFuture.complete(null);
+                        queueMap.get(namespaceName).remove(queueName).complete(null);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;

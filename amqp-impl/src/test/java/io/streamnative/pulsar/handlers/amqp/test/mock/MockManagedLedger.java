@@ -349,19 +349,4 @@ public class MockManagedLedger implements ManagedLedger {
         return null;
     }
 
-    @Override
-    public long getLastOffloadedLedgerId() {
-        return 0;
-    }
-
-    @Override
-    public long getLastOffloadedSuccessTimestamp() {
-        return 0;
-    }
-
-    @Override
-    public long getLastOffloadedFailureTimestamp() {
-        return 0;
-    }
-
 }

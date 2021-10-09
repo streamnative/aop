@@ -102,6 +102,9 @@ public class QueueContainer {
                         } catch (JsonProcessingException e) {
                             log.error("Json decode error in queue recover from properties", e);
                             queueCompletableFuture.completeExceptionally(e);
+                        } catch (Exception e) {
+                            log.error("Failed to recover routers for queue.", e);
+                            queueCompletableFuture.completeExceptionally(e);
                         }
                         queueCompletableFuture.complete(amqpQueue);
                     }

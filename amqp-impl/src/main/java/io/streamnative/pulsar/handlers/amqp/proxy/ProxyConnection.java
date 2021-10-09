@@ -120,7 +120,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-//        log.info("ProxyConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
         switch (state) {
             case Init:
             case RedirectLookup:
@@ -153,7 +152,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 log.info("ProxyConnection [channelRead] - closed");
                 break;
             default:
-                log.info("ProxyConnection [channelRead] - invalid state");
+                log.error("ProxyConnection [channelRead] - invalid state");
                 break;
         }
     }

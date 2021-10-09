@@ -169,71 +169,97 @@ public class ProxyHandler {
 
         @Override
         public void receiveConnectionStart(short i, short i1, FieldTable fieldTable, byte[] bytes, byte[] bytes1) {
-            log.info("ProxyBackendHandler [receiveConnectionStart]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionStart]");
+            }
         }
 
         @Override
         public void receiveConnectionSecure(byte[] bytes) {
-            log.info("ProxyBackendHandler [receiveConnectionSecure]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionSecure]");
+            }
         }
 
         @Override
         public void receiveConnectionRedirect(AMQShortString amqShortString, AMQShortString amqShortString1) {
-            log.info("ProxyBackendHandler [receiveConnectionRedirect]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionRedirect]");
+            }
         }
 
         @Override
         public void receiveConnectionTune(int i, long l, int i1) {
-            log.info("ProxyBackendHandler [receiveConnectionTune]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionTune]");
+            }
         }
 
         @Override
         public void receiveConnectionOpenOk(AMQShortString amqShortString) {
-            log.info("ProxyBackendHandler [receiveConnectionOpenOk]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionOpenOk]");
+            }
             proxyConnection.writeFrame(connectResponseBody.generateFrame(0));
             state = State.Connected;
         }
 
         @Override
         public ProtocolVersion getProtocolVersion() {
-            log.info("ProxyBackendHandler [getProtocolVersion]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [getProtocolVersion]");
+            }
             return null;
         }
 
         @Override
         public ClientChannelMethodProcessor getChannelMethodProcessor(int i) {
-            log.info("ProxyBackendHandler [getChannelMethodProcessor]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [getChannelMethodProcessor]");
+            }
             return null;
         }
 
         @Override
         public void receiveConnectionClose(int i, AMQShortString amqShortString, int i1, int i2) {
-            log.info("ProxyBackendHandler [receiveConnectionClose]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionClose]");
+            }
         }
 
         @Override
         public void receiveConnectionCloseOk() {
-            log.info("ProxyBackendHandler [receiveConnectionCloseOk]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveConnectionCloseOk]");
+            }
         }
 
         @Override
         public void receiveHeartbeat() {
-            log.info("ProxyBackendHandler [receiveHeartbeat]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveHeartbeat]");
+            }
         }
 
         @Override
         public void receiveProtocolHeader(ProtocolInitiation protocolInitiation) {
-            log.info("ProxyBackendHandler [receiveProtocolHeader]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [receiveProtocolHeader]");
+            }
         }
 
         @Override
         public void setCurrentMethod(int i, int i1) {
-            log.info("ProxyBackendHandler [setCurrentMethod]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [setCurrentMethod]");
+            }
         }
 
         @Override
         public boolean ignoreAllButCloseOk() {
-            log.info("ProxyBackendHandler [ignoreAllButCloseOk]");
+            if (log.isDebugEnabled()) {
+                log.debug("ProxyBackendHandler [ignoreAllButCloseOk]");
+            }
             return false;
         }
     }

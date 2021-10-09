@@ -120,6 +120,8 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setAllowAutoTopicCreation(true);
         amqpConfig.setAllowAutoTopicCreationType("partitioned");
         amqpConfig.setBrokerDeleteInactiveTopicsEnabled(false);
+        amqpConfig.setBrokerEntryMetadataInterceptors(
+                Sets.newHashSet("org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor"));
 
         // set protocol related config
         URL testHandlerUrl = this.getClass().getClassLoader().getResource("test-protocol-handler.nar");

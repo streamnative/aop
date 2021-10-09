@@ -348,4 +348,20 @@ public class MockManagedLedger implements ManagedLedger {
     public CompletableFuture<ManagedLedgerInternalStats> getManagedLedgerInternalStats(boolean includeLedgerMetadata) {
         return null;
     }
+
+    @Override
+    public long getLastOffloadedLedgerId() {
+        return 0;
+    }
+
+    @Override
+    public long getLastOffloadedSuccessTimestamp() {
+        return 0;
+    }
+
+    @Override
+    public long getLastOffloadedFailureTimestamp() {
+        return 0;
+    }
+
 }

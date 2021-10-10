@@ -60,13 +60,13 @@ public class ExchangeContainer {
                                                             String exchangeType) {
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = new CompletableFuture<>();
         if (StringUtils.isEmpty(exchangeType) && createIfMissing) {
-            log.error("exchangeType should be set when createIfMissing is true");
+            log.error("[{}][{}] ExchangeType should be set when createIfMissing is true.", namespaceName, exchangeName);
             amqpExchangeCompletableFuture.completeExceptionally(
                     new IllegalArgumentException("exchangeType should be set when createIfMissing is true"));
             return amqpExchangeCompletableFuture;
         }
         if (namespaceName == null || StringUtils.isEmpty(exchangeName)) {
-            log.error("Parameter error, namespaceName or exchangeName is empty.");
+            log.error("[{}][{}] Parameter error, namespaceName or exchangeName is empty.", namespaceName, exchangeName);
             amqpExchangeCompletableFuture.completeExceptionally(
                     new IllegalArgumentException("NamespaceName or exchangeName is empty"));
             return amqpExchangeCompletableFuture;
@@ -86,13 +86,15 @@ public class ExchangeContainer {
             CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
-                    log.error("Failed to get topic from amqpTopicManager", throwable);
-                    exchangeMap.get(namespaceName).remove(exchangeName).completeExceptionally(throwable);
+                    log.error("[{}][{}] Failed to get topic from amqpTopicManager.",
+                            namespaceName, exchangeName, throwable);
+                    amqpExchangeCompletableFuture.completeExceptionally(throwable);
+                    exchangeMap.get(namespaceName).remove(exchangeName);
                 } else {
                     if (null == topic) {
-                        log.warn("The exchange topic did not exist. namespace{}, exchangeName: {}",
-                                namespaceName.toString(), exchangeName);
-                        exchangeMap.get(namespaceName).remove(exchangeName).complete(null);
+                        log.warn("[{}][{}] The exchange topic did not exist.", namespaceName, exchangeName);
+                        amqpExchangeCompletableFuture.complete(null);
+                        exchangeMap.get(namespaceName).remove(exchangeName);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;

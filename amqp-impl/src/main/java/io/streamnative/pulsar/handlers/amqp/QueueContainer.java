@@ -14,7 +14,6 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;

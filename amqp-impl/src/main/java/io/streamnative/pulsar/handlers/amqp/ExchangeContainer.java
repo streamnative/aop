@@ -89,12 +89,12 @@ public class ExchangeContainer {
                     log.error("[{}][{}] Failed to get topic from amqpTopicManager.",
                             namespaceName, exchangeName, throwable);
                     amqpExchangeCompletableFuture.completeExceptionally(throwable);
-                    exchangeMap.get(namespaceName).remove(exchangeName);
+                    removeExchangeFuture(namespaceName, exchangeName);
                 } else {
                     if (null == topic) {
                         log.warn("[{}][{}] The exchange topic did not exist.", namespaceName, exchangeName);
                         amqpExchangeCompletableFuture.complete(null);
-                        exchangeMap.get(namespaceName).remove(exchangeName);
+                        removeExchangeFuture(namespaceName, exchangeName);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;
@@ -128,6 +128,10 @@ public class ExchangeContainer {
         if (StringUtils.isEmpty(exchangeName)) {
             return;
         }
+        removeExchangeFuture(namespaceName, exchangeName);
+    }
+
+    private void removeExchangeFuture(NamespaceName namespaceName, String exchangeName) {
         if (exchangeMap.containsKey(namespaceName)) {
             exchangeMap.get(namespaceName).remove(exchangeName);
         }

@@ -84,12 +84,12 @@ public class QueueContainer {
                     log.error("[{}][{}] Failed to get topic from amqpTopicManager.",
                             namespaceName, queueName, throwable);
                     queueCompletableFuture.completeExceptionally(throwable);
-                    queueMap.get(namespaceName).remove(queueName);
+                    removeQueueFuture(namespaceName, queueName);
                 } else {
                     if (null == topic) {
                         log.warn("[{}][{}] Queue topic did not exist.", namespaceName, queueName);
                         queueCompletableFuture.complete(null);
-                        queueMap.get(namespaceName).remove(queueName);
+                        removeQueueFuture(namespaceName, queueName);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;
@@ -105,7 +105,8 @@ public class QueueContainer {
                             log.error("[{}][{}] Failed to recover routers for queue from properties.",
                                     namespaceName, queueName, e);
                             queueCompletableFuture.completeExceptionally(e);
-                            queueMap.get(namespaceName).remove(queueName);
+                            removeQueueFuture(namespaceName, queueName);
+                            return;
                         }
                         queueCompletableFuture.complete(amqpQueue);
                     }
@@ -125,6 +126,10 @@ public class QueueContainer {
         if (StringUtils.isEmpty(queueName)) {
             return;
         }
+        removeQueueFuture(namespaceName, queueName);
+    }
+
+    private void removeQueueFuture(NamespaceName namespaceName, String queueName) {
         if (queueMap.containsKey(namespaceName)) {
             queueMap.get(namespaceName).remove(queueName);
         }

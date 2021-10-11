@@ -14,7 +14,6 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -61,7 +60,7 @@ public class QueueContainer {
                                                       boolean createIfMissing) {
         CompletableFuture<AmqpQueue> queueCompletableFuture = new CompletableFuture<>();
         if (namespaceName == null || StringUtils.isEmpty(queueName)) {
-            log.error("Parameter error, namespaceName or queueName is empty.");
+            log.error("[{}][{}] Parameter error, namespaceName or queueName is empty.", namespaceName, queueName);
             queueCompletableFuture.completeExceptionally(
                     new IllegalArgumentException("NamespaceName or queueName is empty"));
             return queueCompletableFuture;
@@ -82,12 +81,15 @@ public class QueueContainer {
                     amqpTopicManager.getTopic(topicName, createIfMissing);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
-                    log.error("Failed to get topic from amqpTopicManager", throwable);
+                    log.error("[{}][{}] Failed to get topic from amqpTopicManager.",
+                            namespaceName, queueName, throwable);
                     queueCompletableFuture.completeExceptionally(throwable);
+                    removeQueueFuture(namespaceName, queueName);
                 } else {
                     if (null == topic) {
-                        log.info("Queue topic not existed, queueName:{}", queueName);
+                        log.warn("[{}][{}] Queue topic did not exist.", namespaceName, queueName);
                         queueCompletableFuture.complete(null);
+                        removeQueueFuture(namespaceName, queueName);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;
@@ -99,12 +101,12 @@ public class QueueContainer {
                         try {
                             amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
                                     namespaceName);
-                        } catch (JsonProcessingException e) {
-                            log.error("Json decode error in queue recover from properties", e);
-                            queueCompletableFuture.completeExceptionally(e);
                         } catch (Exception e) {
-                            log.error("Failed to recover routers for queue.", e);
+                            log.error("[{}][{}] Failed to recover routers for queue from properties.",
+                                    namespaceName, queueName, e);
                             queueCompletableFuture.completeExceptionally(e);
+                            removeQueueFuture(namespaceName, queueName);
+                            return;
                         }
                         queueCompletableFuture.complete(amqpQueue);
                     }
@@ -124,6 +126,10 @@ public class QueueContainer {
         if (StringUtils.isEmpty(queueName)) {
             return;
         }
+        removeQueueFuture(namespaceName, queueName);
+    }
+
+    private void removeQueueFuture(NamespaceName namespaceName, String queueName) {
         if (queueMap.containsKey(namespaceName)) {
             queueMap.get(namespaceName).remove(queueName);
         }

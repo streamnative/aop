@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.collect.ImmutableMap;
@@ -29,6 +30,7 @@ import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.ServiceConfigurationUtils;
 import org.apache.pulsar.broker.protocol.ProtocolHandler;
 import org.apache.pulsar.broker.service.BrokerService;
+import org.apache.pulsar.policies.data.loadbalancer.AdvertisedListener;
 
 /**
  * Amqp Protocol Handler load and run by Pulsar Service.
@@ -37,7 +39,7 @@ import org.apache.pulsar.broker.service.BrokerService;
 public class AmqpProtocolHandler implements ProtocolHandler {
 
     public static final String PROTOCOL_NAME = "amqp";
-    public static final String SSL_PREFIX = "SSL://";
+    public static final String SSL_PREFIX = "amqp+ssl://";
     public static final String PLAINTEXT_PREFIX = "amqp://";
     public static final String LISTENER_DEL = ",";
     public static final String LISTENER_PATTEN = "^(amqp)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-0-9+]";
@@ -94,9 +96,12 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             proxyConfig.setAmqpMaxFrameSize(amqpConfig.getAmqpMaxFrameSize());
             proxyConfig.setAmqpHeartBeat(amqpConfig.getAmqpHeartBeat());
             proxyConfig.setAmqpProxyPort(amqpConfig.getAmqpProxyPort());
-            proxyConfig.setBrokerServiceURL("pulsar://"
-                    + ServiceConfigurationUtils.getAppliedAdvertisedAddress(amqpConfig, true) + ":"
-                    + amqpConfig.getBrokerServicePort().get());
+
+            AdvertisedListener internalListener = ServiceConfigurationUtils.getInternalListener(amqpConfig);
+            checkArgument(internalListener.getBrokerServiceUrl() != null,
+                    "plaintext must be configured on internal listener");
+            proxyConfig.setBrokerServiceURL(internalListener.getBrokerServiceUrl().toString());
+
             ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
             try {
                 proxyService.start();

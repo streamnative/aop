@@ -98,7 +98,7 @@ public class ProxyService implements Closeable {
 
         this.pulsarClient = (PulsarClientImpl) this.pulsarService.getClient();
 
-        this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
+        this.lookupHandler = new PulsarServiceLookupHandler(proxyConfig, pulsarService, pulsarClient);
     }
 
     private void releaseConnection(String namespaceName) {
@@ -121,6 +121,9 @@ public class ProxyService implements Closeable {
 
     @Override
     public void close() throws IOException {
+        if (pulsarClient != null) {
+            pulsarClient.close();
+        }
         if (listenChannel != null) {
             listenChannel.close();
         }

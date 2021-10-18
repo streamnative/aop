@@ -28,12 +28,9 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.lookup.LookupResult;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.resources.MetadataStoreCacheLoader;
-import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.lookup.data.LookupData;
 import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.metadata.api.MetadataCache;
 import org.apache.pulsar.policies.data.loadbalancer.LoadManagerReport;
-import org.apache.pulsar.policies.data.loadbalancer.LocalBrokerData;
 
 /**
  * The proxy start with broker, use this lookup handler to find broker.
@@ -66,7 +63,8 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                         LookupOptions.builder().authoritative(true).loadTopicsInBundle(false).build());
         lookup.whenComplete((result, throwable) -> {
             if (!result.isPresent()) {
-                lookupResult.completeExceptionally(new ProxyException("Unable to resolve the broker for the topic: " + topicName));
+                lookupResult.completeExceptionally(new ProxyException(
+                        "Unable to resolve the broker for the topic: " + topicName));
                 return;
             }
             LookupData lookupData = result.get().getLookupData();
@@ -76,13 +74,15 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
             Optional<LoadManagerReport> serviceLookupData =
                     brokers.stream().filter(b -> matches(lookupData, b)).findAny();
             if (!serviceLookupData.isPresent()) {
-                lookupResult.completeExceptionally(new ProxyException("Unable to locate metadata for the broker of the topic: " + topicName));
+                lookupResult.completeExceptionally(new ProxyException(
+                        "Unable to locate metadata for the broker of the topic: " + topicName));
                 return;
             }
 
             Optional<String> protocolData = serviceLookupData.get().getProtocol(protocolHandlerName);
             if (!protocolData.isPresent()) {
-                lookupResult.completeExceptionally(new ProxyException("No protocol data is available for the broker of the topic: "+ topicName));
+                lookupResult.completeExceptionally(new ProxyException(
+                        "No protocol data is available for the broker of the topic: " + topicName));
                 return;
             }
 

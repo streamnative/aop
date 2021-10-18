@@ -45,18 +45,12 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
 
     private PulsarService pulsarService;
 
-    private PulsarClientImpl pulsarClient;
-
-    private MetadataCache<LocalBrokerData> serviceLookupDataCache;
-
     private MetadataStoreCacheLoader metadataStoreCacheLoader;
 
-    public PulsarServiceLookupHandler(ProxyConfiguration proxyConfig, PulsarService pulsarService, PulsarClientImpl pulsarClient)
+    public PulsarServiceLookupHandler(ProxyConfiguration proxyConfig, PulsarService pulsarService)
             throws Exception {
         this.proxyConfig = proxyConfig;
         this.pulsarService = pulsarService;
-        this.pulsarClient = pulsarClient;
-        this.serviceLookupDataCache = pulsarService.getLocalMetadataStore().getMetadataCache(LocalBrokerData.class);
         this.metadataStoreCacheLoader = new MetadataStoreCacheLoader(pulsarService.getPulsarResources(),
                 proxyConfig.getBrokerLookupTimeoutSeconds());
     }
@@ -72,7 +66,7 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                         LookupOptions.builder().authoritative(true).loadTopicsInBundle(false).build());
         lookup.whenComplete((result, throwable) -> {
             if (!result.isPresent()) {
-                lookupResult.completeExceptionally(new ProxyException("Unable to resolve the broker for the topic"));
+                lookupResult.completeExceptionally(new ProxyException("Unable to resolve the broker for the topic: " + topicName));
                 return;
             }
             LookupData lookupData = result.get().getLookupData();
@@ -82,18 +76,19 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
             Optional<LoadManagerReport> serviceLookupData =
                     brokers.stream().filter(b -> matches(lookupData, b)).findAny();
             if (!serviceLookupData.isPresent()) {
-                lookupResult.completeExceptionally(new ProxyException("Unable to locate metadata for the broker of the topic"));
+                lookupResult.completeExceptionally(new ProxyException("Unable to locate metadata for the broker of the topic: " + topicName));
                 return;
             }
 
             Optional<String> protocolData = serviceLookupData.get().getProtocol(protocolHandlerName);
             if (!protocolData.isPresent()) {
-                lookupResult.completeExceptionally(new ProxyException("No protocol data is available for the broker of the topic"));
+                lookupResult.completeExceptionally(new ProxyException("No protocol data is available for the broker of the topic: "+ topicName));
                 return;
             }
 
             String amqpBrokerAddress = protocolData.get();
-            if (!StringUtils.startsWith(amqpBrokerAddress, AmqpProtocolHandler.PLAINTEXT_PREFIX)) {
+            if (!StringUtils.startsWith(amqpBrokerAddress, AmqpProtocolHandler.PLAINTEXT_PREFIX)
+                && !StringUtils.startsWith(amqpBrokerAddress, AmqpProtocolHandler.SSL_PREFIX)) {
                 amqpBrokerAddress = AmqpProtocolHandler.PLAINTEXT_PREFIX + amqpBrokerAddress;
             }
             URI amqpBrokerUri;
@@ -116,6 +111,6 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
 
     @Override
     public void close() throws IOException {
-
+        this.metadataStoreCacheLoader.close();
     }
 }

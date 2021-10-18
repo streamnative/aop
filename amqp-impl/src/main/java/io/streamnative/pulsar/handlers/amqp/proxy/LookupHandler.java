@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
+import java.io.Closeable;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.common.naming.TopicName;
@@ -20,7 +21,7 @@ import org.apache.pulsar.common.naming.TopicName;
 /**
  * Lookup handler.
  */
-public interface LookupHandler {
+public interface LookupHandler extends Closeable {
 
     /**
      * Find broker for protocolHandler.

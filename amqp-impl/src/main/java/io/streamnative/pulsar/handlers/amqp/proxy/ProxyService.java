@@ -41,11 +41,8 @@ public class ProxyService implements Closeable {
 
     @Getter
     private ProxyConfiguration proxyConfig;
-    private String serviceUrl;
     @Getter
     private PulsarService pulsarService;
-    @Getter
-    private PulsarClientImpl pulsarClient;
     @Getter
     private LookupHandler lookupHandler;
 
@@ -96,9 +93,7 @@ public class ProxyService implements Closeable {
             throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getAmqpProxyPort(), e);
         }
 
-        this.pulsarClient = (PulsarClientImpl) this.pulsarService.getClient();
-
-        this.lookupHandler = new PulsarServiceLookupHandler(proxyConfig, pulsarService, pulsarClient);
+        this.lookupHandler = new PulsarServiceLookupHandler(proxyConfig, pulsarService);
     }
 
     private void releaseConnection(String namespaceName) {
@@ -121,8 +116,8 @@ public class ProxyService implements Closeable {
 
     @Override
     public void close() throws IOException {
-        if (pulsarClient != null) {
-            pulsarClient.close();
+        if (lookupHandler != null) {
+            lookupHandler.close();
         }
         if (listenChannel != null) {
             listenChannel.close();

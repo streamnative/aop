@@ -38,15 +38,12 @@ import org.apache.pulsar.policies.data.loadbalancer.LoadManagerReport;
 @Slf4j
 public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
 
-    private ProxyConfiguration proxyConfig;
+    private final PulsarService pulsarService;
 
-    private PulsarService pulsarService;
-
-    private MetadataStoreCacheLoader metadataStoreCacheLoader;
+    private final MetadataStoreCacheLoader metadataStoreCacheLoader;
 
     public PulsarServiceLookupHandler(ProxyConfiguration proxyConfig, PulsarService pulsarService)
             throws Exception {
-        this.proxyConfig = proxyConfig;
         this.pulsarService = pulsarService;
         this.metadataStoreCacheLoader = new MetadataStoreCacheLoader(pulsarService.getPulsarResources(),
                 proxyConfig.getBrokerLookupTimeoutSeconds());

@@ -59,6 +59,10 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                 .getBrokerServiceUrlAsync(topicName,
                         LookupOptions.builder().authoritative(true).loadTopicsInBundle(false).build());
         lookup.whenComplete((result, throwable) -> {
+            if (throwable != null) {
+                lookupResult.completeExceptionally(throwable);
+                return;
+            }
             if (!result.isPresent()) {
                 lookupResult.completeExceptionally(new ProxyException(
                         "Unable to resolve the broker for the topic: " + topicName));

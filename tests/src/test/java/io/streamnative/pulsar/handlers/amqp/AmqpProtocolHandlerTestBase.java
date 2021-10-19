@@ -59,7 +59,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.MockZooKeeper;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
-import org.mockito.Mockito;
 
 /**
  * Unit test to test AoP handler.

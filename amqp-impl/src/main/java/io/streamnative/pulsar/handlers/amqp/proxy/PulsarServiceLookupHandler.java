@@ -60,7 +60,7 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                 lookupResult.completeExceptionally(throwable);
                 return;
             }
-            if (result == null) {
+            if (result == null || result.getLeft() == null) {
                 lookupResult.completeExceptionally(new ProxyException(
                         "Unable to resolve the broker for the topic: " + topicName));
                 return;
@@ -102,9 +102,9 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
         return lookupResult;
     }
 
-    private static boolean matches(String webHostAndPort, LoadManagerReport serviceData) {
-        return StringUtils.contains(serviceData.getWebServiceUrl(), webHostAndPort)
-            || StringUtils.contains(serviceData.getWebServiceUrl(), webHostAndPort);
+    private static boolean matches(String hostAndPort, LoadManagerReport serviceData) {
+        return StringUtils.contains(serviceData.getPulsarServiceUrl(), hostAndPort)
+            || StringUtils.contains(serviceData.getPulsarServiceUrlTls(), hostAndPort);
     }
 
     @Override

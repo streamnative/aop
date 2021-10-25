@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -25,10 +26,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.lookup.LookupResult;
-import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.resources.MetadataStoreCacheLoader;
-import org.apache.pulsar.common.lookup.data.LookupData;
+import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.policies.data.loadbalancer.LoadManagerReport;
 
@@ -38,13 +37,12 @@ import org.apache.pulsar.policies.data.loadbalancer.LoadManagerReport;
 @Slf4j
 public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
 
-    private final PulsarService pulsarService;
-
+    private final PulsarClientImpl pulsarClient;
     private final MetadataStoreCacheLoader metadataStoreCacheLoader;
 
     public PulsarServiceLookupHandler(ProxyConfiguration proxyConfig, PulsarService pulsarService)
             throws Exception {
-        this.pulsarService = pulsarService;
+        this.pulsarClient = (PulsarClientImpl) pulsarService.getClient();
         this.metadataStoreCacheLoader = new MetadataStoreCacheLoader(pulsarService.getPulsarResources(),
                 proxyConfig.getBrokerLookupTimeoutSeconds());
     }
@@ -55,25 +53,24 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
         CompletableFuture<Pair<String, Integer>> lookupResult = new CompletableFuture<>();
 
         // lookup the broker for the given topic
-        CompletableFuture<Optional<LookupResult>> lookup = pulsarService.getNamespaceService()
-                .getBrokerServiceUrlAsync(topicName,
-                        LookupOptions.builder().authoritative(true).loadTopicsInBundle(false).build());
+        CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> lookup =
+                pulsarClient.getLookup().getBroker(topicName);
         lookup.whenComplete((result, throwable) -> {
             if (throwable != null) {
                 lookupResult.completeExceptionally(throwable);
                 return;
             }
-            if (!result.isPresent()) {
+            if (result == null) {
                 lookupResult.completeExceptionally(new ProxyException(
                         "Unable to resolve the broker for the topic: " + topicName));
                 return;
             }
-            LookupData lookupData = result.get().getLookupData();
+            String hostAndPort = result.getLeft().toString();
 
             // fetch the protocol handler data
             List<LoadManagerReport> brokers = metadataStoreCacheLoader.getAvailableBrokers();
             Optional<LoadManagerReport> serviceLookupData =
-                    brokers.stream().filter(b -> matches(lookupData, b)).findAny();
+                    brokers.stream().filter(b -> matches(hostAndPort, b)).findAny();
             if (!serviceLookupData.isPresent()) {
                 lookupResult.completeExceptionally(new ProxyException(
                         "Unable to locate metadata for the broker of the topic: " + topicName));
@@ -105,9 +102,9 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
         return lookupResult;
     }
 
-    private static boolean matches(LookupData lookupData, LoadManagerReport serviceData) {
-        return StringUtils.equals(lookupData.getBrokerUrl(), serviceData.getPulsarServiceUrl())
-            || StringUtils.equals(lookupData.getBrokerUrlTls(), serviceData.getPulsarServiceUrlTls());
+    private static boolean matches(String webHostAndPort, LoadManagerReport serviceData) {
+        return StringUtils.contains(serviceData.getWebServiceUrl(), webHostAndPort)
+            || StringUtils.contains(serviceData.getWebServiceUrl(), webHostAndPort);
     }
 
     @Override

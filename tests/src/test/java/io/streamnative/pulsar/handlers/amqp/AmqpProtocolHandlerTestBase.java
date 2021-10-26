@@ -59,7 +59,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.MockZooKeeper;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
-import org.mockito.Mockito;
 
 /**
  * Unit test to test AoP handler.
@@ -293,6 +292,7 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     public static MockZooKeeper createMockZooKeeper() throws Exception {
         MockZooKeeper zk = MockZooKeeper.newInstance(MoreExecutors.newDirectExecutorService());
+        zk.setSessionId(-1);
         List<ACL> dummyAclList = new ArrayList<>(0);
 
         ZkUtils.createFullPathOptimistic(zk, "/ledgers/available/192.168.1.1:" + 5000,
@@ -387,7 +387,7 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     public void checkPulsarServiceState() {
         for (PulsarService pulsarService : pulsarServiceList) {
-            Mockito.when(pulsarService.getState()).thenReturn(PulsarService.State.Started);
+            doReturn(PulsarService.State.Started).when(pulsarService).getState();
         }
     }
 

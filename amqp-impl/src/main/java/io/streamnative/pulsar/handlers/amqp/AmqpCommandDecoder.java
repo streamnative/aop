@@ -14,25 +14,13 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.loadbalance.LoadManager;
-import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.common.util.FutureUtil;
-import org.apache.pulsar.metadata.api.MetadataCache;
-import org.apache.pulsar.policies.data.loadbalancer.ServiceLookupData;
-import org.apache.pulsar.zookeeper.ZooKeeperCache;
 
 
 /**
@@ -66,105 +54,6 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
     }
 
     abstract void close();
-
-    protected CompletableFuture<Optional<String>>
-    getProtocolDataToAdvertise(InetSocketAddress pulsarAddress,
-                               TopicName topic) {
-        CompletableFuture<Optional<String>> returnFuture = new CompletableFuture<>();
-
-        if (pulsarAddress == null) {
-            log.error("[{}] failed get pulsar address, returned null.", topic.toString());
-
-            returnFuture.complete(Optional.empty());
-            return returnFuture;
-        }
-
-        if (log.isDebugEnabled()) {
-            log.debug("Found broker for topic {} puslarAddress: {}",
-                    topic, pulsarAddress);
-        }
-
-        // advertised data is write in  /loadbalance/brokers/advertisedAddress:webServicePort
-        // here we get the broker url, need to find related webServiceUrl.
-        MetadataCache<ServiceLookupData> serviceLookupDataCache =
-                pulsarService.getLocalMetadataStore().getMetadataCache(ServiceLookupData.class);
-        ZooKeeperCache zkCache = pulsarService.getLocalZkCache();
-        zkCache.getChildrenAsync(LoadManager.LOADBALANCE_BROKERS_ROOT, zkCache)
-                .whenComplete((set, throwable) -> {
-                    if (throwable != null) {
-                        log.error("Error in getChildrenAsync(zk://loadbalance) for {}", pulsarAddress, throwable);
-                        returnFuture.complete(Optional.empty());
-                        return;
-                    }
-
-                    String hostAndPort = pulsarAddress.getHostName() + ":" + pulsarAddress.getPort();
-                    List<String> matchBrokers = Lists.newArrayList();
-                    // match host part of url
-                    for (String activeBroker : set) {
-                        if (activeBroker.startsWith(pulsarAddress.getHostName() + ":")) {
-                            matchBrokers.add(activeBroker);
-                        }
-                    }
-
-                    if (matchBrokers.isEmpty()) {
-                        log.error("No node for broker {} under zk://loadbalance", pulsarAddress);
-                        returnFuture.complete(Optional.empty());
-                        return;
-                    }
-
-                    // Get a list of ServiceLookupData for each matchBroker.
-                    List<CompletableFuture<Optional<ServiceLookupData>>> list = matchBrokers.stream()
-                            .map(matchBroker ->
-                                    serviceLookupDataCache.get(
-                                            String.format("%s/%s", LoadManager.LOADBALANCE_BROKERS_ROOT, matchBroker)))
-                            .collect(Collectors.toList());
-
-                    FutureUtil.waitForAll(list)
-                        .whenComplete((ignore, th) -> {
-                            if (th != null) {
-                                log.error("Error in getDataAsync() for {}", pulsarAddress, th);
-                                returnFuture.complete(Optional.empty());
-                                return;
-                            }
-
-                            try {
-                                for (CompletableFuture<Optional<ServiceLookupData>> lookupData : list) {
-                                    ServiceLookupData data = lookupData.get().get();
-                                    if (log.isDebugEnabled()) {
-                                        log.debug("Handle getProtocolDataToAdvertise for {}, pulsarUrl: {}, "
-                                                        + "pulsarUrlTls: {}, webUrl: {}, webUrlTls: {} amqp: {}",
-                                                topic, data.getPulsarServiceUrl(), data.getPulsarServiceUrlTls(),
-                                                data.getWebServiceUrl(), data.getWebServiceUrlTls(),
-                                                data.getProtocol(AmqpProtocolHandler.PROTOCOL_NAME));
-                                    }
-
-                                    if (lookupDataContainsAddress(data, hostAndPort)) {
-                                        returnFuture.complete(data.getProtocol(AmqpProtocolHandler.PROTOCOL_NAME));
-                                        return;
-                                    }
-                                }
-                            } catch (Exception e) {
-                                log.error("Error in {} lookupFuture get: ", pulsarAddress, e);
-                                returnFuture.complete(Optional.empty());
-                                return;
-                            }
-
-                            // no matching lookup data in all matchBrokers.
-                            log.error("Not able to search {} in all child of zk://loadbalance", pulsarAddress);
-                            returnFuture.complete(Optional.empty());
-                        }
-                        );
-                });
-        return returnFuture;
-    }
-
-    // whether a ServiceLookupData contains wanted address.
-    static boolean lookupDataContainsAddress(ServiceLookupData data, String hostAndPort) {
-        return (data.getPulsarServiceUrl() != null && data.getPulsarServiceUrl().contains(hostAndPort))
-                || (data.getPulsarServiceUrlTls() != null && data.getPulsarServiceUrlTls().contains(hostAndPort))
-                || (data.getWebServiceUrl() != null && data.getWebServiceUrl().contains(hostAndPort))
-                || (data.getWebServiceUrlTls() != null && data.getWebServiceUrlTls().contains(hostAndPort));
-    }
 
     public PulsarService getPulsarService() {
         return pulsarService;

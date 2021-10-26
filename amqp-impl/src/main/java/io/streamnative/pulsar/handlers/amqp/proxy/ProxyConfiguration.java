@@ -73,4 +73,9 @@ public class ProxyConfiguration {
     )
     private String brokerServiceURL;
 
+    @FieldContext(
+            category = CATEGORY_BROKER_DISCOVERY,
+            doc = "The timeout for broker lookups (in seconds)"
+    )
+    private int brokerLookupTimeoutSeconds = 30;
 }

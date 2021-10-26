@@ -29,7 +29,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
 
@@ -41,11 +40,8 @@ public class ProxyService implements Closeable {
 
     @Getter
     private ProxyConfiguration proxyConfig;
-    private String serviceUrl;
     @Getter
     private PulsarService pulsarService;
-    @Getter
-    private PulsarClientImpl pulsarClient;
     @Getter
     private LookupHandler lookupHandler;
 
@@ -96,9 +92,7 @@ public class ProxyService implements Closeable {
             throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getAmqpProxyPort(), e);
         }
 
-        this.pulsarClient = (PulsarClientImpl) this.pulsarService.getClient();
-
-        this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
+        this.lookupHandler = new PulsarServiceLookupHandler(proxyConfig, pulsarService);
     }
 
     private void releaseConnection(String namespaceName) {
@@ -121,6 +115,9 @@ public class ProxyService implements Closeable {
 
     @Override
     public void close() throws IOException {
+        if (lookupHandler != null) {
+            lookupHandler.close();
+        }
         if (listenChannel != null) {
             listenChannel.close();
         }

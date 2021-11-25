@@ -89,7 +89,6 @@ public final class MessagePublishContext implements PublishContext {
      * publish amqp message to pulsar topic, no batch.
      */
     public static void publishMessages(Message<byte[]> message, Topic topic, CompletableFuture<Position> future) {
-        ByteBuf headerAndPayload = messageToByteBuf(message);
         CompletableFuture<PositionImpl> positionFuture = new CompletableFuture<>();
         positionFuture.whenComplete((position, throwable) -> {
             if (throwable != null) {
@@ -97,10 +96,14 @@ public final class MessagePublishContext implements PublishContext {
             } else {
                 future.complete(position);
             }
-            headerAndPayload.release();
         });
 
-        topic.publishMessage(headerAndPayload,
-                MessagePublishContext.get(positionFuture, topic, System.nanoTime()));
+        ByteBuf headerAndPayload = messageToByteBuf(message);
+        try {
+            topic.publishMessage(headerAndPayload,
+                    MessagePublishContext.get(positionFuture, topic, System.nanoTime()));
+        } finally {
+            headerAndPayload.release();
+        }
     }
 }

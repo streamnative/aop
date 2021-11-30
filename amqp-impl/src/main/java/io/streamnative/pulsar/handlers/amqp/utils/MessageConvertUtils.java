@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.utils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-
 import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -371,7 +370,8 @@ public final class MessageConvertUtils {
         try {
             long ledgerId = payload.readLong();
             long entryId = payload.readLong();
-            String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1).toString();
+            String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1)
+                    .toString();
             return IndexMessage.create(exchangeName, ledgerId, entryId);
         } finally {
             payload.release();

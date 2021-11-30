@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.utils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-
 import com.google.common.collect.ImmutableList;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -337,11 +336,10 @@ public final class MessageConvertUtils {
             } else {
                 // currently, no consider for batch
             }
+            return amqpMessage;
         } finally {
             metadataAndPayload.release();
         }
-
-        return amqpMessage;
     }
 
     private static String byteToString(byte b) throws UnsupportedEncodingException {

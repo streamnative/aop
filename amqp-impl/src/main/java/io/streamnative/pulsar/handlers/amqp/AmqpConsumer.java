@@ -119,12 +119,7 @@ public class AmqpConsumer extends Consumer {
                     // Entry was filtered out
                     continue;
                 }
-                IndexMessage indexMessage;
-                try {
-                    indexMessage = MessageConvertUtils.entryToIndexMessage(index);
-                } finally {
-                    index.getDataBuffer().release();
-                }
+                IndexMessage indexMessage = MessageConvertUtils.entryToIndexMessage(index);
                 if (indexMessage == null) {
                     continue;
                 }
@@ -149,8 +144,6 @@ public class AmqpConsumer extends Consumer {
                                             AMQShortString.createAMQShortString(consumerTag));
                                 } catch (UnsupportedEncodingException e) {
                                     log.error("sendMessages UnsupportedEncodingException", e);
-                                } finally {
-                                    msg.getDataBuffer().release();
                                 }
 
                                 if (autoAck) {

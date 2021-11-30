@@ -304,37 +304,41 @@ public final class MessageConvertUtils {
         //  then assemble deliver body with ContentHeaderBody and ContentBody
 
         ByteBuf metadataAndPayload = entry.getDataBuffer();
-        MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
-        int numMessages = msgMetadata.getNumMessagesInBatch();
-        boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
-        ByteBuf payload = metadataAndPayload.retain();
+        try {
+            MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
+            int numMessages = msgMetadata.getNumMessagesInBatch();
+            boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
+            ByteBuf payload = metadataAndPayload.retain();
 
-        if (log.isDebugEnabled()) {
-            log.debug("entryToRecord.  NumMessagesInBatch: {}, isBatchMessage: {}."
-                    + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
-                numMessages, !notBatchMessage, entry.getLedgerId(),
-                entry.getEntryId(), payload.readerIndex(), payload.writerIndex());
-        }
+            if (log.isDebugEnabled()) {
+                log.debug("entryToRecord.  NumMessagesInBatch: {}, isBatchMessage: {}."
+                        + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
+                    numMessages, !notBatchMessage, entry.getLedgerId(),
+                    entry.getEntryId(), payload.readerIndex(), payload.writerIndex());
+            }
 
-        // need handle encryption
-        checkState(msgMetadata.getEncryptionKeysCount() == 0);
+            // need handle encryption
+            checkState(msgMetadata.getEncryptionKeysCount() == 0);
 
-        if (notBatchMessage) {
-            Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
-                getPropertiesFromMetadata(msgMetadata.getPropertiesList());
+            if (notBatchMessage) {
+                Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
+                    getPropertiesFromMetadata(msgMetadata.getPropertiesList());
 
-            ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
-            contentHeaderBody.setBodySize(payload.readableBytes());
+                ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
+                contentHeaderBody.setBodySize(payload.readableBytes());
 
-            byte[] data = new byte[payload.readableBytes()];
-            payload.readBytes(data);
-            amqpMessage = AmqpMessageData.builder()
-                .messagePublishInfo(metaData.getRight())
-                .contentHeaderBody(contentHeaderBody)
-                .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
-                .build();
-        } else {
-            // currently, no consider for batch
+                byte[] data = new byte[payload.readableBytes()];
+                payload.readBytes(data);
+                amqpMessage = AmqpMessageData.builder()
+                    .messagePublishInfo(metaData.getRight())
+                    .contentHeaderBody(contentHeaderBody)
+                    .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
+                    .build();
+            } else {
+                // currently, no consider for batch
+            }
+        } finally {
+            metadataAndPayload.release();
         }
 
         return amqpMessage;
@@ -362,13 +366,17 @@ public final class MessageConvertUtils {
     // Currently, one entry consist of one IndexMessage info
     public static IndexMessage entryToIndexMessage(Entry entry) {
         ByteBuf metadataAndPayload = entry.getDataBuffer();
-        Commands.parseMessageMetadata(metadataAndPayload);
-        ByteBuf payload = metadataAndPayload.retain();
+        try {
+            Commands.parseMessageMetadata(metadataAndPayload);
+            ByteBuf payload = metadataAndPayload.retain();
 
-        long ledgerId = payload.readLong();
-        long entryId = payload.readLong();
-        String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1).toString();
-        return IndexMessage.create(exchangeName, ledgerId, entryId);
+            long ledgerId = payload.readLong();
+            long entryId = payload.readLong();
+            String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1).toString();
+            return IndexMessage.create(exchangeName, ledgerId, entryId);
+        } finally {
+            metadataAndPayload.release();
+        }
     }
 
     public static Map<String, Object> getHeaders(Message<byte[]> message) {

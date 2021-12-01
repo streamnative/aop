@@ -153,10 +153,10 @@ public class AmqpConsumer extends Consumer {
                                 } else {
                                     messagesAck(index.getPosition());
                                 }
-                                indexMessage.recycle();
                             } finally {
                                 msg.release();
                                 index.release();
+                                indexMessage.recycle();
                             }
                         })).exceptionally(throwable -> {
                             log.error("Failed to get queue from queue container", throwable);

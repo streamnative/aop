@@ -304,12 +304,11 @@ public final class MessageConvertUtils {
         //  then assemble deliver body with ContentHeaderBody and ContentBody
 
         ByteBuf metadataAndPayload = entry.getDataBuffer();
+        MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
+        int numMessages = msgMetadata.getNumMessagesInBatch();
+        boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
+        ByteBuf payload = metadataAndPayload.retain();
         try {
-            MessageMetadata msgMetadata = Commands.parseMessageMetadata(metadataAndPayload);
-            int numMessages = msgMetadata.getNumMessagesInBatch();
-            boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
-            ByteBuf payload = metadataAndPayload.retain();
-
             if (log.isDebugEnabled()) {
                 log.debug("entryToRecord.  NumMessagesInBatch: {}, isBatchMessage: {}."
                         + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
@@ -339,7 +338,7 @@ public final class MessageConvertUtils {
             }
             return amqpMessage;
         } finally {
-            metadataAndPayload.release();
+            payload.release();
         }
     }
 

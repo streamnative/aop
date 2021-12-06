@@ -126,35 +126,38 @@ public class AmqpConsumer extends Consumer {
                 asyncGetQueue().thenApply(amqpQueue -> amqpQueue.readEntryAsync(
                         indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
                         .whenComplete((msg, ex) -> {
-                            if (ex == null) {
-                                long deliveryTag = channel.getNextDeliveryTag();
+                            try {
+                                if (ex == null) {
+                                    long deliveryTag = channel.getNextDeliveryTag();
 
-                                addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                                        (PositionImpl) msg.getPosition());
-                                if (!autoAck) {
-                                    channel.getUnacknowledgedMessageMap().add(deliveryTag,
-                                            index.getPosition(), this, msg.getLength());
-                                }
+                                    addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
+                                            (PositionImpl) msg.getPosition());
+                                    if (!autoAck) {
+                                        channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                                index.getPosition(), this, msg.getLength());
+                                    }
 
-                                try {
-                                    connection.getAmqpOutputConverter().writeDeliver(
-                                            MessageConvertUtils.entryToAmqpBody(msg),
-                                            channel.getChannelId(), getRedeliveryTracker().
-                                                    contains(index.getPosition()), deliveryTag,
-                                            AMQShortString.createAMQShortString(consumerTag));
-                                } catch (UnsupportedEncodingException e) {
-                                    log.error("sendMessages UnsupportedEncodingException", e);
-                                }
+                                    try {
+                                        connection.getAmqpOutputConverter().writeDeliver(
+                                                MessageConvertUtils.entryToAmqpBody(msg),
+                                                channel.getChannelId(), getRedeliveryTracker().
+                                                        contains(index.getPosition()), deliveryTag,
+                                                AMQShortString.createAMQShortString(consumerTag));
+                                    } catch (UnsupportedEncodingException e) {
+                                        log.error("sendMessages UnsupportedEncodingException", e);
+                                    }
 
-                                if (autoAck) {
+                                    if (autoAck) {
+                                        messagesAck(index.getPosition());
+                                    }
+                                } else {
                                     messagesAck(index.getPosition());
                                 }
-                            } else {
-                                messagesAck(index.getPosition());
+                            } finally {
+                                msg.release();
+                                index.release();
+                                indexMessage.recycle();
                             }
-                            msg.release();
-                            index.release();
-                            indexMessage.recycle();
                         })).exceptionally(throwable -> {
                             log.error("Failed to get queue from queue container", throwable);
                             return null;

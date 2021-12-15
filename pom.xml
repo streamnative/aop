@@ -43,7 +43,7 @@
     <grpc.version>1.18.0</grpc.version>
     <jackson.version>2.11.0</jackson.version>
     <jcommander.version>1.48</jcommander.version>
-    <log4j2.version>2.13.3</log4j2.version>
+    <log4j2.version>2.16.0</log4j2.version>
     <lombok.version>1.18.4</lombok.version>
     <mockito.version>2.22.0</mockito.version>
     <pulsar.version>2.8.1.5</pulsar.version>

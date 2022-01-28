@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -53,6 +54,7 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.common.lookup.data.LookupData;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.policies.data.HierarchyTopicPolicies;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -151,6 +153,7 @@ public abstract class AmqpProtocolTestBase {
         brokerService = Mockito.mock(BrokerService.class);
         Mockito.when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
         Mockito.when(brokerService.pulsar()).thenReturn(pulsarService);
+        Mockito.when(brokerService.getPulsar()).thenReturn(pulsarService);
     }
 
     private void initDefaultExchange() {
@@ -167,6 +170,7 @@ public abstract class AmqpProtocolTestBase {
 
         CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
         Subscription subscription = Mockito.mock(Subscription.class);
+        Mockito.when(subscription.getTopic()).thenReturn(persistentTopic);
         subFuture.complete(subscription);
         Mockito.when(persistentTopic.createSubscription(Mockito.anyString(),
                 Mockito.any(), Mockito.anyBoolean())).thenReturn(subFuture);
@@ -177,6 +181,7 @@ public abstract class AmqpProtocolTestBase {
         CompletableFuture deleteCpm = new CompletableFuture<>();
         Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);
         deleteCpm.complete(null);
+        Mockito.when(persistentTopic.getHierarchyTopicPolicies()).thenReturn(spy(new HierarchyTopicPolicies()));
 
         completableFuture.complete(persistentTopic);
         NamespaceService namespaceService = Mockito.mock(NamespaceService.class);

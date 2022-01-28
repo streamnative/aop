@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarServerException;
@@ -21,6 +22,8 @@ import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.AbstractTopic;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
+import org.apache.pulsar.common.policies.data.InactiveTopicPolicies;
 
 /**
  * Exchange and queue topic manager.
@@ -28,7 +31,9 @@ import org.apache.pulsar.common.naming.TopicName;
 @Slf4j
 public class AmqpTopicManager {
 
-    private PulsarService pulsarService;
+    private final PulsarService pulsarService;
+
+    private volatile Field fenceField;
 
     public AmqpTopicManager(PulsarService pulsarService) {
         this.pulsarService = pulsarService;
@@ -66,16 +71,24 @@ public class AmqpTopicManager {
                                     topicCompletableFuture.complete(null);
                                     return;
                                 }
+
+                                if (!topicOptional.isPresent()) {
+                                    log.error("Get empty topic for name {}", topicName);
+                                    topicCompletableFuture.complete(null);
+                                    return;
+                                }
+
+                                AbstractTopic persistentTopic = (AbstractTopic) topicOptional.get();
+                                if (checkTopicIsFenced(persistentTopic, topicCompletableFuture)) {
+                                    return;
+                                }
+
                                 try {
-                                    if (topicOptional.isPresent()) {
-                                        Topic topic = topicOptional.get();
-                                        AbstractTopic abstractTopic = (AbstractTopic) topic;
-                                        abstractTopic.setDeleteWhileInactive(false);
-                                        topicCompletableFuture.complete(topic);
-                                    } else {
-                                        log.error("Get empty topic for name {}", topicName);
-                                        topicCompletableFuture.complete(null);
-                                    }
+                                    persistentTopic.getHierarchyTopicPolicies()
+                                            .getInactiveTopicPolicies().updateTopicValue(new InactiveTopicPolicies(
+                                                    InactiveTopicDeleteMode.delete_when_no_subscriptions,
+                                            1000, false));
+                                    topicCompletableFuture.complete(persistentTopic);
                                 } catch (Exception e) {
                                     log.error("Failed to get client in registerInPersistentTopic {}. "
                                             + "exception:", topicName, e);
@@ -84,6 +97,24 @@ public class AmqpTopicManager {
                             });
                 });
         return topicCompletableFuture;
+    }
+
+    private boolean checkTopicIsFenced(Topic topic, CompletableFuture<Topic> topicCompletableFuture) {
+        try {
+            if (fenceField == null) {
+                fenceField = AbstractTopic.class.getDeclaredField("isFenced");
+                fenceField.setAccessible(true);
+            }
+            boolean isFenced = fenceField.getBoolean(topic);
+            if (isFenced) {
+                topicCompletableFuture.completeExceptionally(
+                        new RuntimeException("The topic " + topic.getName() + " is already fenced."));
+            }
+            return isFenced;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            topicCompletableFuture.completeExceptionally(e);
+            return true;
+        }
     }
 
 }

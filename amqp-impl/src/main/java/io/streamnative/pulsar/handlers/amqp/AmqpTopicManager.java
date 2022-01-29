@@ -50,51 +50,53 @@ public class AmqpTopicManager {
             topicCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService is not set."));
             return topicCompletableFuture;
         }
-        // setup ownership of service unit to this broker
-        LookupOptions lookupOptions = LookupOptions.builder().authoritative(true).build();
-        pulsarService.getNamespaceService().getBrokerServiceUrlAsync(TopicName.get(topicName), lookupOptions).
-                whenComplete((addr, th) -> {
-                    log.info("Find getBrokerServiceUrl {}, return Topic: {}", addr, topicName);
-                    if (th != null || addr == null || addr.get() == null) {
-                        log.warn("Failed getBrokerServiceUrl {}, return null Topic. throwable: ", topicName, th);
+        TopicName tpName = TopicName.get(topicName);
+        // Check the namespace first to make sure the namespace is existing.
+        pulsarService.getPulsarResources().getNamespaceResources().getPoliciesAsync(tpName.getNamespaceObject())
+                .thenCompose(policies -> {
+                    if (!policies.isPresent()) {
+                        throw new RuntimeException("Policies not found for " + tpName.getNamespace() + " namespace");
+                    }
+                    // setup ownership of service unit to this broker
+                    return pulsarService.getNamespaceService().getBrokerServiceUrlAsync(
+                            tpName, LookupOptions.builder().authoritative(true).build());
+                })
+                .thenCompose(lookupOp -> {
+                    if (!lookupOp.isPresent()) {
+                        throw new RuntimeException("Failed to perform lookup operation for " + topicName);
+                    }
+
+                    if (log.isDebugEnabled()) {
+                        log.debug("Get broker service url for {}. lookupResult: {}",
+                                topicName, lookupOp.get().getLookupData().getBrokerUrl());
+                    }
+                    return pulsarService.getBrokerService().getTopic(topicName, createIfMissing);
+                })
+                .thenAccept(topicOp -> {
+                    if (!topicOp.isPresent()) {
+                        log.error("Get empty topic for name {}", topicName);
                         topicCompletableFuture.complete(null);
                         return;
                     }
-                    if (log.isDebugEnabled()) {
-                        log.debug("getBrokerServiceUrl for {} in ExchangeTopicManager. brokerAddress: {}",
-                                topicName, addr.get().getLookupData().getBrokerUrl());
+
+                    AbstractTopic persistentTopic = (AbstractTopic) topicOp.get();
+                    if (checkTopicIsFenced(persistentTopic, topicCompletableFuture)) {
+                        return;
                     }
-                    pulsarService.getBrokerService().getTopic(topicName, createIfMissing)
-                            .whenComplete((topicOptional, throwable) -> {
-                                if (throwable != null) {
-                                    log.error("Failed to getTopic {}. exception: {}", topicName, throwable);
-                                    topicCompletableFuture.complete(null);
-                                    return;
-                                }
 
-                                if (!topicOptional.isPresent()) {
-                                    log.error("Get empty topic for name {}", topicName);
-                                    topicCompletableFuture.complete(null);
-                                    return;
-                                }
-
-                                AbstractTopic persistentTopic = (AbstractTopic) topicOptional.get();
-                                if (checkTopicIsFenced(persistentTopic, topicCompletableFuture)) {
-                                    return;
-                                }
-
-                                try {
-                                    persistentTopic.getHierarchyTopicPolicies()
-                                            .getInactiveTopicPolicies().updateTopicValue(new InactiveTopicPolicies(
-                                                    InactiveTopicDeleteMode.delete_when_no_subscriptions,
-                                            1000, false));
-                                    topicCompletableFuture.complete(persistentTopic);
-                                } catch (Exception e) {
-                                    log.error("Failed to get client in registerInPersistentTopic {}. "
-                                            + "exception:", topicName, e);
-                                    topicCompletableFuture.complete(null);
-                                }
-                            });
+                    try {
+                        persistentTopic.getHierarchyTopicPolicies().getInactiveTopicPolicies()
+                                .updateTopicValue(new InactiveTopicPolicies(
+                                        InactiveTopicDeleteMode.delete_when_no_subscriptions, 1000, false));
+                        topicCompletableFuture.complete(persistentTopic);
+                    } catch (Exception e) {
+                        log.error("Failed to get client in registerInPersistentTopic {}. ", topicName, e);
+                        topicCompletableFuture.complete(null);
+                    }
+                })
+                .exceptionally(throwable -> {
+                    topicCompletableFuture.completeExceptionally(throwable);
+                    return null;
                 });
         return topicCompletableFuture;
     }

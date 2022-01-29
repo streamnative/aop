@@ -81,8 +81,7 @@ public class QueueContainer {
                     amqpTopicManager.getTopic(topicName, createIfMissing);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
-                    log.error("[{}][{}] Failed to get topic from amqpTopicManager.",
-                            namespaceName, queueName, throwable);
+                    log.error("[{}][{}] Failed to get queue topic.", namespaceName, queueName, throwable);
                     queueCompletableFuture.completeExceptionally(throwable);
                     removeQueueFuture(namespaceName, queueName);
                 } else {

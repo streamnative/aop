@@ -64,7 +64,9 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         }
 
         admin.namespaces().createNamespace("public/" + newAddedVhost);
-        unknownConn.close();
+        if (unknownConn.isOpen()) {
+            unknownConn.close();
+        }
         basicConsume(newAddedVhost);
     }
 

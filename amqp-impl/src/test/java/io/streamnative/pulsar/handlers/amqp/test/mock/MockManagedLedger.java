@@ -349,4 +349,8 @@ public class MockManagedLedger implements ManagedLedger {
         return 0;
     }
 
+    @Override
+    public CompletableFuture<Long> getEarliestMessagePublishTimeInBacklog() {
+        return null;
+    }
 }

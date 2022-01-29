@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
@@ -45,6 +46,8 @@ import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.lookup.LookupResult;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.namespace.NamespaceService;
+import org.apache.pulsar.broker.resources.NamespaceResources;
+import org.apache.pulsar.broker.resources.PulsarResources;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
@@ -55,6 +58,7 @@ import org.apache.pulsar.common.lookup.data.LookupData;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.HierarchyTopicPolicies;
+import org.apache.pulsar.common.policies.data.Policies;
 import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -147,6 +151,13 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(pulsarService.getOrderedExecutor()).thenReturn(
                 OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
         Mockito.when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());
+
+        NamespaceResources namespaceResources = Mockito.mock(NamespaceResources.class);
+        Mockito.when(namespaceResources.getPoliciesAsync(any()))
+                .thenReturn(CompletableFuture.completedFuture(Optional.of(new Policies())));
+        PulsarResources pulsarResources = Mockito.mock(PulsarResources.class);
+        Mockito.when(pulsarResources.getNamespaceResources()).thenReturn(namespaceResources);
+        Mockito.when(pulsarService.getPulsarResources()).thenReturn(pulsarResources);
     }
 
     private void mockBrokerService() {

@@ -16,14 +16,17 @@ package io.streamnative.pulsar.handlers.amqp;
 import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.clients.exceptions.NamespaceNotFoundException;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.AbstractTopic;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
 import org.apache.pulsar.common.policies.data.InactiveTopicPolicies;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Exchange and queue topic manager.
@@ -55,7 +58,7 @@ public class AmqpTopicManager {
         pulsarService.getPulsarResources().getNamespaceResources().getPoliciesAsync(tpName.getNamespaceObject())
                 .thenCompose(policies -> {
                     if (!policies.isPresent()) {
-                        throw new RuntimeException("Policies not found for " + tpName.getNamespace() + " namespace");
+                        return FutureUtil.failedFuture(new NamespaceNotFoundException(tpName.getNamespace()));
                     }
                     // setup ownership of service unit to this broker
                     return pulsarService.getNamespaceService().getBrokerServiceUrlAsync(
@@ -63,7 +66,8 @@ public class AmqpTopicManager {
                 })
                 .thenCompose(lookupOp -> {
                     if (!lookupOp.isPresent()) {
-                        throw new RuntimeException("Failed to perform lookup operation for " + topicName);
+                        return FutureUtil.failedFuture(new PulsarClientException.LookupException(
+                                "Lookup result is empty for " + topicName));
                     }
 
                     if (log.isDebugEnabled()) {

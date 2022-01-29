@@ -86,8 +86,7 @@ public class ExchangeContainer {
             CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
-                    log.error("[{}][{}] Failed to get topic from amqpTopicManager.",
-                            namespaceName, exchangeName, throwable);
+                    log.error("[{}][{}] Failed to get exchange topic.", namespaceName, exchangeName, throwable);
                     amqpExchangeCompletableFuture.completeExceptionally(throwable);
                     removeExchangeFuture(namespaceName, exchangeName);
                 } else {

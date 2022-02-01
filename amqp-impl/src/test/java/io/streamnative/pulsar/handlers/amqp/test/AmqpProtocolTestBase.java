@@ -145,12 +145,14 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(pulsarService.getOrderedExecutor()).thenReturn(
                 OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
         Mockito.when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());
+        Mockito.when(serviceConfiguration.isAcknowledgmentAtBatchIndexLevelEnabled()).thenReturn(false);
     }
 
     private void mockBrokerService() {
         brokerService = Mockito.mock(BrokerService.class);
         Mockito.when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
         Mockito.when(brokerService.pulsar()).thenReturn(pulsarService);
+        Mockito.when(brokerService.getPulsar()).thenReturn(pulsarService);
     }
 
     private void initDefaultExchange() {
@@ -167,6 +169,7 @@ public abstract class AmqpProtocolTestBase {
 
         CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
         Subscription subscription = Mockito.mock(Subscription.class);
+        Mockito.when(subscription.getTopic()).thenReturn(persistentTopic);
         subFuture.complete(subscription);
         Mockito.when(persistentTopic.createSubscription(Mockito.anyString(),
                 Mockito.any(), Mockito.anyBoolean())).thenReturn(subFuture);

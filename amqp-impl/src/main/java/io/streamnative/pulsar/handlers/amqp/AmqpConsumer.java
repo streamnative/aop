@@ -73,12 +73,12 @@ public class AmqpConsumer extends Consumer {
 
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId,
-        int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
+        int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
         String appId, Map<String, String> metadata, boolean readCompacted,
         CommandSubscribe.InitialPosition subscriptionInitialPosition,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
-        super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
+        super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null);
         this.channel = channel;
         this.queueContainer = queueContainer;

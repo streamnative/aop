@@ -91,6 +91,8 @@ public class AmqpTopicManager {
                         persistentTopic.getHierarchyTopicPolicies().getInactiveTopicPolicies()
                                 .updateTopicValue(new InactiveTopicPolicies(
                                         InactiveTopicDeleteMode.delete_when_no_subscriptions, 1000, false));
+                        persistentTopic.getHierarchyTopicPolicies().getMaxUnackedMessagesOnConsumer()
+                                .updateTopicValue(0);
                         topicCompletableFuture.complete(persistentTopic);
                     } catch (Exception e) {
                         log.error("Failed to get client in registerInPersistentTopic {}. ", topicName, e);

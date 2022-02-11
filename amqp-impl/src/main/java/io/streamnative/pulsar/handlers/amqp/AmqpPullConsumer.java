@@ -29,14 +29,13 @@ public class AmqpPullConsumer extends AmqpConsumer {
 
     public AmqpPullConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
-        String consumerName, int maxUnackedMessages, ServerCnx cnx, String appId,
+        String consumerName, boolean isDurable, ServerCnx cnx, String appId,
         Map<String, String> metadata, boolean readCompacted,
         CommandSubscribe.InitialPosition subscriptionInitialPosition,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
         super(queueContainer, subscription, subType, topicName, consumerId, priorityLevel, consumerName,
-                maxUnackedMessages,
-            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, channel,
+                isDurable, cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, channel,
             consumerTag, queueName, autoAck);
     }
 

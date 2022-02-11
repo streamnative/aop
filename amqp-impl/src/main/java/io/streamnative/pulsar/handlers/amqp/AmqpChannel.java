@@ -269,7 +269,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 consumer = new AmqpConsumer(queueContainer, subscription, exclusive
                         ? CommandSubscribe.SubType.Exclusive :
                         CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
-                        finalConsumerTag, 0, connection.getServerCnx(), "", null,
+                        finalConsumerTag, true, connection.getServerCnx(), "", null,
                         false, CommandSubscribe.InitialPosition.Latest,
                         null, this, finalConsumerTag, queueName, ack);
             } catch (BrokerServiceException e) {
@@ -386,7 +386,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             }
                             consumer = new AmqpPullConsumer(queueContainer, subscription,
                                     CommandSubscribe.SubType.Shared,
-                                    topic.getName(), 0, 0, "", 0,
+                                    topic.getName(), 0, 0, "", true,
                                     connection.getServerCnx(), "", null, false,
                                     CommandSubscribe.InitialPosition.Latest, null, this,
                                     "", queueName, noAck);

@@ -356,6 +356,6 @@ public class MockManagedLedger implements ManagedLedger {
 
     @Override
     public void checkInactiveLedgerAndRollOver() {
-
+        // nothing to do
     }
 }

@@ -88,7 +88,7 @@ public class MockDispatcher implements Dispatcher {
         return null;
     }
 
-    @Override public void redeliverUnacknowledgedMessages(Consumer consumer) {
+    @Override public void redeliverUnacknowledgedMessages(Consumer consumer, long consumerEpoch) {
 
     }
 
@@ -110,8 +110,8 @@ public class MockDispatcher implements Dispatcher {
     }
 
     @Override
-    public void initializeDispatchRateLimiterIfNeeded(Optional<Policies> policies) {
-
+    public boolean initializeDispatchRateLimiterIfNeeded() {
+        return false;
     }
 
     @Override

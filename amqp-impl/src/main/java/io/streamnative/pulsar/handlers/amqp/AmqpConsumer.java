@@ -40,6 +40,7 @@ import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
+import org.apache.pulsar.common.protocol.Commands;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**
@@ -79,7 +80,8 @@ public class AmqpConsumer extends Consumer {
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
-            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null);
+            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null,
+                Commands.DEFAULT_CONSUMER_EPOCH);
         this.channel = channel;
         this.queueContainer = queueContainer;
         this.autoAck = autoAck;

@@ -120,8 +120,8 @@ public class MockSubscription implements Subscription {
         return null;
     }
 
-    @Override public void redeliverUnacknowledgedMessages(Consumer consumer) {
-
+    @Override public void redeliverUnacknowledgedMessages(Consumer consumer, long consumerEpoch) {
+        // nothing to do
     }
 
     @Override public void redeliverUnacknowledgedMessages(Consumer consumer, List<PositionImpl> positions) {

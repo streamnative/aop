@@ -24,7 +24,6 @@ import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.persistent.DispatchRateLimiter;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.MessageMetadata;
-import org.apache.pulsar.common.policies.data.Policies;
 
 /**
  * Dispatcher mock test.
@@ -88,8 +87,8 @@ public class MockDispatcher implements Dispatcher {
         return null;
     }
 
-    @Override public void redeliverUnacknowledgedMessages(Consumer consumer) {
-
+    @Override public void redeliverUnacknowledgedMessages(Consumer consumer, long consumerEpoch) {
+        // nothing to do
     }
 
     @Override public void redeliverUnacknowledgedMessages(Consumer consumer, List<PositionImpl> positions) {
@@ -110,8 +109,8 @@ public class MockDispatcher implements Dispatcher {
     }
 
     @Override
-    public void initializeDispatchRateLimiterIfNeeded(Optional<Policies> policies) {
-
+    public boolean initializeDispatchRateLimiterIfNeeded() {
+        return false;
     }
 
     @Override

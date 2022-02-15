@@ -353,4 +353,9 @@ public class MockManagedLedger implements ManagedLedger {
     public CompletableFuture<Long> getEarliestMessagePublishTimeInBacklog() {
         return null;
     }
+
+    @Override
+    public void checkInactiveLedgerAndRollOver() {
+        // nothing to do
+    }
 }

@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.channel.ChannelPromise;
+import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
@@ -90,15 +91,18 @@ public class AmqpConsumer extends Consumer {
         this.unAckMessages = new ConcurrentHashMap<>();
     }
 
-    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,  int totalMessages,
-                                       long totalBytes, RedeliveryTracker redeliveryTracker) {
-        return sendMessages(entries, batchSizes, null, totalMessages, totalBytes, 0, redeliveryTracker);
+    @Override
+    public Future<Void> sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
+                                     EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes,
+                                     long totalChunkedMessages, RedeliveryTracker redeliveryTracker) {
+        return sendMessages(entries, batchSizes, batchIndexesAcks, totalMessages, totalBytes,
+                totalChunkedMessages, redeliveryTracker, Commands.DEFAULT_CONSUMER_EPOCH);
     }
 
     @Override
     public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
            EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
-           RedeliveryTracker redeliveryTracker) {
+           RedeliveryTracker redeliveryTracker, long epoch) {
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
                 log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}");

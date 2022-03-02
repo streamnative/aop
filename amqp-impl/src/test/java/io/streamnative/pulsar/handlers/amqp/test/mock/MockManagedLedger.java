@@ -358,4 +358,10 @@ public class MockManagedLedger implements ManagedLedger {
     public void checkInactiveLedgerAndRollOver() {
         // nothing to do
     }
+
+    @Override
+    public void removeWaitingCursor(ManagedCursor cursor) {
+        // nothing to do
+    }
+
 }

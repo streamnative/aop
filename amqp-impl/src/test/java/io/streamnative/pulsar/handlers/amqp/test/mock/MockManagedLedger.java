@@ -348,4 +348,9 @@ public class MockManagedLedger implements ManagedLedger {
         return 0;
     }
 
+    @Override
+    public void removeWaitingCursor(ManagedCursor cursor) {
+        // do nothing
+    }
+
 }

@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.BrokerServiceException;
@@ -102,7 +103,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     /**
      * This tag is unique per subscription to a queue. The server returns this in response to a basic.consume request.
      */
-    private volatile int consumerTag;
+    private final AtomicLong CONSUMER_TAG = new AtomicLong(0);
+
+    /**
+     * The consumer ID
+     */
+    private static final AtomicLong CONSUMER_ID = new AtomicLong(0);
 
     /**
      * The delivery tag is unique per channel. This is pre-incremented before putting into the deliver frame so that
@@ -219,9 +225,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
         final String consumerTag1;
         if (consumerTag == null) {
-            consumerTag1 = "consumerTag_" + getNextConsumerTag();
+            consumerTag1 = "consumerTag_" + getNextConsumerTag() + "_" + channelId;
         } else {
-            consumerTag1 = consumerTag.toString();
+            consumerTag1 = consumerTag + "_" + channelId;
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
                 queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
@@ -240,45 +246,42 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         });
     }
 
-    private void subscribe(String consumerTag, String queueName, Topic topic,
+    private synchronized void subscribe(String consumerTag, String queueName, Topic topic,
                            boolean ack, boolean exclusive, boolean nowait){
-        if (consumerTag == null) {
-            consumerTag = "consumerTag_" + getNextConsumerTag();
-        }
-        final String finalConsumerTag = consumerTag;
 
         CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
         exceptionFuture.whenComplete((ignored, e) -> {
             if (e != null) {
                 closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
                 log.error("BasicConsume error queue:{} consumerTag:{} ex {}",
-                        queueName, finalConsumerTag, e.getMessage());
+                        queueName, consumerTag, e.getMessage());
             }
         });
 
         if (tag2ConsumersMap.containsKey(consumerTag)) {
             exceptionFuture.completeExceptionally(
                     new ConsumerTagInUseException("Consumer already exists with same consumerTag: " + consumerTag));
+            return;
         }
 
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
                 defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false);
         subscriptionFuture.thenAccept(subscription -> {
-            AmqpConsumer consumer = null;
+            AmqpConsumer consumer;
             try {
                 consumer = new AmqpConsumer(queueContainer, subscription, exclusive
                         ? CommandSubscribe.SubType.Exclusive :
-                        CommandSubscribe.SubType.Shared, topic.getName(), 0, 0,
-                        finalConsumerTag, true, connection.getServerCnx(), "", null,
+                        CommandSubscribe.SubType.Shared, topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
+                        consumerTag, true, connection.getServerCnx(), "", null,
                         false, CommandSubscribe.InitialPosition.Latest,
-                        null, this, finalConsumerTag, queueName, ack);
+                        null, this, consumerTag, queueName, ack);
             } catch (BrokerServiceException e) {
                 exceptionFuture.completeExceptionally(e);
                 return;
             }
             subscription.addConsumer(consumer);
             consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
-            tag2ConsumersMap.put(finalConsumerTag, consumer);
+            tag2ConsumersMap.put(consumerTag, consumer);
 
             if (!nowait) {
                 MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -747,8 +750,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return ++deliveryTag;
     }
 
-    private int getNextConsumerTag() {
-        return ++consumerTag;
+    private long getNextConsumerTag() {
+        return CONSUMER_TAG.incrementAndGet();
     }
 
     public AmqpConnection getConnection() {

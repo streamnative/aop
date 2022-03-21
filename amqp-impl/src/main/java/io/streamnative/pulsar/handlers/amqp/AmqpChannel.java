@@ -103,10 +103,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     /**
      * This tag is unique per subscription to a queue. The server returns this in response to a basic.consume request.
      */
-    private final AtomicLong CONSUMER_TAG = new AtomicLong(0);
+    private final AtomicLong consumerTag = new AtomicLong(0);
 
     /**
-     * The consumer ID
+     * The consumer ID.
      */
     private static final AtomicLong CONSUMER_ID = new AtomicLong(0);
 
@@ -751,7 +751,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private long getNextConsumerTag() {
-        return CONSUMER_TAG.incrementAndGet();
+        return consumerTag.incrementAndGet();
     }
 
     public AmqpConnection getConnection() {

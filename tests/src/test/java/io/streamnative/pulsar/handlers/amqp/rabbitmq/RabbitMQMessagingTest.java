@@ -395,4 +395,77 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         return connectionFactory.newConnection();
     }
 
+    @Test(timeOut = 1000 * 20)
+    public void basicConsumeCloseAllAndRecreate() throws Exception {
+        String exchangeName = randExName();
+        String routingKey = "test.key";
+        String queueName = randQuName();
+
+        Connection conn = getConnection("vhost1", false);
+
+        int messageCnt = 100;
+        CountDownLatch countDownLatch1 = new CountDownLatch(messageCnt);
+        CountDownLatch countDownLatch2 = new CountDownLatch(messageCnt * 2);
+        AtomicInteger consumeIndex = new AtomicInteger(0);
+
+        Channel channel1 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch1, countDownLatch2, consumeIndex);
+        Channel channel2 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch1, countDownLatch2, consumeIndex);
+
+        for (int i = 0; i < messageCnt; i++) {
+            byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
+            channel1.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
+        }
+
+        countDownLatch1.await();
+        Assert.assertEquals(messageCnt, consumeIndex.get());
+        channel1.close();
+        channel2.close();
+
+        Channel channel3 = createConsumer(exchangeName, routingKey, queueName, conn, null, countDownLatch2, consumeIndex);
+
+        for (int i = 0; i <= messageCnt * 2; i++) {
+            byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
+            channel3.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
+        }
+        try {
+            countDownLatch2.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            // ignored
+        }
+        Assert.assertEquals(messageCnt * 2, consumeIndex.get());
+        channel3.close();
+        conn.close();
+    }
+
+    private Channel createConsumer(String exchangeName, String routingKey, String queueName, Connection conn,
+                                   CountDownLatch countDownLatch1, CountDownLatch countDownLatch2,
+                                   AtomicInteger consumeIndex) throws IOException {
+        Channel channel = conn.createChannel();
+
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
+
+        channel.basicConsume(queueName, false,
+                new DefaultConsumer(channel) {
+                    @Override
+                    public void handleDelivery(String consumerTag,
+                                               Envelope envelope,
+                                               AMQP.BasicProperties properties,
+                                               byte[] body) throws IOException {
+                        try {
+                            consumeIndex.incrementAndGet();
+                            long deliveryTag = envelope.getDeliveryTag();
+                            // (process the message components here ...)
+                            channel.basicAck(deliveryTag, false);
+                        } finally {
+                            if (countDownLatch1 != null) {
+                                countDownLatch1.countDown();
+                            }
+                            countDownLatch2.countDown();
+                        }
+                    }
+                });
+        return channel;
+    }
 }

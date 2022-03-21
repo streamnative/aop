@@ -405,13 +405,10 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
 
         int messageCnt = 100;
         CountDownLatch countDownLatch1 = new CountDownLatch(messageCnt);
-        CountDownLatch countDownLatch2 = new CountDownLatch(messageCnt * 2);
-        AtomicInteger consumeIndex = new AtomicInteger(0);
+        AtomicInteger consumeIndex1 = new AtomicInteger(0);
 
-        Channel channel1 = createConsumer(exchangeName, routingKey, queueName, conn,
-                countDownLatch1, countDownLatch2, consumeIndex);
-        Channel channel2 = createConsumer(exchangeName, routingKey, queueName, conn,
-                countDownLatch1, countDownLatch2, consumeIndex);
+        Channel channel1 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch1, consumeIndex1);
+        Channel channel2 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch1, consumeIndex1);
 
         for (int i = 0; i < messageCnt; i++) {
             byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
@@ -419,13 +416,13 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         }
 
         countDownLatch1.await();
-        Assert.assertEquals(messageCnt, consumeIndex.get());
+        Assert.assertEquals(messageCnt, consumeIndex1.get());
         channel1.close();
         channel2.close();
 
-        Channel channel3 = createConsumer(exchangeName, routingKey, queueName, conn,
-                null, countDownLatch2, consumeIndex);
-
+        CountDownLatch countDownLatch2 = new CountDownLatch(messageCnt);
+        AtomicInteger consumeIndex2 = new AtomicInteger(0);
+        Channel channel3 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch2, consumeIndex2);
         for (int i = 0; i <= messageCnt; i++) {
             byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
             channel3.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
@@ -435,14 +432,13 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         } catch (InterruptedException e) {
             // ignored
         }
-        Assert.assertEquals(messageCnt * 2, consumeIndex.get());
+        Assert.assertEquals(messageCnt, consumeIndex2.get());
         channel3.close();
         conn.close();
     }
 
     private Channel createConsumer(String exchangeName, String routingKey, String queueName, Connection conn,
-                                   CountDownLatch countDownLatch1, CountDownLatch countDownLatch2,
-                                   AtomicInteger consumeIndex) throws IOException {
+                                   CountDownLatch countDownLatch, AtomicInteger consumeIndex) throws IOException {
         Channel channel = conn.createChannel();
 
         channel.exchangeDeclare(exchangeName, "direct", true);
@@ -462,10 +458,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
                             // (process the message components here ...)
                             channel.basicAck(deliveryTag, false);
                         } finally {
-                            if (countDownLatch1 != null) {
-                                countDownLatch1.countDown();
-                            }
-                            countDownLatch2.countDown();
+                            countDownLatch.countDown();
                         }
                     }
                 });

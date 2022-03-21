@@ -408,8 +408,10 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         CountDownLatch countDownLatch2 = new CountDownLatch(messageCnt * 2);
         AtomicInteger consumeIndex = new AtomicInteger(0);
 
-        Channel channel1 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch1, countDownLatch2, consumeIndex);
-        Channel channel2 = createConsumer(exchangeName, routingKey, queueName, conn, countDownLatch1, countDownLatch2, consumeIndex);
+        Channel channel1 = createConsumer(exchangeName, routingKey, queueName, conn,
+                countDownLatch1, countDownLatch2, consumeIndex);
+        Channel channel2 = createConsumer(exchangeName, routingKey, queueName, conn,
+                countDownLatch1, countDownLatch2, consumeIndex);
 
         for (int i = 0; i < messageCnt; i++) {
             byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
@@ -421,9 +423,10 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         channel1.close();
         channel2.close();
 
-        Channel channel3 = createConsumer(exchangeName, routingKey, queueName, conn, null, countDownLatch2, consumeIndex);
+        Channel channel3 = createConsumer(exchangeName, routingKey, queueName, conn,
+                null, countDownLatch2, consumeIndex);
 
-        for (int i = 0; i <= messageCnt * 2; i++) {
+        for (int i = 0; i <= messageCnt; i++) {
             byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
             channel3.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
         }

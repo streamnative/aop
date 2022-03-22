@@ -36,7 +36,8 @@ public interface AmqpQueue {
     /**
      * Write the index message into the queue.
      */
-    CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId);
+    CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId,
+                                                   Map<String, Object> properties);
 
     /**
      * Read entry by queue message. Since the queue just store message IDs, so it's need to read the real data from

@@ -107,16 +107,16 @@ public class IndexMessage {
     }
 
     public long getDeliverAtTime(){
-        Object delayProp;
-        long delay = 0;
-        if (properties != null && (delayProp = properties.get(X_DELAY)) != null) {
+        Object delayValue;
+        long delayTime = 0;
+        if (properties != null && (delayValue = properties.get(X_DELAY)) != null) {
             try {
-                delay = Long.parseLong(delayProp.toString());
+                delayTime = Long.parseLong(delayValue.toString());
             } catch (NumberFormatException e) {
-                log.warn("Failed to parse the number according to x-delay.", e);
+                log.warn("Failed to parse the number according to x-delay. x-delay value:{}", delayValue, e);
             }
         }
-        return delay;
+        return delayTime;
     }
 
     @Override

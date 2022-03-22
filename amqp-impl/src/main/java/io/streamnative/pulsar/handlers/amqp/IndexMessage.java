@@ -50,7 +50,8 @@ public class IndexMessage {
      */
     private Map<String, Object> properties;
 
-    public static IndexMessage create(String exchangeName, long ledgerId, long entryId, Map<String, Object> properties) {
+    public static IndexMessage create(String exchangeName, long ledgerId, long entryId,
+                                      Map<String, Object> properties) {
         IndexMessage instance = RECYCLER.get();
         instance.exchangeName = exchangeName;
         instance.ledgerId = ledgerId;

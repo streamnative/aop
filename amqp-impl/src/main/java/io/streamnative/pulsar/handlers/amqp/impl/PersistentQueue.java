@@ -135,6 +135,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 messageRouter.setArguments(arguments);
                 messageRouter.setBindingKeys(bindingKeys);
                 routers.put(exchangeName, messageRouter);
+                amqpExchange.addQueue(this);
             });
         });
     }

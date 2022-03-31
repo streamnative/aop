@@ -97,7 +97,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             proxyConfig.setAmqpHeartBeat(amqpConfig.getAmqpHeartBeat());
             proxyConfig.setAmqpProxyPort(amqpConfig.getAmqpProxyPort());
 
-            AdvertisedListener internalListener = ServiceConfigurationUtils.getInternalListener(amqpConfig);
+            AdvertisedListener internalListener = ServiceConfigurationUtils.getInternalListener(amqpConfig, "pulsar");
             checkArgument(internalListener.getBrokerServiceUrl() != null,
                     "plaintext must be configured on internal listener");
             proxyConfig.setBrokerServiceURL(internalListener.getBrokerServiceUrl().toString());

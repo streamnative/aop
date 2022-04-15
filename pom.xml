@@ -41,7 +41,7 @@
     <commons-lang3.version>3.4</commons-lang3.version>
     <guava.version>21.0</guava.version>
     <grpc.version>1.18.0</grpc.version>
-    <jackson.version>2.11.0</jackson.version>
+    <jackson.version>2.13.2</jackson.version>
     <jcommander.version>1.48</jcommander.version>
     <log4j2.version>2.17.1</log4j2.version>
     <lombok.version>1.18.4</lombok.version>
@@ -106,12 +106,6 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-core</artifactId>
       <version>${grpc.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative</groupId>
-      <artifactId>pulsar-websocket</artifactId>
-      <version>${pulsar.version}</version>
     </dependency>
 
     <dependency>
@@ -208,6 +202,16 @@
       <groupId>org.apache.qpid</groupId>
       <artifactId>qpid-broker-core</artifactId>
       <version>${qpid-protocol-plugin.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
 
     <dependency>

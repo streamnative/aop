@@ -227,7 +227,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (consumerTag == null) {
             consumerTag1 = "consumerTag_" + getNextConsumerTag() + "_" + channelId;
         } else {
-            consumerTag1 = consumerTag + "_" + channelId;
+            consumerTag1 = consumerTag.toString();
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
                 queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
@@ -297,7 +297,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveBasicCancel(AMQShortString consumerTag, boolean noWait) {
         if (log.isDebugEnabled()) {
-            log.debug("RECV[ {} ] BasicCancel[ consumerTag: {}  noWait: {} ]", channelId, consumerTag, noWait);
+            log.debug("RECV[{}] BasicCancel[ consumerTag: {}  noWait: {} ]", channelId, consumerTag, noWait);
         }
 
         unsubscribeConsumer(AMQShortString.toString(consumerTag));

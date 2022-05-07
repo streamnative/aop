@@ -80,9 +80,9 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public String getProtocolDataToAdvertise() {
         if (log.isDebugEnabled()) {
-            log.debug("Get configured listeners", amqpConfig.getAmqpListeners());
+            log.debug("Get configured listeners: {}", getAppliedAmqpListeners(amqpConfig));
         }
-        return amqpConfig.getAmqpListeners();
+        return getAppliedAmqpListeners(amqpConfig);
     }
 
     @Override
@@ -112,7 +112,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
         }
 
         log.info("Starting AmqpProtocolHandler, listener: {}, aop version is: '{}'",
-                amqpConfig.getAmqpListeners(), AopVersion.getVersion());
+                getAppliedAmqpListeners(amqpConfig), AopVersion.getVersion());
         log.info("Git Revision {}", AopVersion.getGitSha());
         log.info("Built by {} on {} at {}",
             AopVersion.getBuildUser(),
@@ -124,10 +124,10 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public Map<InetSocketAddress, ChannelInitializer<SocketChannel>> newChannelInitializers() {
         checkState(amqpConfig != null);
-        checkState(amqpConfig.getAmqpListeners() != null);
+        checkState(getAppliedAmqpListeners(amqpConfig) != null);
         checkState(brokerService != null);
 
-        String listeners = amqpConfig.getAmqpListeners();
+        String listeners = getAppliedAmqpListeners(amqpConfig);
         String[] parts = listeners.split(LISTENER_DEL);
 
         try {
@@ -161,5 +161,18 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
         int lastIndex = listener.lastIndexOf(':');
         return Integer.parseInt(listener.substring(lastIndex + 1));
+    }
+
+    public static String getAppliedAmqpListeners(AmqpServiceConfiguration configuration) {
+        String amqpListeners = configuration.getAmqpListeners();
+        if (amqpListeners == null) {
+            String fullyHostName = ServiceConfigurationUtils.getDefaultOrConfiguredAddress(amqpListeners);
+            return amqpUrl(fullyHostName, 5672);
+        }
+        return amqpListeners;
+    }
+
+    public static String amqpUrl(String host, int port) {
+        return String.format("amqp://%s:%d", host, port);
     }
 }

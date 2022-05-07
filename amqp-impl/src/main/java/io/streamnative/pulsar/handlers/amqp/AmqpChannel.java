@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -101,9 +102,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private final String defaultSubscription = "defaultSubscription";
     public static final AMQShortString EMPTY_STRING = AMQShortString.createAMQShortString((String) null);
     /**
-     * This tag is unique per subscription to a queue. The server returns this in response to a basic.consume request.
+     * ConsumerTag prefix, the tag is unique per subscription to a queue.
+     * The server returns this in response to a basic.consume request.
      */
-    private final AtomicLong consumerTag = new AtomicLong(0);
+    private static final String CONSUMER_TAG_PREFIX = "aop.ctag-";
 
     /**
      * The consumer ID.
@@ -223,12 +225,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] BasicConsume[queue:{} consumerTag:{} noLocal:{} noAck:{} exclusive:{} nowait:{}"
                     + " arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
         }
-        final String consumerTag1;
-        if (consumerTag == null) {
-            consumerTag1 = "consumerTag_" + getNextConsumerTag() + "_" + channelId;
-        } else {
-            consumerTag1 = consumerTag.toString();
-        }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
                 queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
@@ -240,10 +236,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
                 } else {
                     PersistentTopic indexTopic = ((PersistentQueue) amqpQueue).getIndexTopic();
-                    subscribe(consumerTag1, queue.toString(), indexTopic, noAck, exclusive, nowait);
+                    subscribe(getConsumerTag(consumerTag), queue.toString(), indexTopic, noAck, exclusive, nowait);
                 }
             }
         });
+    }
+
+    private String getConsumerTag(AMQShortString consumerTag) {
+        if (consumerTag == null) {
+            return CONSUMER_TAG_PREFIX + connection.remoteAddress + "-" + UUID.randomUUID();
+        } else {
+            // don't change the consumer tag if the consumerTag is existing
+            return consumerTag.toString();
+        }
     }
 
     private synchronized void subscribe(String consumerTag, String queueName, Topic topic,
@@ -748,10 +753,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     public long getNextDeliveryTag() {
         return ++deliveryTag;
-    }
-
-    private long getNextConsumerTag() {
-        return consumerTag.incrementAndGet();
     }
 
     public AmqpConnection getConnection() {

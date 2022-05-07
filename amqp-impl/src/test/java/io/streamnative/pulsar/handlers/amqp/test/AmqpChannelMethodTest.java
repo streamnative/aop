@@ -405,8 +405,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testBasicAckOne() {
         testBasicConsume();
         AmqpChannel channel = (AmqpChannel) connection.getChannelMethodProcessor(0);
-        AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap()
-                .get("consumerTag1_" + channel.getChannelId());
+        AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap().get("consumerTag1");
         Assert.assertTrue(consumer != null);
         UnacknowledgedMessageMap unacknowledgedMessageMap = channel.getUnacknowledgedMessageMap();
         unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), consumer, 0);
@@ -423,8 +422,7 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
     public void testBasicAckBatch() {
         testBasicConsume();
         AmqpChannel channel = (AmqpChannel) connection.getChannelMethodProcessor(0);
-        AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap()
-                .get("consumerTag1_" + channel.getChannelId());
+        AmqpConsumer consumer = (AmqpConsumer) channel.getTag2ConsumersMap().get("consumerTag1");
         Assert.assertTrue(consumer != null);
         UnacknowledgedMessageMap unacknowledgedMessageMap = channel.getUnacknowledgedMessageMap();
         unacknowledgedMessageMap.add(1, PositionImpl.get(1, 1), consumer, 0);

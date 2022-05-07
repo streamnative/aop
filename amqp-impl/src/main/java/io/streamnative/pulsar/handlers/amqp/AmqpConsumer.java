@@ -99,7 +99,8 @@ public class AmqpConsumer extends Consumer {
            RedeliveryTracker redeliveryTracker) {
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
-                log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}");
+                log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}",
+                        queueName, consumerTag, consumerId());
             }
 
             return null;
@@ -113,16 +114,12 @@ public class AmqpConsumer extends Consumer {
         final AmqpConnection connection = channel.getConnection();
         MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         connection.ctx.channel().eventLoop().execute(() -> {
-            for (int i = 0; i < entries.size(); i++) {
-                Entry index = entries.get(i);
+            for (Entry index : entries) {
                 if (index == null) {
                     // Entry was filtered out
                     continue;
                 }
                 IndexMessage indexMessage = MessageConvertUtils.entryToIndexMessage(index);
-                if (indexMessage == null) {
-                    continue;
-                }
                 asyncGetQueue().thenApply(amqpQueue -> amqpQueue.readEntryAsync(
                         indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
                         .whenComplete((msg, ex) -> {
@@ -227,6 +224,11 @@ public class AmqpConsumer extends Consumer {
         }
         return this.channel.getCreditManager().hasCredit()
             ? (int) this.channel.getCreditManager().getMessageCredit() : 0;
+    }
+
+    @Override
+    public boolean isWritable() {
+        return channel.getConnection().ctx.channel().isWritable();
     }
 
     void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {

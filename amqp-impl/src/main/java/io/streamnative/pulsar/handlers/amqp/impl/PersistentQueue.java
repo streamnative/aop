@@ -20,12 +20,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpQueue;
+import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
-import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
@@ -43,6 +43,7 @@ import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Persistent queue.
@@ -58,6 +59,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private ObjectMapper jsonMapper;
 
+    private AmqpEntryWriter amqpEntryWriter;
+
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
                            boolean exclusive, boolean autoDelete) {
@@ -65,19 +68,20 @@ public class PersistentQueue extends AbstractAmqpQueue {
         this.indexTopic = indexTopic;
         topicNameValidate();
         this.jsonMapper = new ObjectMapper();
+        this.amqpEntryWriter = new AmqpEntryWriter(indexTopic);
     }
 
     @Override
     public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId) {
-        CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
         try {
             IndexMessage indexMessage = IndexMessage.create(exchangeName, ledgerId, entryId);
             MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(indexMessage);
-            MessagePublishContext.publishMessages(message, indexTopic, new CompletableFuture<>());
+            return amqpEntryWriter.publishMessage(message).thenApply(__ -> null);
         } catch (Exception e) {
-            completableFuture.completeExceptionally(e);
+            log.error("Failed to writer index message for exchange {} with position {}:{}.",
+                    exchangeName, ledgerId, entryId);
+            return FutureUtil.failedFuture(e);
         }
-        return completableFuture;
     }
 
     @Override

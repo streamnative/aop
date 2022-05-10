@@ -166,7 +166,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public static String getAppliedAmqpListeners(AmqpServiceConfiguration configuration) {
         String amqpListeners = configuration.getAmqpListeners();
         if (amqpListeners == null) {
-            String fullyHostName = ServiceConfigurationUtils.getDefaultOrConfiguredAddress(amqpListeners);
+            String fullyHostName = ServiceConfigurationUtils.unsafeLocalhostResolve();
             return amqpUrl(fullyHostName, 5672);
         }
         return amqpListeners;

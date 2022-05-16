@@ -308,36 +308,38 @@ public final class MessageConvertUtils {
         int numMessages = msgMetadata.getNumMessagesInBatch();
         boolean notBatchMessage = (numMessages == 1 && !msgMetadata.hasNumMessagesInBatch());
         ByteBuf payload = metadataAndPayload.retain();
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug("entryToRecord.  NumMessagesInBatch: {}, isBatchMessage: {}."
+                        + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
+                    numMessages, !notBatchMessage, entry.getLedgerId(),
+                    entry.getEntryId(), payload.readerIndex(), payload.writerIndex());
+            }
 
-        if (log.isDebugEnabled()) {
-            log.debug("entryToRecord.  NumMessagesInBatch: {}, isBatchMessage: {}."
-                    + " new entryId {}:{}, readerIndex: {},  writerIndex: {}",
-                numMessages, !notBatchMessage, entry.getLedgerId(),
-                entry.getEntryId(), payload.readerIndex(), payload.writerIndex());
+            // need handle encryption
+            checkState(msgMetadata.getEncryptionKeysCount() == 0);
+
+            if (notBatchMessage) {
+                Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
+                    getPropertiesFromMetadata(msgMetadata.getPropertiesList());
+
+                ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
+                contentHeaderBody.setBodySize(payload.readableBytes());
+
+                byte[] data = new byte[payload.readableBytes()];
+                payload.readBytes(data);
+                amqpMessage = AmqpMessageData.builder()
+                    .messagePublishInfo(metaData.getRight())
+                    .contentHeaderBody(contentHeaderBody)
+                    .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
+                    .build();
+            } else {
+                // currently, no consider for batch
+            }
+            return amqpMessage;
+        } finally {
+            payload.release();
         }
-
-        // need handle encryption
-        checkState(msgMetadata.getEncryptionKeysCount() == 0);
-
-        if (notBatchMessage) {
-            Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
-                getPropertiesFromMetadata(msgMetadata.getPropertiesList());
-
-            ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
-            contentHeaderBody.setBodySize(payload.readableBytes());
-
-            byte[] data = new byte[payload.readableBytes()];
-            payload.readBytes(data);
-            amqpMessage = AmqpMessageData.builder()
-                .messagePublishInfo(metaData.getRight())
-                .contentHeaderBody(contentHeaderBody)
-                .contentBody(new ContentBody(QpidByteBuffer.wrap(data)))
-                .build();
-        } else {
-            // currently, no consider for batch
-        }
-
-        return amqpMessage;
     }
 
     private static String byteToString(byte b) throws UnsupportedEncodingException {
@@ -365,10 +367,15 @@ public final class MessageConvertUtils {
         Commands.parseMessageMetadata(metadataAndPayload);
         ByteBuf payload = metadataAndPayload.retain();
 
-        long ledgerId = payload.readLong();
-        long entryId = payload.readLong();
-        String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1).toString();
-        return IndexMessage.create(exchangeName, ledgerId, entryId);
+        try {
+            long ledgerId = payload.readLong();
+            long entryId = payload.readLong();
+            String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1)
+                    .toString();
+            return IndexMessage.create(exchangeName, ledgerId, entryId);
+        } finally {
+            payload.release();
+        }
     }
 
     public static Map<String, Object> getHeaders(Message<byte[]> message) {

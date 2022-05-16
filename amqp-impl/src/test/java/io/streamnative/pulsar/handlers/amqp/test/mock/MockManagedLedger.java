@@ -95,6 +95,13 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
+    public ManagedCursor newNonDurableCursor(Position startPosition, String subscriptionName,
+                                             CommandSubscribe.InitialPosition initialPosition, boolean isReadCompacted)
+            throws ManagedLedgerException {
+        return null;
+    }
+
+    @Override
     public void asyncDeleteCursor(String s, AsyncCallbacks.DeleteCursorCallback deleteCursorCallback, Object o) {
 
     }
@@ -280,13 +287,6 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public ManagedCursor newNonDurableCursor(Position position, String s,
-                                             CommandSubscribe.InitialPosition initialPosition)
-            throws ManagedLedgerException {
-        return null;
-    }
-
-    @Override
     public Position addEntry(byte[] data, int numberOfMessages) throws InterruptedException, ManagedLedgerException {
         return null;
     }
@@ -333,4 +333,35 @@ public class MockManagedLedger implements ManagedLedger {
     public CompletableFuture<ManagedLedgerInternalStats> getManagedLedgerInternalStats(boolean includeLedgerMetadata) {
         return null;
     }
+
+    @Override
+    public long getLastOffloadedLedgerId() {
+        return 0;
+    }
+
+    @Override
+    public long getLastOffloadedSuccessTimestamp() {
+        return 0;
+    }
+
+    @Override
+    public long getLastOffloadedFailureTimestamp() {
+        return 0;
+    }
+
+    @Override
+    public CompletableFuture<Long> getEarliestMessagePublishTimeInBacklog() {
+        return null;
+    }
+
+    @Override
+    public void checkInactiveLedgerAndRollOver() {
+        // nothing to do
+    }
+
+    @Override
+    public void removeWaitingCursor(ManagedCursor cursor) {
+        // nothing to do
+    }
+
 }

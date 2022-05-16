@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.channel.ChannelPromise;
+import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
 import java.util.Collections;
@@ -40,6 +41,7 @@ import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
+import org.apache.pulsar.common.protocol.Commands;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**
@@ -73,13 +75,14 @@ public class AmqpConsumer extends Consumer {
 
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId,
-        int priorityLevel, String consumerName, int maxUnackedMessages, ServerCnx cnx,
+        int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
         String appId, Map<String, String> metadata, boolean readCompacted,
         CommandSubscribe.InitialPosition subscriptionInitialPosition,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
         boolean autoAck) throws BrokerServiceException {
-        super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, maxUnackedMessages,
-            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null);
+        super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
+            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null,
+                Commands.DEFAULT_CONSUMER_EPOCH);
         this.channel = channel;
         this.queueContainer = queueContainer;
         this.autoAck = autoAck;
@@ -88,18 +91,22 @@ public class AmqpConsumer extends Consumer {
         this.unAckMessages = new ConcurrentHashMap<>();
     }
 
-    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,  int totalMessages,
-                                       long totalBytes, RedeliveryTracker redeliveryTracker) {
-        return sendMessages(entries, batchSizes, null, totalMessages, totalBytes, 0, redeliveryTracker);
+    @Override
+    public Future<Void> sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
+                                     EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes,
+                                     long totalChunkedMessages, RedeliveryTracker redeliveryTracker) {
+        return sendMessages(entries, batchSizes, batchIndexesAcks, totalMessages, totalBytes,
+                totalChunkedMessages, redeliveryTracker, Commands.DEFAULT_CONSUMER_EPOCH);
     }
 
     @Override
     public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
            EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
-           RedeliveryTracker redeliveryTracker) {
+           RedeliveryTracker redeliveryTracker, long epoch) {
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
-                log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}");
+                log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}",
+                        queueName, consumerTag, consumerId());
             }
 
             return null;
@@ -113,48 +120,47 @@ public class AmqpConsumer extends Consumer {
         final AmqpConnection connection = channel.getConnection();
         MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         connection.ctx.channel().eventLoop().execute(() -> {
-            for (int i = 0; i < entries.size(); i++) {
-                Entry index = entries.get(i);
+            for (Entry index : entries) {
                 if (index == null) {
                     // Entry was filtered out
                     continue;
                 }
                 IndexMessage indexMessage = MessageConvertUtils.entryToIndexMessage(index);
-                if (indexMessage == null) {
-                    continue;
-                }
                 asyncGetQueue().thenApply(amqpQueue -> amqpQueue.readEntryAsync(
                         indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
                         .whenComplete((msg, ex) -> {
-                            if (ex == null) {
-                                long deliveryTag = channel.getNextDeliveryTag();
+                            try {
+                                if (ex == null) {
+                                    long deliveryTag = channel.getNextDeliveryTag();
 
-                                addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                                        (PositionImpl) msg.getPosition());
-                                if (!autoAck) {
-                                    channel.getUnacknowledgedMessageMap().add(deliveryTag,
-                                            index.getPosition(), this, msg.getLength());
-                                }
+                                    addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
+                                            (PositionImpl) msg.getPosition());
+                                    if (!autoAck) {
+                                        channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                                index.getPosition(), this, msg.getLength());
+                                    }
 
-                                try {
-                                    connection.getAmqpOutputConverter().writeDeliver(
-                                            MessageConvertUtils.entryToAmqpBody(msg),
-                                            channel.getChannelId(), getRedeliveryTracker().
-                                                    contains(index.getPosition()), deliveryTag,
-                                            AMQShortString.createAMQShortString(consumerTag));
-                                } catch (UnsupportedEncodingException e) {
-                                    log.error("sendMessages UnsupportedEncodingException", e);
-                                }
+                                    try {
+                                        connection.getAmqpOutputConverter().writeDeliver(
+                                                MessageConvertUtils.entryToAmqpBody(msg),
+                                                channel.getChannelId(), getRedeliveryTracker().
+                                                        contains(index.getPosition()), deliveryTag,
+                                                AMQShortString.createAMQShortString(consumerTag));
+                                    } catch (UnsupportedEncodingException e) {
+                                        log.error("sendMessages UnsupportedEncodingException", e);
+                                    }
 
-                                if (autoAck) {
+                                    if (autoAck) {
+                                        messagesAck(index.getPosition());
+                                    }
+                                } else {
                                     messagesAck(index.getPosition());
                                 }
-                            } else {
-                                messagesAck(index.getPosition());
+                            } finally {
+                                msg.release();
+                                index.release();
+                                indexMessage.recycle();
                             }
-                            msg.release();
-                            index.release();
-                            indexMessage.recycle();
                         })).exceptionally(throwable -> {
                             log.error("Failed to get queue from queue container", throwable);
                             return null;
@@ -224,6 +230,11 @@ public class AmqpConsumer extends Consumer {
         }
         return this.channel.getCreditManager().hasCredit()
             ? (int) this.channel.getCreditManager().getMessageCredit() : 0;
+    }
+
+    @Override
+    public boolean isWritable() {
+        return channel.getConnection().ctx.channel().isWritable();
     }
 
     void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {

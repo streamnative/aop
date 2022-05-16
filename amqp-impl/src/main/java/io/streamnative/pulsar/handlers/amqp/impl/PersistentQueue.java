@@ -111,12 +111,15 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public void recoverRoutersFromQueueProperties(Map<String, String> properties,
                                                   ExchangeContainer exchangeContainer,
                                                   NamespaceName namespaceName) throws JsonProcessingException {
-        if (null == properties || properties.size() == 0) {
+        if (null == properties || properties.isEmpty() || !properties.containsKey(ROUTERS)) {
             return;
         }
         List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
                 new TypeReference<List<AmqpQueueProperties>>() {
                 });
+        if (amqpQueueProperties == null) {
+            return;
+        }
         amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
             // recover exchange
             String exchangeName = amqpQueueProperty.getExchangeName();

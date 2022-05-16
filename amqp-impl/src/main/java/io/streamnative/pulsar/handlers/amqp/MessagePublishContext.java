@@ -99,7 +99,11 @@ public final class MessagePublishContext implements PublishContext {
         });
 
         ByteBuf headerAndPayload = messageToByteBuf(message);
-        topic.publishMessage(headerAndPayload,
-                MessagePublishContext.get(positionFuture, topic, System.nanoTime()));
+        try {
+            topic.publishMessage(headerAndPayload,
+                    MessagePublishContext.get(positionFuture, topic, System.nanoTime()));
+        } finally {
+            headerAndPayload.release();
+        }
     }
 }

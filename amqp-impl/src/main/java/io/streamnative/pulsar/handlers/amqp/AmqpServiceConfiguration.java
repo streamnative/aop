@@ -58,10 +58,10 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
 
     @FieldContext(
             category = CATEGORY_AMQP,
-            required = true,
+            required = false,
             doc = "The namespace used for storing Amqp metadata topics"
     )
-    private String amqpListeners = "amqp://127.0.0.1:5672";
+    private String amqpListeners;
 
     @FieldContext(
         category = CATEGORY_AMQP,

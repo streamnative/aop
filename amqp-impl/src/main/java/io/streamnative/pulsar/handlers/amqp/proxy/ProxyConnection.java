@@ -120,7 +120,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-//        log.info("ProxyConnection [channelRead] - access msg: {}", ((ByteBuf) msg));
         switch (state) {
             case Init:
             case RedirectLookup:
@@ -153,7 +152,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 log.info("ProxyConnection [channelRead] - closed");
                 break;
             default:
-                log.info("ProxyConnection [channelRead] - invalid state");
+                log.error("ProxyConnection [channelRead] - invalid state");
                 break;
         }
     }
@@ -250,7 +249,8 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     public void handleConnect(AtomicInteger retryTimes) {
         log.info("handle connect residue retryTimes: {}", retryTimes);
         if (retryTimes.get() == 0) {
-            log.warn("Handle connect retryTime is 0.");
+            log.warn("Handle connect retryTimes is 0.");
+            close();
             return;
         }
         if (proxyService.getVhostBrokerMap().containsKey(vhost)) {
@@ -266,12 +266,20 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 CompletableFuture<Pair<String, Integer>> lookupData = lookupHandler.findBroker(
                         TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
                 lookupData.whenComplete((pair, throwable) -> {
+                    if (throwable != null) {
+                        log.error("Lookup broker failed; may retry.", throwable);
+                        retryTimes.decrementAndGet();
+                        handleConnect(retryTimes);
+                        return;
+                    }
+                    assert pair != null;
                     handleConnectComplete(pair.getLeft(), pair.getRight(), retryTimes);
                     proxyService.cacheVhostMap(vhost, pair);
                 });
             } catch (Exception e) {
                 log.error("Lookup broker failed.", e);
                 resetProxyHandler();
+                close();
             }
         }
     }

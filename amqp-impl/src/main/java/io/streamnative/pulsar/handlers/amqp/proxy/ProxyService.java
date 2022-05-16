@@ -29,10 +29,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
-import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
 
 /**
  * This service is used for redirecting AMQP client request to proper AMQP protocol handler Broker.
@@ -42,11 +39,8 @@ public class ProxyService implements Closeable {
 
     @Getter
     private ProxyConfiguration proxyConfig;
-    private String serviceUrl;
     @Getter
     private PulsarService pulsarService;
-    @Getter
-    private PulsarClientImpl pulsarClient;
     @Getter
     private LookupHandler lookupHandler;
 
@@ -58,8 +52,6 @@ public class ProxyService implements Closeable {
     private DefaultThreadFactory acceptorThreadFactory = new DefaultThreadFactory("amqp-redirect-acceptor");
     private DefaultThreadFactory workerThreadFactory = new DefaultThreadFactory("amqp-redirect-io");
     private static final int numThreads = Runtime.getRuntime().availableProcessors();
-
-    private ZooKeeperClientFactory zkClientFactory = null;
 
     @Getter
     private static final Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
@@ -97,11 +89,7 @@ public class ProxyService implements Closeable {
             throw new IOException("Failed to bind Pulsar Proxy on port " + proxyConfig.getAmqpProxyPort(), e);
         }
 
-        this.pulsarClient = (PulsarClientImpl) PulsarClient.builder()
-                .serviceUrl(proxyConfig.getBrokerServiceURL())
-                .build();
-
-        this.lookupHandler = new PulsarServiceLookupHandler(pulsarService, pulsarClient);
+        this.lookupHandler = new PulsarServiceLookupHandler(proxyConfig, pulsarService);
     }
 
     private void releaseConnection(String namespaceName) {
@@ -124,6 +112,9 @@ public class ProxyService implements Closeable {
 
     @Override
     public void close() throws IOException {
+        if (lookupHandler != null) {
+            lookupHandler.close();
+        }
         if (listenChannel != null) {
             listenChannel.close();
         }

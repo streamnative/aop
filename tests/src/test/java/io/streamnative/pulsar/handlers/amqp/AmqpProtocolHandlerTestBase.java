@@ -19,17 +19,16 @@ import static org.mockito.Mockito.spy;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.channel.EventLoopGroup;
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -52,14 +51,12 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.compaction.Compactor;
+import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
 import org.apache.pulsar.metadata.impl.ZKMetadataStore;
-import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
-import org.apache.pulsar.zookeeper.ZookeeperClientFactoryImpl;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.MockZooKeeper;
-import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.MockZooKeeperSession;
 import org.apache.zookeeper.data.ACL;
-import org.mockito.Mockito;
 
 /**
  * Unit test to test AoP handler.
@@ -120,6 +117,8 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setAllowAutoTopicCreation(true);
         amqpConfig.setAllowAutoTopicCreationType("partitioned");
         amqpConfig.setBrokerDeleteInactiveTopicsEnabled(false);
+        amqpConfig.setBrokerEntryMetadataInterceptors(
+                Sets.newHashSet("org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor"));
 
         // set protocol related config
         URL testHandlerUrl = this.getClass().getClassLoader().getResource("test-protocol-handler.nar");
@@ -278,10 +277,11 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     protected void setupBrokerMocks(PulsarService pulsar) throws Exception {
         // Override default providers with mocked ones
-        doReturn(mockZooKeeperClientFactory).when(pulsar).getZooKeeperClientFactory();
         doReturn(mockBookKeeperClientFactory).when(pulsar).newBookKeeperClientFactory();
-        doReturn(new ZKMetadataStore(mockZooKeeper)).when(pulsar).createLocalMetadataStore();
-        doReturn(new ZKMetadataStore(mockZooKeeper)).when(pulsar).createConfigurationMetadataStore();
+
+        MockZooKeeperSession mockZooKeeperSession = MockZooKeeperSession.newInstance(mockZooKeeper);
+        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar).createLocalMetadataStore();
+        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar).createConfigurationMetadataStore();
 
         Supplier<NamespaceService> namespaceServiceSupplier = () -> spy(new NamespaceService(pulsar));
         doReturn(namespaceServiceSupplier).when(pulsar).getNamespaceServiceProvider();
@@ -291,15 +291,14 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     public static MockZooKeeper createMockZooKeeper() throws Exception {
         MockZooKeeper zk = MockZooKeeper.newInstance(MoreExecutors.newDirectExecutorService());
+        zk.setSessionId(-1);
         List<ACL> dummyAclList = new ArrayList<>(0);
 
         ZkUtils.createFullPathOptimistic(zk, "/ledgers/available/192.168.1.1:" + 5000,
-            "".getBytes(ZookeeperClientFactoryImpl.ENCODING_SCHEME), dummyAclList, CreateMode.PERSISTENT);
+                "".getBytes(StandardCharsets.UTF_8), dummyAclList, CreateMode.PERSISTENT);
 
-        zk.create(
-            "/ledgers/LAYOUT",
-            "1\nflat:1".getBytes(ZookeeperClientFactoryImpl.ENCODING_SCHEME), dummyAclList,
-            CreateMode.PERSISTENT);
+        zk.create("/ledgers/LAYOUT", "1\nflat:1".getBytes(StandardCharsets.UTF_8), dummyAclList,
+                CreateMode.PERSISTENT);
         return zk;
     }
 
@@ -331,31 +330,23 @@ public abstract class AmqpProtocolHandlerTestBase {
         }
     }
 
-    protected ZooKeeperClientFactory mockZooKeeperClientFactory = new ZooKeeperClientFactory() {
+    private final BookKeeperClientFactory mockBookKeeperClientFactory = new BookKeeperClientFactory() {
 
         @Override
-        public CompletableFuture<ZooKeeper> create(String serverList, SessionType sessionType,
-                                                   int zkSessionTimeoutMillis) {
-            // Always return the same instance
-            // (so that we don't loose the mock ZK content on broker restart
-            return CompletableFuture.completedFuture(mockZooKeeper);
-        }
-    };
-
-    private BookKeeperClientFactory mockBookKeeperClientFactory = new BookKeeperClientFactory() {
-
-        @Override
-        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup,
+        public BookKeeper create(ServiceConfiguration conf, MetadataStoreExtended store,
+                                 EventLoopGroup eventLoopGroup,
                                  Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
-                                 Map<String, Object> ensemblePlacementPolicyProperties) throws IOException {
+                                 Map<String, Object> properties) {
+            // Always return the same instance (so that we don't loose the mock BK content on broker restart
             return mockBookKeeper;
         }
 
         @Override
-        public BookKeeper create(ServiceConfiguration conf, ZooKeeper zkClient, EventLoopGroup eventLoopGroup,
+        public BookKeeper create(ServiceConfiguration conf, MetadataStoreExtended store,
+                                 EventLoopGroup eventLoopGroup,
                                  Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
-                                 Map<String, Object> ensemblePlacementPolicyProperties, StatsLogger statsLogger)
-                throws IOException {
+                                 Map<String, Object> properties, StatsLogger statsLogger) {
+            // Always return the same instance (so that we don't loose the mock BK content on broker restart
             return mockBookKeeper;
         }
 
@@ -363,7 +354,6 @@ public abstract class AmqpProtocolHandlerTestBase {
         public void close() {
             // no-op
         }
-
     };
 
     public static void retryStrategically(Predicate<Void> predicate, int retryCount, long intSleepTimeInMillis)
@@ -385,7 +375,7 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     public void checkPulsarServiceState() {
         for (PulsarService pulsarService : pulsarServiceList) {
-            Mockito.when(pulsarService.getState()).thenReturn(PulsarService.State.Started);
+            doReturn(PulsarService.State.Started).when(pulsarService).getState();
         }
     }
 

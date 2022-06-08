@@ -159,7 +159,7 @@ public class RabbitMQTestCase {
 
     public void defaultEmptyExchangeTest(int aopPort, String vhost) throws Exception {
         @Cleanup
-        Connection connection = getConnection("vhost1", aopPort);
+        Connection connection = getConnection(vhost, aopPort);
         @Cleanup
         Channel channel = connection.createChannel();
 

@@ -17,7 +17,6 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import io.netty.buffer.ByteBuf;
@@ -67,54 +66,12 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         if (unknownConn.isOpen()) {
             unknownConn.close();
         }
-        basicConsume(newAddedVhost);
+        basicDirectConsume(newAddedVhost);
     }
 
     @Test(timeOut = 1000 * 5)
     public void basicConsumeCase() throws Exception {
-        basicConsume("vhost1");
-    }
-
-    private void basicConsume(String vhost) throws Exception {
-        String exchangeName = randExName();
-        String routingKey = "test.key";
-        String queueName = randQuName();
-
-        Connection conn = getConnection(vhost, false);
-        Channel channel = conn.createChannel();
-
-        channel.exchangeDeclare(exchangeName, "direct", true);
-        channel.queueDeclare(queueName, true, false, false, null);
-        channel.queueBind(queueName, exchangeName, routingKey);
-
-        int messageCnt = 100;
-        CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
-
-        AtomicInteger consumeIndex = new AtomicInteger(0);
-        channel.basicConsume(queueName, false,
-                new DefaultConsumer(channel) {
-                    @Override
-                    public void handleDelivery(String consumerTag,
-                                               Envelope envelope,
-                                               AMQP.BasicProperties properties,
-                                               byte[] body) throws IOException {
-                        long deliveryTag = envelope.getDeliveryTag();
-                        Assert.assertEquals(new String(body), "Hello, world! - " + consumeIndex.getAndIncrement());
-                        // (process the message components here ...)
-                        channel.basicAck(deliveryTag, false);
-                        countDownLatch.countDown();
-                    }
-                });
-
-        for (int i = 0; i < messageCnt; i++) {
-            byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
-            channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
-        }
-
-        countDownLatch.await();
-        Assert.assertEquals(messageCnt, consumeIndex.get());
-        channel.close();
-        conn.close();
+        basicDirectConsume("vhost1");
     }
 
     @Test(timeOut = 1000 * 5)
@@ -379,20 +336,6 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
     public void defaultEmptyExchangeTest() throws Exception {
         RabbitMQTestCase rabbitMQTestCase = new RabbitMQTestCase(admin);
         rabbitMQTestCase.defaultEmptyExchangeTest(getAmqpBrokerPortList().get(0), "vhost1");
-    }
-
-    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
-        ConnectionFactory connectionFactory = new ConnectionFactory();
-        connectionFactory.setHost("localhost");
-        if (amqpProxyEnable) {
-            int proxyPort = getProxyPort();
-            log.info("use proxyPort: {}", proxyPort);
-        } else {
-            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
-            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
-        }
-        connectionFactory.setVirtualHost(vhost);
-        return connectionFactory.newConnection();
     }
 
     @Test(timeOut = 1000 * 20)

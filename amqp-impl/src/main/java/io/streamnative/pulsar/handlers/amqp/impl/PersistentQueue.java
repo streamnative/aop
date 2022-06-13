@@ -115,35 +115,41 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return indexTopic;
     }
 
-    public void recoverRoutersFromQueueProperties(Map<String, String> properties,
+    public CompletableFuture<Void> recoverRoutersFromQueueProperties(Map<String, String> properties,
                                                   ExchangeContainer exchangeContainer,
                                                   NamespaceName namespaceName) throws JsonProcessingException {
         if (null == properties || properties.isEmpty() || !properties.containsKey(ROUTERS)) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         List<AmqpQueueProperties> amqpQueueProperties = jsonMapper.readValue(properties.get(ROUTERS),
-                new TypeReference<List<AmqpQueueProperties>>() {
-                });
+                new TypeReference<>() {});
         if (amqpQueueProperties == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
-        amqpQueueProperties.stream().forEach((amqpQueueProperty) -> {
-            // recover exchange
-            String exchangeName = amqpQueueProperty.getExchangeName();
-            Set<String> bindingKeys = amqpQueueProperty.getBindingKeys();
-            Map<String, Object> arguments = amqpQueueProperty.getArguments();
-            CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                    exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
-            amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
-                AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
-                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
-                messageRouter.setQueue(this);
-                messageRouter.setExchange(amqpExchange);
-                messageRouter.setArguments(arguments);
-                messageRouter.setBindingKeys(bindingKeys);
-                amqpExchange.addQueue(this).thenAccept(__ -> routers.put(exchangeName, messageRouter));
-            });
+        List<CompletableFuture<Void>> futureList = new ArrayList<>();
+        amqpQueueProperties.forEach((amqpQueueProperty) -> {
+            futureList.add(recoverExchangeBind(exchangeContainer, namespaceName, amqpQueueProperty));
         });
+        return FutureUtil.waitForAll(futureList);
+    }
+
+    private CompletableFuture<Void> recoverExchangeBind(ExchangeContainer exchangeContainer,
+                                                        NamespaceName namespaceName,
+                                                        AmqpQueueProperties props) {
+        // recover exchange
+        String exchangeName = props.getExchangeName();
+        Set<String> bindingKeys = props.getBindingKeys();
+        Map<String, Object> arguments = props.getArguments();
+        return exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null)
+                .thenCompose(amqpExchange -> {
+                    AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
+                            generateRouter(AmqpExchange.Type.value(props.getType().toString()));
+                    messageRouter.setQueue(this);
+                    messageRouter.setExchange(amqpExchange);
+                    messageRouter.setArguments(arguments);
+                    messageRouter.setBindingKeys(bindingKeys);
+                    return amqpExchange.addQueue(this).thenAccept(__ -> routers.put(exchangeName, messageRouter));
+                });
     }
 
     private void updateQueueProperties() {

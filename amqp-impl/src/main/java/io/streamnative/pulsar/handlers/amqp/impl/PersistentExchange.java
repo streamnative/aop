@@ -17,21 +17,20 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPE
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
-import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import io.streamnative.pulsar.handlers.amqp.utils.MapperUtil;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
@@ -43,9 +42,8 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
-import org.apache.pulsar.client.impl.MessageImpl;
+import org.apache.pulsar.client.impl.Backoff;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
-import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -66,51 +64,34 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String ARGUMENTS = "ARGUMENTS";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
-    private PersistentTopic persistentTopic;
+    private final PersistentTopic persistentTopic;
     private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
-    private AmqpExchangeReplicator messageReplicator;
-    private AmqpEntryWriter amqpEntryWriter;
+    private final AmqpExchangeReplicator messageReplicator;
+    private final AmqpEntryWriter amqpEntryWriter;
+    private final AmqpBrokerService amqpBrokerService;
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
-                              boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              Executor routeExecutor, int routeQueueSize) {
+    private final Backoff startReplicateBackoff = new Backoff(100, TimeUnit.MILLISECONDS,
+            30, TimeUnit.SECONDS, 30, TimeUnit.SECONDS);
+
+    public PersistentExchange(AmqpBrokerService amqpBrokerService, String exchangeName, Type type,
+                              PersistentTopic persistentTopic, boolean durable, boolean autoDelete, boolean internal,
+                              Map<String, Object> arguments, Executor routeExecutor, int routeQueueSize) {
         super(exchangeName, type, new HashSet<>(), durable, autoDelete, internal, arguments);
+        this.amqpBrokerService = amqpBrokerService;
         this.persistentTopic = persistentTopic;
         topicNameValidate();
-        cursors = new ConcurrentOpenHashMap<>(16, 1);
+        cursors = ConcurrentOpenHashMap.<String, CompletableFuture<ManagedCursor>>newBuilder()
+                .expectedItems(16).concurrencyLevel(1).build();
         for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {
             cursors.put(cursor.getName(), CompletableFuture.completedFuture(cursor));
-            log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());
+            log.info("[{}] PersistentExchange recover cursor {}", persistentTopic.getName(), cursor.toString());
             cursor.setInactive();
         }
 
-        if (messageReplicator == null) {
-            messageReplicator = new AmqpExchangeReplicator(this, routeExecutor, routeQueueSize) {
-                @Override
-                public CompletableFuture<Void> readProcess(ByteBuf data, Position position) {
-                    Map<String, Object> props;
-                    try {
-                        MessageImpl<byte[]> message = MessageImpl.deserialize(data);
-                        props = message.getMessageBuilder().getPropertiesList().stream()
-                                .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
-                    } catch (IOException e) {
-                        log.error("Deserialize entry dataBuffer failed. exchangeName: {}", exchangeName, e);
-                        return FutureUtil.failedFuture(e);
-                    }
-                    List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
-                    for (AmqpQueue queue : queues) {
-                        CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
-                                position.getLedgerId(), position.getEntryId(),
-                                props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
-                                props);
-                        routeFutureList.add(routeFuture);
-                    }
-                    return FutureUtil.waitForAll(routeFutureList);
-                }
-            };
-            messageReplicator.startReplicate();
-        }
         this.amqpEntryWriter = new AmqpEntryWriter(persistentTopic);
+        this.messageReplicator = new AmqpExchangeReplicator(this, routeExecutor, routeQueueSize);
+        // start routing message could be in async way
+        startRouteMessages();
     }
 
     @Override
@@ -243,7 +224,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     private CompletableFuture<ManagedCursor> createCursorIfNotExists(String name) {
         CompletableFuture<ManagedCursor> cursorFuture = new CompletableFuture<>();
-        return cursors.computeIfAbsent(name, cusrsor -> {
+        return cursors.computeIfAbsent(name, cursor -> {
             ManagedLedgerImpl ledger = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
             if (log.isDebugEnabled()) {
                 log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());
@@ -306,6 +287,46 @@ public class PersistentExchange extends AbstractAmqpExchange {
         String[] nameArr = this.persistentTopic.getName().split("/");
         checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + exchangeName),
                 "The exchange topic name does not conform to the rules(__amqp_exchange__exchangeName).");
+    }
+
+    private void startRouteMessages() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        startRouteMessagesInternal(future);
+    }
+
+    private void startRouteMessagesInternal(CompletableFuture<Void> future) {
+        this.recoverAllBoundQueues()
+                .thenAccept(__ -> {
+                    this.messageReplicator.startReplicate();
+                    future.complete(null);
+                })
+                .exceptionally(t -> {
+                    this.messageReplicator.stopReplicate();
+                    long backoff = this.startReplicateBackoff.next();
+                    log.error("[{}] Failed to start route messages, retry in {} ms.", exchangeName, backoff, t);
+                    amqpBrokerService.getPulsarService().getExecutor()
+                            .schedule(() -> this.startRouteMessagesInternal(future), backoff, TimeUnit.MILLISECONDS);
+                    return null;
+                });
+    }
+
+    public CompletableFuture<Void> recoverAllBoundQueues() {
+        TopicName topicName = TopicName.get(persistentTopic.getName());
+        String queueJsonStr = persistentTopic.getManagedLedger().getProperties().get(PersistentExchange.QUEUES);
+        List<CompletableFuture<AmqpQueue>> amqpQueueFutureList = new ArrayList<>();
+        if (queueJsonStr != null) {
+            try {
+                List<String> list = MapperUtil.readListValue(queueJsonStr);
+                for (String queue : list) {
+                    amqpQueueFutureList.add(
+                            this.amqpBrokerService.getQueueContainer()
+                                    .asyncGetQueue(topicName.getNamespaceObject(), queue, true));
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return FutureUtil.waitForAll(amqpQueueFutureList);
     }
 
 }

@@ -187,7 +187,7 @@ public class QueueServiceImpl implements QueueService {
                     } else {
                         try {
                             amqpQueue.unbindExchange(amqpExchange);
-                            if (amqpExchange.getAutoDelete() && (amqpExchange.getQueueSize() == 0)) {
+                            if (amqpExchange.getAutoDelete() && (amqpExchange.getQueues().size() == 0)) {
                                 exchangeContainer.deleteExchange(namespaceName, exchangeName);
                                 amqpExchange.getTopic().delete().get();
                             }

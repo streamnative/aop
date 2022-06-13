@@ -67,8 +67,8 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     }
 
     @Override
-    public int getQueueSize() {
-        return queues.size();
+    public Set<AmqpQueue> getQueues() {
+        return queues;
     }
 
     @Override

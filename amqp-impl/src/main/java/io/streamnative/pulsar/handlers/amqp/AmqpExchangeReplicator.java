@@ -17,14 +17,18 @@ import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAG
 
 import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
@@ -35,28 +39,30 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.Backoff;
+import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.api.proto.KeyValue;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Amqp exchange replicator, read entries from BookKeeper and process entries.
  */
 @Slf4j
-public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntriesCallback,
-        AsyncCallbacks.DeleteCallback {
+public class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntriesCallback, AsyncCallbacks.DeleteCallback {
 
-    private PersistentExchange persistentExchange;
-    private final String cursorNamePre = "__amqp_replicator__";
-    private String name;
-    private PersistentTopic topic;
+    private final PersistentExchange persistentExchange;
+    private static final String CURSOR_NAME_PREFIX = "__amqp_replicator__";
+    private final String name;
+    private final PersistentTopic topic;
     private ManagedCursor cursor;
-    private ScheduledExecutorService scheduledExecutorService;
+    private final ScheduledExecutorService scheduledExecutorService;
 
     protected final Backoff backOff = new Backoff(
             100, TimeUnit.MILLISECONDS, 1, TimeUnit.MINUTES, 0, TimeUnit.MILLISECONDS);
 
-    private static final AtomicReferenceFieldUpdater<AmqpExchangeReplicator, State> STATE_UPDATER =
+    private final AtomicReferenceFieldUpdater<AmqpExchangeReplicator, State> stateUpdater =
             AtomicReferenceFieldUpdater.newUpdater(AmqpExchangeReplicator.class, State.class, "state");
-    private volatile State state  = State.Stopped;
+    private volatile State state = State.Stopped;
     /**
      * Replicator state.
      */
@@ -82,14 +88,14 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
 
     private final Executor routeExecutor;
 
-    protected AmqpExchangeReplicator(PersistentExchange persistentExchange, Executor routeExecutor,
+    public AmqpExchangeReplicator(PersistentExchange persistentExchange, Executor routeExecutor,
                                      int routeQueueSize) {
         this.persistentExchange = persistentExchange;
         this.topic = (PersistentTopic) persistentExchange.getTopic();
         this.scheduledExecutorService = topic.getBrokerService().executor();
         this.initMaxRouteQueueSize(routeQueueSize);
         this.routeExecutor = routeExecutor;
-        STATE_UPDATER.set(this, AmqpExchangeReplicator.State.Stopped);
+        stateUpdater.set(this, AmqpExchangeReplicator.State.Stopped);
         this.name = "[AMQP Replicator for " + topic.getName() + " ]";
     }
 
@@ -103,16 +109,17 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
     }
 
     public void startReplicate() {
-        if (STATE_UPDATER.get(AmqpExchangeReplicator.this).equals(AmqpExchangeReplicator.State.Stopping)) {
+        if (stateUpdater.get(AmqpExchangeReplicator.this).equals(AmqpExchangeReplicator.State.Stopping)) {
             long waitTimeMs = backOff.next();
             if (log.isDebugEnabled()) {
                 log.debug("{} Waiting for producer close before attempting reconnect, retrying in {} s",
                         name, waitTimeMs / 1000);
             }
             scheduledExecutorService.schedule(this::startReplicate, waitTimeMs, TimeUnit.MILLISECONDS);
+            return;
         }
-        State state = STATE_UPDATER.get(this);
-        if (!STATE_UPDATER.compareAndSet(this, State.Stopped, State.Starting)) {
+        State state = stateUpdater.get(this);
+        if (!stateUpdater.compareAndSet(this, State.Stopped, State.Starting)) {
             if (state.equals(State.Started)) {
                 // already running
                 if (log.isDebugEnabled()) {
@@ -124,14 +131,15 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             return;
         }
 
-        topic.getManagedLedger().asyncOpenCursor(cursorNamePre + persistentExchange.getName(),
+        log.info("{} Replicator is starting.", name);
+
+        topic.getManagedLedger().asyncOpenCursor(CURSOR_NAME_PREFIX + persistentExchange.getName(),
                 CommandSubscribe.InitialPosition.Earliest,
                 new AsyncCallbacks.OpenCursorCallback() {
                     @Override
                     public void openCursorComplete(ManagedCursor managedCursor, Object o) {
-                        log.info("{} Open cursor succeed for route.", name);
                         AmqpExchangeReplicator.this.cursor = managedCursor;
-                        readEntries();
+                        startReadEntries();
                     }
 
                     @Override
@@ -142,7 +150,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
     }
 
     private void retryStartReplicator(Throwable ex) {
-        if (STATE_UPDATER.compareAndSet(this, State.Starting, State.Stopped)) {
+        if (stateUpdater.compareAndSet(this, State.Starting, State.Stopped)) {
             long waitTimeMs = backOff.next();
             if (log.isDebugEnabled()) {
                 log.debug("{} Failed to start replicator, errorMsg: {}, retrying in {} s.",
@@ -154,7 +162,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         }
     }
 
-    private void readEntries() {
+    private void startReadEntries() {
         // Rewind the cursor to be sure to read again all non-acked messages sent while restarting
         cursor.rewind();
         cursor.cancelPendingReadRequest();
@@ -163,7 +171,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         // activate cursor: so, entries can be cached
         cursor.setActive();
 
-        STATE_UPDATER.set(this, State.Started);
+        stateUpdater.set(this, State.Started);
         log.info("{} Replicator is started, routeQueueSize: {}.", name, this.routeQueueSize);
 
         readMoreEntries();
@@ -229,9 +237,9 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
     private void readComplete(List<Pair<PositionImpl, ByteBuf>> list) {
         for (Pair<PositionImpl, ByteBuf> entry : list) {
             PENDING_SIZE_UPDATER.incrementAndGet(this);
-            readProcess(entry.getRight(), entry.getLeft()).whenCompleteAsync((ignored, exception) -> {
+            routeMessages(entry.getRight(), entry.getLeft()).whenCompleteAsync((ignored, exception) -> {
                 if (exception != null) {
-                    log.error("{} Error producing messages", name, exception);
+                    log.error("{} Failed to route messages", name, exception);
                     this.cursor.rewind();
                 } else {
                     if (log.isDebugEnabled()) {
@@ -249,7 +257,26 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         }
     }
 
-    public abstract CompletableFuture<Void> readProcess(ByteBuf data, Position position);
+    private CompletableFuture<Void> routeMessages(ByteBuf data, Position position) {
+        Map<String, Object> props;
+        try {
+            MessageImpl<byte[]> message = MessageImpl.deserialize(data);
+            props = message.getMessageBuilder().getPropertiesList().stream()
+                    .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
+        } catch (IOException e) {
+            log.error("Failed to deserialize entry data for exchange {}", persistentExchange.getName(), e);
+            return FutureUtil.failedFuture(e);
+        }
+        List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
+        for (AmqpQueue queue : persistentExchange.getQueues()) {
+            CompletableFuture<Void> routeFuture = queue.getRouter(persistentExchange.getName()).routingMessage(
+                    position.getLedgerId(), position.getEntryId(),
+                    props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                    props);
+            routeFutureList.add(routeFuture);
+        }
+        return FutureUtil.waitForAll(routeFutureList);
+    }
 
     @Override
     public void readEntriesFailed(ManagedLedgerException exception, Object o) {
@@ -283,24 +310,24 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
 
     public void stopReplicate() {
         if (cursor == null) {
-            STATE_UPDATER.set(this, State.Stopped);
+            stateUpdater.set(this, State.Stopped);
             log.info("[{}] AMQP Exchange Replicator is stopped.", name);
             return;
         }
 
-        if (STATE_UPDATER.get(this).equals(State.Stopping)) {
+        if (stateUpdater.get(this).equals(State.Stopping)) {
             log.warn("Replicator is stopping.");
             return;
         }
 
-        if (cursor != null && (STATE_UPDATER.compareAndSet(this, State.Starting, State.Stopping)
-                || STATE_UPDATER.compareAndSet(this, State.Started, State.Stopping))) {
+        if (cursor != null && (stateUpdater.compareAndSet(this, State.Starting, State.Stopping)
+                || stateUpdater.compareAndSet(this, State.Started, State.Stopping))) {
             cursor.setInactive();
             cursor.asyncClose(new AsyncCallbacks.CloseCallback() {
                 @Override
                 public void closeComplete(Object o) {
                     log.info("[{}] AMQP Exchange Replicator is stopped.", name);
-                    STATE_UPDATER.set(AmqpExchangeReplicator.this, State.Stopped);
+                    stateUpdater.set(AmqpExchangeReplicator.this, State.Stopped);
                     cursor = null;
                 }
 
@@ -308,19 +335,18 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
                 public void closeFailed(ManagedLedgerException e, Object o) {
                     if (e instanceof ManagedLedgerException.CursorAlreadyClosedException) {
                         cursor = null;
-                        STATE_UPDATER.set(AmqpExchangeReplicator.this, State.Stopped);
+                        stateUpdater.set(AmqpExchangeReplicator.this, State.Stopped);
                         return;
                     }
                     long waitTimeMs = backOff.next();
                     log.error("[{}] AMQP Exchange Replicator stop failed. retrying in {} s",
                             name, waitTimeMs / 1000, e);
                     AmqpExchangeReplicator.this.scheduledExecutorService.schedule(
-                            AmqpExchangeReplicator.this::stopReplicate, waitTimeMs, TimeUnit.MILLISECONDS);
+                            () -> AmqpExchangeReplicator.this.stopReplicate(),
+                            waitTimeMs, TimeUnit.MILLISECONDS);
                 }
             }, null);
         }
-
-        log.info("[{}] AMQP Exchange Replicator is already stopped. State: {}", name, STATE_UPDATER.get(this));
     }
 
 }

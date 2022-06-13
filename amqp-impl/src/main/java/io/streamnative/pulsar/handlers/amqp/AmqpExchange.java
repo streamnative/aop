@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
@@ -151,6 +152,6 @@ public interface AmqpExchange {
      */
     void removeQueue(AmqpQueue queue);
 
-    int getQueueSize();
+    Set<AmqpQueue> getQueues();
 
 }

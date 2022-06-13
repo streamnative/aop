@@ -270,7 +270,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
-                defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false);
+                defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
             AmqpConsumer consumer;
             try {
@@ -390,7 +390,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         try {
                             if (subscription == null) {
                                 subscription = topic.createSubscription(defaultSubscription,
-                                        CommandSubscribe.InitialPosition.Earliest, false).get();
+                                        CommandSubscribe.InitialPosition.Earliest, false, null).get();
                             }
                             consumer = new AmqpPullConsumer(queueContainer, subscription,
                                     CommandSubscribe.SubType.Shared,

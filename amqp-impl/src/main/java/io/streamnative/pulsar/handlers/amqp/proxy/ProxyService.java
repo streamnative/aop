@@ -54,8 +54,6 @@ public class ProxyService implements Closeable {
     private static final int numThreads = Runtime.getRuntime().availableProcessors();
 
     @Getter
-    private static final Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
-    @Getter
     private static final Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
 
     private String tenant;
@@ -100,14 +98,6 @@ public class ProxyService implements Closeable {
                 proxyConnection.close();
             }
         }
-    }
-
-    public void cacheVhostMap(String vhost, Pair<String, Integer> lookupData) {
-        this.vhostBrokerMap.put(vhost, lookupData);
-    }
-
-    public void cacheVhostMapRemove(String vhost) {
-        this.vhostBrokerMap.remove(vhost);
     }
 
     @Override

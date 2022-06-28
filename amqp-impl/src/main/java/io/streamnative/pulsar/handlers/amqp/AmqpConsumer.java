@@ -18,6 +18,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,7 @@ import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
 import org.apache.pulsar.common.protocol.Commands;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**
@@ -122,11 +124,14 @@ public class AmqpConsumer extends Consumer {
         final AmqpConnection connection = channel.getConnection();
         MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         connection.ctx.channel().eventLoop().execute(() -> {
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
             for (Entry index : entries) {
                 if (index == null) {
                     // Entry was filtered out
                     continue;
                 }
+                CompletableFuture<Void> sendFuture = new CompletableFuture<>();
+                futures.add(sendFuture);
                 IndexMessage indexMessage = MessageConvertUtils.entryToIndexMessage(index);
                 asyncGetQueue().thenApply(amqpQueue -> amqpQueue.readEntryAsync(
                         indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
@@ -148,17 +153,18 @@ public class AmqpConsumer extends Consumer {
                                                 channel.getChannelId(), getRedeliveryTracker().
                                                         contains(index.getPosition()), deliveryTag,
                                                 AMQShortString.createAMQShortString(consumerTag));
-                                        connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);
+                                        sendFuture.complete(null);
                                     } catch (UnsupportedEncodingException e) {
                                         log.error("Failed to sendMessages due to unsupportedEncodingException", e);
-                                        writePromise.setFailure(e);
+                                        sendFuture.completeExceptionally(e);
                                     }
 
                                     if (autoAck) {
                                         messagesAck(index.getPosition());
                                     }
                                 } else {
-                                    messagesAck(index.getPosition());
+                                    log.error("Failed to read entries data.", ex);
+                                    sendFuture.completeExceptionally(ex);
                                 }
                             } finally {
                                 msg.release();
@@ -167,9 +173,17 @@ public class AmqpConsumer extends Consumer {
                             }
                         })).exceptionally(throwable -> {
                             log.error("Failed to get queue from queue container", throwable);
+                            sendFuture.completeExceptionally(throwable);
                             return null;
-                });
+                }).join();
             }
+            FutureUtil.waitForAll(futures).whenComplete((ignored, throwable) -> {
+                if (throwable != null) {
+                    writePromise.setFailure(throwable);
+                    return;
+                }
+                connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);
+            });
             batchSizes.recyle();
         });
         return writePromise;

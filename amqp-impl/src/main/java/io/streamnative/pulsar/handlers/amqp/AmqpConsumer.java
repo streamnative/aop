@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -100,16 +101,17 @@ public class AmqpConsumer extends Consumer {
     }
 
     @Override
-    public ChannelPromise sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
+    public Future<Void> sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
            EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
            RedeliveryTracker redeliveryTracker, long epoch) {
+        ChannelPromise writePromise = this.channel.getConnection().getCtx().newPromise();
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
                 log.debug("[{}-{}] List of messages is empty, triggering write future immediately for consumerId {}",
                         queueName, consumerTag, consumerId());
             }
-
-            return null;
+            writePromise.setSuccess(null);
+            return writePromise;
         }
         if (!autoAck) {
             channel.getCreditManager().useCreditForMessages(totalMessages, 0);
@@ -146,8 +148,10 @@ public class AmqpConsumer extends Consumer {
                                                 channel.getChannelId(), getRedeliveryTracker().
                                                         contains(index.getPosition()), deliveryTag,
                                                 AMQShortString.createAMQShortString(consumerTag));
+                                        connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);
                                     } catch (UnsupportedEncodingException e) {
-                                        log.error("sendMessages UnsupportedEncodingException", e);
+                                        log.error("Failed to sendMessages due to unsupportedEncodingException", e);
+                                        writePromise.setFailure(e);
                                     }
 
                                     if (autoAck) {
@@ -168,7 +172,7 @@ public class AmqpConsumer extends Consumer {
             }
             batchSizes.recyle();
         });
-        return null;
+        return writePromise;
     }
 
     public void messagesAck(List<Position> position) {

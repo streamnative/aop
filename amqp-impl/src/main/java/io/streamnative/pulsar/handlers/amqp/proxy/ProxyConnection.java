@@ -253,34 +253,27 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             close();
             return;
         }
-        if (proxyService.getVhostBrokerMap().containsKey(vhost)) {
-            String aopBrokerHost = proxyService.getVhostBrokerMap().get(vhost).getLeft();
-            int aopBrokerPort = proxyService.getVhostBrokerMap().get(vhost).getRight();
-            handleConnectComplete(aopBrokerHost, aopBrokerPort, retryTimes);
-        } else {
-            try {
-                NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), vhost);
+        try {
+            NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), vhost);
 
-                String topic = TopicName.get(TopicDomain.persistent.value(),
-                        namespaceName, "__lookup__").toString();
-                CompletableFuture<Pair<String, Integer>> lookupData = lookupHandler.findBroker(
-                        TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
-                lookupData.whenComplete((pair, throwable) -> {
-                    if (throwable != null) {
-                        log.error("Lookup broker failed; may retry.", throwable);
-                        retryTimes.decrementAndGet();
-                        handleConnect(retryTimes);
-                        return;
-                    }
-                    assert pair != null;
-                    handleConnectComplete(pair.getLeft(), pair.getRight(), retryTimes);
-                    proxyService.cacheVhostMap(vhost, pair);
-                });
-            } catch (Exception e) {
-                log.error("Lookup broker failed.", e);
-                resetProxyHandler();
-                close();
-            }
+            String topic = TopicName.get(TopicDomain.persistent.value(),
+                    namespaceName, "__lookup__").toString();
+            CompletableFuture<Pair<String, Integer>> lookupData = lookupHandler.findBroker(
+                    TopicName.get(topic), AmqpProtocolHandler.PROTOCOL_NAME);
+            lookupData.whenComplete((pair, throwable) -> {
+                if (throwable != null) {
+                    log.error("Lookup broker failed; may retry.", throwable);
+                    retryTimes.decrementAndGet();
+                    handleConnect(retryTimes);
+                    return;
+                }
+                assert pair != null;
+                handleConnectComplete(pair.getLeft(), pair.getRight(), retryTimes);
+            });
+        } catch (Exception e) {
+            log.error("Lookup broker failed.", e);
+            resetProxyHandler();
+            close();
         }
     }
 

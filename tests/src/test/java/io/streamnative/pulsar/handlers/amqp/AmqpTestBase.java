@@ -117,7 +117,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
 
         AtomicInteger consumeIndex = new AtomicInteger(0);
-        channel.basicConsume(queueName, false, null, false, exclusiveConsume, null,
+        channel.basicConsume(queueName, false, "", false, exclusiveConsume, null,
                 new DefaultConsumer(channel) {
                     @Override
                     public void handleDelivery(String consumerTag,

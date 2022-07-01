@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQFrameDecodingException;
 import org.apache.qpid.server.protocol.v0_8.ServerDecoder;
@@ -24,9 +25,10 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 /**
  * Amqp broker decoder for amqp protocol requests decoding.
  */
+@Slf4j
 public class AmqpBrokerDecoder extends ServerDecoder {
 
-    private static final int bufferSize = 4 * 1024 * 1024;
+    private static final int bufferSize = 4 * 1024;
     private volatile QpidByteBuffer netInputBuffer;
 
     /**
@@ -47,13 +49,18 @@ public class AmqpBrokerDecoder extends ServerDecoder {
     @Override
     public void decodeBuffer(QpidByteBuffer buf) throws AMQFrameDecodingException, AMQProtocolVersionException,
             IOException {
-        if (netInputBuffer.remaining() < buf.remaining()) {
+        int messageSize = buf.remaining();
+        if (netInputBuffer.remaining() < messageSize) {
             QpidByteBuffer oldBuffer = netInputBuffer;
-            netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize);
+            boolean oldBufferFlag = false;
             if (oldBuffer.position() != 0) {
                 oldBuffer.limit(oldBuffer.position());
                 oldBuffer.slice();
                 oldBuffer.flip();
+                oldBufferFlag = true;
+            }
+            netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize + oldBuffer.remaining() + messageSize);
+            if (oldBufferFlag) {
                 netInputBuffer.put(oldBuffer);
             }
         }

@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import java.io.IOException;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQFrameDecodingException;
 import org.apache.qpid.server.protocol.v0_8.ServerDecoder;
@@ -25,7 +24,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 /**
  * Amqp broker decoder for amqp protocol requests decoding.
  */
-@Slf4j
 public class AmqpBrokerDecoder extends ServerDecoder {
 
     private static final int bufferSize = 4 * 1024;

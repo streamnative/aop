@@ -50,16 +50,14 @@ public class AmqpBrokerDecoder extends ServerDecoder {
         int messageSize = buf.remaining();
         if (netInputBuffer.remaining() < messageSize) {
             QpidByteBuffer oldBuffer = netInputBuffer;
-            boolean oldBufferFlag = false;
             if (oldBuffer.position() != 0) {
                 oldBuffer.limit(oldBuffer.position());
                 oldBuffer.slice();
                 oldBuffer.flip();
-                oldBufferFlag = true;
-            }
-            netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize + oldBuffer.remaining() + messageSize);
-            if (oldBufferFlag) {
+                netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize + oldBuffer.remaining() + messageSize);
                 netInputBuffer.put(oldBuffer);
+            } else {
+                netInputBuffer = QpidByteBuffer.allocateDirect(bufferSize + messageSize);
             }
         }
         netInputBuffer.put(buf);

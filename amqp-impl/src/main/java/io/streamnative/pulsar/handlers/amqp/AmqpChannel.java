@@ -334,7 +334,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                 return;
                             } else {
                                 // bind to default exchange.
-                                if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null) {
+                                if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null
+                                        || amqpExchange.getQueue(queueName) == null) {
                                     amqpQueue.bindExchange(amqpExchange,
                                             AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
                                             routingKey.toString(), null);

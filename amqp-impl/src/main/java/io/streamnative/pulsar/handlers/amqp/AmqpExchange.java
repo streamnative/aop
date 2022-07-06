@@ -134,6 +134,13 @@ public interface AmqpExchange {
     void addQueue(AmqpQueue queue);
 
     /**
+     * Get a queue {@link AmqpQueue} with queue name.
+     * @param queueName AMQP queue name.
+     * @return AMQP queue.
+     */
+    AmqpQueue getQueue(String queueName);
+
+    /**
      * Remove a queue {@link AmqpQueue} from the exchange.
      * @param queue AMQP queue.
      */

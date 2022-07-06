@@ -484,7 +484,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             CompletableFuture<AmqpExchange> completableFuture = exchangeContainer.
                     asyncGetExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
                             true, ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
-            completableFuture.whenComplete((amqpExchange, throwable) -> {
+            completableFuture.whenCompleteAsync((amqpExchange, throwable) -> {
                 if (null != throwable) {
                     log.error("Get exchange failed. exchange name:{}", AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
                     closeChannel(ErrorCodes.INTERNAL_ERROR, "Get exchange failed. ");
@@ -492,14 +492,13 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     String queueName = routingKey.toString();
                     CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
                             queueContainer.asyncGetQueue(connection.getNamespaceName(), queueName, false);
-                    amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable1) -> {
+                    amqpQueueCompletableFuture.whenCompleteAsync((amqpQueue, throwable1) -> {
                         if (throwable1 != null) {
                             log.error("Get Topic error:{}", throwable1.getMessage());
                             closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable1.getMessage());
                         } else {
                             if (amqpQueue == null) {
                                 closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + queueName);
-                                return;
                             } else {
                                 // bind to default exchange.
                                 if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null

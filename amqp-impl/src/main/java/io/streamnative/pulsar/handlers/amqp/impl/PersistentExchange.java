@@ -323,7 +323,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
                                     .asyncGetQueue(topicName.getNamespaceObject(), queue, true));
                 }
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                log.error("Failed to read bound queues for exchange {}.", exchangeName, e);
+                FutureUtil.failedFuture(e);
             }
         }
         return FutureUtil.waitForAll(amqpQueueFutureList);

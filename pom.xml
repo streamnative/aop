@@ -80,6 +80,7 @@
     <module>amqp-impl</module>
     <module>tests</module>
     <module>tests-qpid-jms-client</module>
+    <module>amqp-client-auth</module>
   </modules>
 
   <!-- dependency definitions -->
@@ -90,6 +91,11 @@
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-annotations</artifactId>
         <version>${spotbugs-annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.rabbitmq</groupId>
+        <artifactId>amqp-client</artifactId>
+        <version>${rabbitmq.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

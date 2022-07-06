@@ -172,7 +172,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                     (short) pv.getActualMinorVersion(),
                     null,
                     // TODO temporary modification
-                    "PLAIN".getBytes(US_ASCII),
+                    "PLAIN token".getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
         } catch (QpidException e) {

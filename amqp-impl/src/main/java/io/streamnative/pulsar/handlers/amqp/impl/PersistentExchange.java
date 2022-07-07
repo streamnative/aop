@@ -17,6 +17,7 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPE
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
@@ -24,11 +25,11 @@ import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -74,7 +75,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
                               Executor routeExecutor, int routeQueueSize) {
-        super(exchangeName, type, new HashSet<>(), durable, autoDelete, internal, arguments);
+        super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
         cursors = new ConcurrentOpenHashMap<>(16, 1);
@@ -93,17 +94,40 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         MessageImpl<byte[]> message = MessageImpl.deserialize(data);
                         props = message.getMessageBuilder().getPropertiesList().stream()
                                 .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
-                    } catch (IOException e) {
-                        log.error("Deserialize entry dataBuffer failed. exchangeName: {}", exchangeName, e);
+                    } catch (Exception e) {
+                        log.error("Failed to deserialize entry dataBuffer. exchangeName: {}", exchangeName, e);
                         return FutureUtil.failedFuture(e);
                     }
+
                     List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
-                    for (AmqpQueue queue : queues) {
-                        CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
-                                position.getLedgerId(), position.getEntryId(),
-                                props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
-                                props);
-                        routeFutureList.add(routeFuture);
+                    if (exchangeType == Type.Direct) {
+                        String bindingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
+                        Set<AmqpQueue> queueSet = bindingKeyQueueMap.get(bindingKey);
+                        if (queueSet == null) {
+                            if (log.isDebugEnabled()) {
+                                log.debug("The queue set of the bindingKey {} is not exist.", bindingKey);
+                            }
+                        } else {
+                            for (AmqpQueue queue : queueSet) {
+                                routeFutureList.add(
+                                        queue.writeIndexMessageAsync(
+                                                exchangeName, position.getLedgerId(), position.getEntryId(), props));
+                            }
+                        }
+                    } else if (exchangeType == Type.Fanout) {
+                        for (AmqpQueue queue : queues) {
+                            routeFutureList.add(
+                                    queue.writeIndexMessageAsync(
+                                            exchangeName, position.getLedgerId(), position.getEntryId(), props));
+                        }
+                    } else {
+                        for (AmqpQueue queue : queues) {
+                            CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
+                                    position.getLedgerId(), position.getEntryId(),
+                                    props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                                    props);
+                            routeFutureList.add(routeFuture);
+                        }
                     }
                     return FutureUtil.waitForAll(routeFutureList);
                 }
@@ -203,6 +227,20 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public CompletableFuture<Void> addQueue(AmqpQueue queue) {
         queues.add(queue);
+        if (exchangeType == Type.Direct) {
+            for (String bindingKey : queue.getRouter(exchangeName).getBindingKey()) {
+                bindingKeyQueueMap.compute(bindingKey, (k, v) -> {
+                    if (v == null) {
+                        Set<AmqpQueue> set = new HashSet<>();
+                        set.add(queue);
+                        return set;
+                    } else {
+                        v.add(queue);
+                        return v;
+                    }
+                });
+            }
+        }
         updateExchangeProperties();
         return createCursorIfNotExists(queue.getName()).thenApply(__ -> null);
     }
@@ -210,6 +248,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
+        if (bindingKeyQueueMap != null) {
+            for (Set<AmqpQueue> queueSet : bindingKeyQueueMap.values()) {
+                queueSet.remove(queue);
+            }
+        }
         updateExchangeProperties();
         deleteCursor(queue.getName());
     }

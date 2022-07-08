@@ -27,6 +27,7 @@ import io.netty.handler.timeout.IdleStateHandler;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -199,8 +200,13 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 return;
             }
 
+            String authMethod = String.valueOf(mechanism);
+            if (authMethod.equals("PLAIN")) {
+                authMethod = "basic";
+            }
+
             AuthenticationProvider authenticationProvider = amqpBrokerService.getAuthenticationService()
-                    .getAuthenticationProvider(String.valueOf(mechanism));
+                    .getAuthenticationProvider(authMethod);
             if (authenticationProvider == null) {
                 if (log.isDebugEnabled()) {
                     log.debug("No authentication provider is configured: mechanism={}", mechanism);
@@ -210,7 +216,25 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             }
 
             try {
-                AuthData authData = AuthData.of(response);
+                AuthData authData;
+                if (authMethod.equals("basic")) {
+                    // Original format: \000USERNAME\000PASSWORD
+                    String splitter = "\000";
+                    String[] data = StringUtils.stripStart(new String(response, StandardCharsets.UTF_8), splitter)
+                            .split(splitter);
+                    if (data.length != 2) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Authentication data format error: mechanism={}", mechanism);
+                        }
+                        sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "Authentication data format error", 0);
+                        return;
+                    }
+                    // Encode data to Pulsar format: USERNAME:PASSWORD
+                    authData = AuthData.of(String.format("%s:%s", data[0], data[1]).getBytes(StandardCharsets.UTF_8));
+                } else {
+                    authData = AuthData.of(response);
+                }
+
                 authenticationState = authenticationProvider.newAuthState(authData, null, null);
                 authenticationState.authenticate(authData);
                 if (log.isDebugEnabled()) {

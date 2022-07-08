@@ -99,7 +99,7 @@ public abstract class AmqpProtocolTestBase {
         mockPulsarService();
         mockBrokerService();
         ConnectionContainer connectionContainer = mock(ConnectionContainer.class);
-        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer, new AmqpServiceConfiguration());
         amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.
@@ -138,7 +138,7 @@ public abstract class AmqpProtocolTestBase {
         pulsarService = mock(PulsarService.class);
         PulsarAdmin adminClient = mock(PulsarAdmin.class);
         Namespaces namespaces = mock(Namespaces.class);
-        ServiceConfiguration serviceConfiguration = mock(ServiceConfiguration.class);
+        ServiceConfiguration serviceConfiguration = spy(ServiceConfiguration.class);
         Mockito.when(pulsarService.getAdminClient()).thenReturn(adminClient);
         Mockito.when(pulsarService.getAdminClient().namespaces()).thenReturn(namespaces);
         Mockito.when(pulsarService.getBrokerService()).then(new Answer<Object>() {

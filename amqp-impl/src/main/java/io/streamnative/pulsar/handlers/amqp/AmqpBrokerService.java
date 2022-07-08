@@ -14,8 +14,13 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import com.google.common.collect.Sets;
+import com.google.gson.Gson;
+import java.util.Set;
 import lombok.Getter;
+import lombok.SneakyThrows;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
 
 /**
@@ -36,8 +41,10 @@ public class AmqpBrokerService {
     private ConnectionContainer connectionContainer;
     @Getter
     private PulsarService pulsarService;
+    @Getter
+    private AuthenticationService authenticationService;
 
-    public AmqpBrokerService(PulsarService pulsarService) {
+    public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
@@ -45,9 +52,11 @@ public class AmqpBrokerService {
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
+        loadAuthenticationService(amqpConfig);
     }
 
-    public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
+    public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer,
+                             AmqpServiceConfiguration amqpConfig) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
@@ -55,13 +64,23 @@ public class AmqpBrokerService {
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = connectionContainer;
+        loadAuthenticationService(amqpConfig);
+    }
+
+    @SneakyThrows
+    public void loadAuthenticationService(AmqpServiceConfiguration amqpConfig) {
+        Gson gson = new Gson();
+        ServiceConfiguration conf = gson.fromJson(gson.toJson(pulsarService.getConfiguration(),
+                ServiceConfiguration.class), ServiceConfiguration.class);
+        Set<String> providers = Sets.newHashSet();
+        providers.addAll(amqpConfig.getAuthenticationProviders());
+        providers.addAll(amqpConfig.getAmqpAuthenticationProviders());
+        conf.setAuthenticationProviders(providers);
+
+        this.authenticationService = new AuthenticationService(conf);
     }
 
     public boolean isAuthenticationEnabled() {
         return pulsarService.getConfiguration().isAuthenticationEnabled();
-    }
-
-    public AuthenticationService getAuthenticationService() {
-        return pulsarService.getBrokerService().getAuthenticationService();
     }
 }

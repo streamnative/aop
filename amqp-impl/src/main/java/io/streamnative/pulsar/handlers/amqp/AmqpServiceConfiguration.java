@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Collections;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -97,4 +99,11 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
             doc = "Whether start amqp protocol handler with proxy"
     )
     private boolean amqpProxyEnable = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_PROXY,
+            required = false,
+            doc = "Whether enable amqp protocol handler with authentication"
+    )
+    private Set<String> amqpAuthenticationProviders = Collections.emptySet();
 }

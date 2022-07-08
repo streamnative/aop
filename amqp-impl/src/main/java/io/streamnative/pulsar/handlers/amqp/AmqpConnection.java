@@ -31,12 +31,16 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.naming.AuthenticationException;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pulsar.broker.authentication.AuthenticationProvider;
+import org.apache.pulsar.broker.authentication.AuthenticationState;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.ServerCnx;
+import org.apache.pulsar.common.api.AuthData;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -103,6 +107,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
     private AmqpBrokerService amqpBrokerService;
+    private AuthenticationState authenticationState;
 
     public AmqpConnection(AmqpServiceConfiguration amqpConfig,
                           AmqpBrokerService amqpBrokerService) {
@@ -175,18 +180,49 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response,
-        AMQShortString locale) {
+                                         AMQShortString locale) {
         if (log.isDebugEnabled()) {
             log.debug("RECV ConnectionStartOk[clientProperties: {}, mechanism: {}, locale: {}]",
-                clientProperties, mechanism, locale);
+                    clientProperties, mechanism, locale);
         }
         assertState(ConnectionState.AWAIT_START_OK);
         // TODO clientProperties
 
-        // TODO security process
-//        AMQMethodBody responseBody = this.methodRegistry.createConnectionSecureBody(new byte[0]);
-//        writeFrame(responseBody.generateFrame(0));
-//        state = ConnectionState.AWAIT_SECURE_OK;
+        // TODO tls security process
+        if (amqpBrokerService.isAuthenticationEnabled()) {
+            if (mechanism == null) {
+                sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "No mechanism provided", 0);
+                return;
+            }
+            if (response == null || response.length == 0) {
+                sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "No authentication data provided", 0);
+                return;
+            }
+
+            AuthenticationProvider authenticationProvider = amqpBrokerService.getAuthenticationService()
+                    .getAuthenticationProvider(String.valueOf(mechanism));
+            if (authenticationProvider == null) {
+                if (log.isDebugEnabled()) {
+                    log.debug("No authentication provider is configured: mechanism={}", mechanism);
+                }
+                sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "No authentication provider is configured", 0);
+                return;
+            }
+
+            try {
+                AuthData authData = AuthData.of(response);
+                authenticationState = authenticationProvider.newAuthState(authData, null, null);
+                authenticationState.authenticate(authData);
+                if (log.isDebugEnabled()) {
+                    String authRole = authenticationState.getAuthRole();
+                    log.debug("Authentication succeeded: mechanism={}, authRole={}", mechanism, authRole);
+                }
+            } catch (AuthenticationException e) {
+                log.error("Failed to authenticate: mechanism={}", mechanism, e);
+                sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Authentication failed", 0);
+                return;
+            }
+        }
 
         ConnectionTuneBody tuneBody =
                 methodRegistry.createConnectionTuneBody(maxChannels,
@@ -398,14 +434,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         brokerDecoder.setExpectProtocolInitiation(false);
         try {
             ProtocolVersion pv = pi.checkVersion(); // Fails if not correct
-            // TODO serverProperties mechanis
+            // TODO serverProperties
             AMQMethodBody responseBody = this.methodRegistry.createConnectionStartBody(
-                (short) protocolVersion.getMajorVersion(),
-                (short) pv.getActualMinorVersion(),
-                null,
-                // TODO temporary modification
-                "PLAIN".getBytes(US_ASCII),
-                "en_US".getBytes(US_ASCII));
+                    (short) protocolVersion.getMajorVersion(),
+                    (short) pv.getActualMinorVersion(),
+                    null,
+                    // TODO temporary modification
+                    "PLAIN token".getBytes(US_ASCII),
+                    "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
             state = ConnectionState.AWAIT_START_OK;
         } catch (Exception e) {

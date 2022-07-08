@@ -99,7 +99,13 @@
       <version>${hamcrest-version}</version>
       <scope>test</scope>
     </dependency>
-    <!-- jms test -->
+
+    <dependency>
+      <groupId>io.streamnative.pulsar.handlers</groupId>
+      <artifactId>amqp-client-auth</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
 
   </dependencies>
 

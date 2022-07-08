@@ -42,12 +42,15 @@ import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.BookKeeperClientFactory;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.ServiceConfiguration;
 import org.apache.pulsar.broker.auth.SameThreadOrderedSafeExecutor;
 import org.apache.pulsar.broker.namespace.NamespaceService;
 import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminBuilder;
+import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.compaction.Compactor;
@@ -150,7 +153,13 @@ public abstract class AmqpProtocolHandlerTestBase {
     }
 
     protected PulsarClient newPulsarClient(String url, int intervalInSecs) throws PulsarClientException {
-        return PulsarClient.builder().serviceUrl(url).statsInterval(intervalInSecs, TimeUnit.SECONDS).build();
+        ClientBuilder clientBuilder = PulsarClient.builder().serviceUrl(url).statsInterval(intervalInSecs,
+                TimeUnit.SECONDS);
+        if (StringUtils.isNotEmpty(conf.getBrokerClientAuthenticationPlugin())) {
+            clientBuilder.authentication(conf.getBrokerClientAuthenticationPlugin(),
+                    conf.getBrokerClientAuthenticationParameters());
+        }
+        return clientBuilder.build();
     }
 
     protected final void init() throws Exception {
@@ -167,7 +176,12 @@ public abstract class AmqpProtocolHandlerTestBase {
         brokerUrlTls = new URL("https://" + pulsarServiceList.get(0).getAdvertisedAddress() + ":"
                 + pulsarServiceList.get(0).getConfiguration().getWebServicePortTls().get());
 
-        admin = spy(PulsarAdmin.builder().serviceHttpUrl(brokerUrl.toString()).build());
+        PulsarAdminBuilder pulsarAdminBuilder = PulsarAdmin.builder().serviceHttpUrl(brokerUrl.toString());
+        if (StringUtils.isNotEmpty(conf.getBrokerClientAuthenticationPlugin())) {
+            pulsarAdminBuilder.authentication(conf.getBrokerClientAuthenticationPlugin(),
+                    conf.getBrokerClientAuthenticationParameters());
+        }
+        admin = spy(pulsarAdminBuilder.build());
     }
 
     protected final void internalCleanup() throws Exception {

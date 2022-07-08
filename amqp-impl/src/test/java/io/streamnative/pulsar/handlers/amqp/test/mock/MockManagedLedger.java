@@ -90,6 +90,12 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
+    public ManagedCursor newNonDurableCursor(Position position, String s,
+            PulsarApi.CommandSubscribe.InitialPosition initialPosition, boolean b) throws ManagedLedgerException {
+        return null;
+    }
+
+    @Override
     public void asyncDeleteCursor(String s, AsyncCallbacks.DeleteCursorCallback deleteCursorCallback, Object o) {
 
     }
@@ -272,12 +278,5 @@ public class MockManagedLedger implements ManagedLedger {
     @Override
     public void rollCurrentLedgerIfFull() {
 
-    }
-
-    @Override
-    public ManagedCursor newNonDurableCursor(Position position, String s,
-                                             PulsarApi.CommandSubscribe.InitialPosition initialPosition)
-            throws ManagedLedgerException {
-        return null;
     }
 }

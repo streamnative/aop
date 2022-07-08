@@ -15,12 +15,15 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Sets;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.streamnative.pulsar.handlers.amqp.authentication.AuthenticationProviderBasic;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import javax.crypto.SecretKey;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.pulsar.broker.authentication.AuthenticationProviderToken;
 import org.apache.pulsar.broker.authentication.utils.AuthTokenUtils;
 import org.apache.pulsar.client.impl.auth.AuthenticationToken;
@@ -44,10 +47,15 @@ public class AmqpTokenAuthenticationTestBase extends AmqpProtocolHandlerTestBase
     @Override
     public void setup() throws Exception {
         conf.setAuthenticationEnabled(true);
-        conf.setAuthenticationProviders(Sets.newHashSet(AuthenticationProviderToken.class.getName()));
-
+        conf.setAuthenticationProviders(Sets.newHashSet(
+                AuthenticationProviderToken.class.getName(),
+                AuthenticationProviderBasic.class.getName()
+        ));
         Properties properties = new Properties();
         properties.setProperty("tokenSecretKey", AuthTokenUtils.encodeKeyBase64(secretKey));
+        String basicAuthConf = Base64.encodeBase64String(("superUser:mQQQIsyvvKRtU\n"
+                + "superUser2:$apr1$foobarmq$kuSZlLgOITksCkRgl57ie/\n").getBytes(StandardCharsets.UTF_8));
+        properties.setProperty("basicAuthConf", basicAuthConf);
         conf.setProperties(properties);
 
         conf.setBrokerClientAuthenticationPlugin(AuthenticationToken.class.getName());

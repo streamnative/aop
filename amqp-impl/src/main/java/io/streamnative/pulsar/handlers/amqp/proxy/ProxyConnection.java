@@ -137,6 +137,8 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 } catch (Throwable e) {
                     log.error("error while handle command:", e);
                     close();
+                } finally {
+                    buffer.release();
                 }
 
                 break;

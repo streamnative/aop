@@ -121,8 +121,8 @@ public class AmqpConsumer extends Consumer {
                 channel.setBlockedOnCredit();
             }
         }
-        final AmqpConnection connection = channel.getConnection();
         MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
+        final AmqpConnection connection = channel.getConnection();
         connection.ctx.channel().eventLoop().execute(() -> {
             List<CompletableFuture<Void>> futures = new ArrayList<>();
             for (Entry index : entries) {
@@ -130,52 +130,7 @@ public class AmqpConsumer extends Consumer {
                     // Entry was filtered out
                     continue;
                 }
-                CompletableFuture<Void> sendFuture = new CompletableFuture<>();
-                futures.add(sendFuture);
-                IndexMessage indexMessage = MessageConvertUtils.entryToIndexMessage(index);
-                asyncGetQueue().thenApply(amqpQueue -> amqpQueue.readEntryAsync(
-                        indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
-                        .whenComplete((msg, ex) -> {
-                            try {
-                                if (ex == null) {
-                                    long deliveryTag = channel.getNextDeliveryTag();
-
-                                    addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                                            (PositionImpl) msg.getPosition());
-                                    if (!autoAck) {
-                                        channel.getUnacknowledgedMessageMap().add(deliveryTag,
-                                                index.getPosition(), this, msg.getLength());
-                                    }
-
-                                    try {
-                                        connection.getAmqpOutputConverter().writeDeliver(
-                                                MessageConvertUtils.entryToAmqpBody(msg),
-                                                channel.getChannelId(), getRedeliveryTracker().
-                                                        contains(index.getPosition()), deliveryTag,
-                                                AMQShortString.createAMQShortString(consumerTag));
-                                        sendFuture.complete(null);
-                                    } catch (UnsupportedEncodingException e) {
-                                        log.error("Failed to sendMessages due to unsupportedEncodingException", e);
-                                        sendFuture.completeExceptionally(e);
-                                    }
-
-                                    if (autoAck) {
-                                        messagesAck(index.getPosition());
-                                    }
-                                } else {
-                                    log.error("Failed to read entries data.", ex);
-                                    sendFuture.completeExceptionally(ex);
-                                }
-                            } finally {
-                                msg.release();
-                                index.release();
-                                indexMessage.recycle();
-                            }
-                        })).exceptionally(throwable -> {
-                            log.error("Failed to get queue from queue container", throwable);
-                            sendFuture.completeExceptionally(throwable);
-                            return null;
-                }).join();
+                futures.add(sendMessage(index));
             }
             FutureUtil.waitForAll(futures).whenComplete((ignored, throwable) -> {
                 if (throwable != null) {
@@ -187,6 +142,62 @@ public class AmqpConsumer extends Consumer {
             batchSizes.recyle();
         });
         return writePromise;
+    }
+
+    private CompletableFuture<Void> sendMessage(Entry index) {
+        CompletableFuture<Void> sendFuture = new CompletableFuture<>();
+        IndexMessage indexMessage;
+        try {
+            indexMessage = MessageConvertUtils.entryToIndexMessage(index);
+        } catch (Exception e) {
+            log.error("[{}-{}] Failed to get index data.", queueName, consumerTag, e);
+            sendFuture.completeExceptionally(e);
+            return sendFuture;
+        }
+        asyncGetQueue()
+                .thenCompose(amqpQueue -> amqpQueue.readEntryAsync(
+                        indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
+                .thenAccept(msg -> {
+                    try {
+                        long deliveryTag = channel.getNextDeliveryTag();
+
+                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
+                                (PositionImpl) msg.getPosition());
+                        if (!autoAck) {
+                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                    index.getPosition(), this, msg.getLength());
+                        }
+
+                        try {
+                            channel.getConnection().getAmqpOutputConverter().writeDeliver(
+                                    MessageConvertUtils.entryToAmqpBody(msg),
+                                    channel.getChannelId(),
+                                    getRedeliveryTracker().contains(index.getPosition()),
+                                    deliveryTag,
+                                    AMQShortString.createAMQShortString(consumerTag));
+                            sendFuture.complete(null);
+                        } catch (Exception e) {
+                            log.error("[{}-{}] Failed to send message to consumer.", queueName, consumerTag, e);
+                            sendFuture.completeExceptionally(e);
+                            return;
+                        } finally {
+                            msg.release();
+                        }
+
+                        if (autoAck) {
+                            messagesAck(index.getPosition());
+                        }
+                    } finally {
+                        index.release();
+                        indexMessage.recycle();
+                    }
+                })).exceptionally(throwable -> {
+                    log.error("[{}-{}] Failed to read data from exchange topic {}.",
+                            queueName, consumerTag, indexMessage.getExchangeName(), throwable);
+                    sendFuture.completeExceptionally(throwable);
+                    return null;
+        });
+        return sendFuture;
     }
 
     public void messagesAck(List<Position> position) {

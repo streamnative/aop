@@ -383,7 +383,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         } catch (InterruptedException e) {
             // ignored
         }
-        Assert.assertEquals(messageCnt, consumeIndex2.get());
+        Assert.assertTrue(consumeIndex2.get() >= messageCnt);
         channel3.close();
         conn.close();
     }

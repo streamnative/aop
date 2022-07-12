@@ -144,7 +144,10 @@ public class ProxyHandler {
                     } catch (Throwable e) {
                         log.error("error while handle command:", e);
                         close();
+                    } finally {
+                        buffer.release();
                     }
+
                     break;
                 case Connected:
                     clientChannel.writeAndFlush(msg);

@@ -44,6 +44,7 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.impl.MessageImpl;
+import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -63,7 +64,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     private PersistentTopic persistentTopic;
     private ObjectMapper jsonMapper = new JsonMapper();
-    private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
+    private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
 
@@ -74,7 +75,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         updateExchangeProperties();
         cursors = new ConcurrentOpenHashMap<>(16, 1);
         for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {
-            cursors.put(cursor.getName(), cursor);
+            cursors.put(cursor.getName(), CompletableFuture.completedFuture(cursor));
             log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());
             cursor.setInactive();
         }
@@ -120,27 +121,30 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
-        CompletableFuture<Entry> future = new CompletableFuture();
         // TODO Temporarily put the creation operation here, and later put the operation in router
-        ManagedCursor cursor = cursors.get(queueName);
-        if (cursor == null) {
-            future.completeExceptionally(new ManagedLedgerException("cursor is null"));
-            return future;
-        }
-        ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();
-
-        ledger.asyncReadEntry((PositionImpl) position, new AsyncCallbacks.ReadEntryCallback() {
-                @Override
-                public void readEntryComplete(Entry entry, Object o) {
-                    future.complete(entry);
-                }
-
-                @Override
-                public void readEntryFailed(ManagedLedgerException e, Object o) {
-                    future.completeExceptionally(e);
-                }
+        CompletableFuture<Entry> future = new CompletableFuture<>();
+        getCursor(queueName).thenAccept(cursor -> {
+            if (cursor == null) {
+                future.completeExceptionally(new RuntimeException(
+                        "The cursor " + queueName + " of the exchange " + exchangeName + " is null"));
+                return;
             }
-            , null);
+            ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();
+            ledger.asyncReadEntry((PositionImpl) position, new AsyncCallbacks.ReadEntryCallback() {
+                        @Override
+                        public void readEntryComplete(Entry entry, Object o) {
+                            future.complete(entry);
+                        }
+
+                        @Override
+                        public void readEntryFailed(ManagedLedgerException e, Object o) {
+                            future.completeExceptionally(e);
+                        }
+                    }, null);
+        }).exceptionally(t -> {
+            future.completeExceptionally(t);
+            return null;
+        });
         return future;
     }
 
@@ -151,54 +155,67 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> markDeleteAsync(String queueName, Position position) {
-        CompletableFuture<Void> future = new CompletableFuture();
-        ManagedCursor cursor = cursors.get(queueName);
-        if (cursor == null) {
-            future.complete(null);
-            return future;
-        }
-        if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
-            future.complete(null);
-            return future;
-        }
-        cursor.asyncMarkDelete(position, new AsyncCallbacks.MarkDeleteCallback() {
-            @Override
-            public void markDeleteComplete(Object ctx) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Mark delete success for position: {}", position);
-                }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        getCursor(queueName).thenAccept(cursor -> {
+            if (cursor == null) {
+                future.completeExceptionally(new RuntimeException(
+                        "The cursor " + queueName + " of the exchange " + exchangeName + " is null."));
+                return;
+            }
+            if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
                 future.complete(null);
+                return;
             }
+            cursor.asyncMarkDelete(position, new AsyncCallbacks.MarkDeleteCallback() {
+                @Override
+                public void markDeleteComplete(Object ctx) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("[{}] Mark delete success for position: {}", exchangeName, position);
+                    }
+                    future.complete(null);
+                }
 
-            @Override
-            public void markDeleteFailed(ManagedLedgerException e, Object ctx) {
-                log.warn("Mark delete success for position: {} with error:",
-                    position, e);
-                future.completeExceptionally(e);
-            }
-        }, null);
+                @Override
+                public void markDeleteFailed(ManagedLedgerException e, Object ctx) {
+                    if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
+                        log.warn("Mark delete failed for position: {}, {}", position, e.getMessage());
+                    } else {
+                        log.error("Mark delete failed for position: {}", position, e);
+                    }
+                    future.completeExceptionally(e);
+                }
+            }, null);
+        }).exceptionally(t -> {
+            future.completeExceptionally(t);
+            return null;
+        });
         return future;
     }
 
     @Override
     public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
-        CompletableFuture<Position> future = new CompletableFuture();
-        ManagedCursor cursor = cursors.get(queueName);
-        if (cursor == null) {
-            future.complete(null);
-            return future;
-        }
-        future.complete(cursor.getMarkDeletedPosition());
-        return future;
+        return getCursor(queueName).thenApply(cursor -> {
+            if (cursor == null) {
+                throw new RuntimeException("The cursor " + queueName + " is null.");
+            }
+            return cursor.getMarkDeletedPosition();
+        });
     }
 
+    private CompletableFuture<ManagedCursor> getCursor(String queueName) {
+        CompletableFuture<ManagedCursor> cursorFuture = cursors.get(queueName);
+        if (cursorFuture == null) {
+            return FutureUtil.failedFuture(new RuntimeException(
+                    "The cursor " + queueName + " of the exchange " + exchangeName + " is not exist."));
+        }
+        return cursorFuture;
+    }
 
     @Override
     public void addQueue(AmqpQueue queue) {
         queues.add(queue);
         updateExchangeProperties();
         createCursorIfNotExists(queue.getName());
-
     }
 
     @Override
@@ -237,46 +254,60 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return queueNames;
     }
 
-    private ManagedCursor createCursorIfNotExists(String name) {
-        return cursors.computeIfAbsent(name, cusrsor -> {
+    private void createCursorIfNotExists(String name) {
+        CompletableFuture<ManagedCursor> cursorFuture = new CompletableFuture<>();
+        cursors.computeIfAbsent(name, cusrsor -> {
             ManagedLedgerImpl ledger = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
             if (log.isDebugEnabled()) {
                 log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());
             }
-            ManagedCursor newCursor;
-            try {
-                //newCursor = ledger.openCursor(name, CommandSubscribe.InitialPosition.Latest);
-                newCursor = ledger.newNonDurableCursor(ledger.getLastConfirmedEntry(), name);
-            } catch (ManagedLedgerException e) {
-                log.error("Error new cursor for topic {} - {}. will cause fetch data error.",
-                    persistentTopic.getName(), e);
-                return null;
-            }
-            return newCursor;
+            ledger.asyncOpenCursor(name, CommandSubscribe.InitialPosition.Earliest,
+                    new AsyncCallbacks.OpenCursorCallback() {
+                    @Override
+                    public void openCursorComplete(ManagedCursor cursor, Object ctx) {
+                        cursorFuture.complete(cursor);
+                    }
+
+                    @Override
+                    public void openCursorFailed(ManagedLedgerException exception, Object ctx) {
+                        log.error("[{}] Failed to open cursor. ", name, exception);
+                        cursorFuture.completeExceptionally(exception);
+                        if (cursors.get(name) != null && cursors.get(name).isCompletedExceptionally()
+                                || cursors.get(name).isCancelled()) {
+                            cursors.remove(name);
+                        }
+                    }
+                }, null);
+            return cursorFuture;
         });
     }
 
     public void deleteCursor(String name) {
-        ManagedCursor cursor = cursors.remove(name);
-        if (cursor != null) {
-            persistentTopic.getManagedLedger().asyncDeleteCursor(cursor.getName(),
-                new AsyncCallbacks.DeleteCursorCallback() {
-                @Override
-                public void deleteCursorComplete(Object ctx) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Cursor {} for topic {} deleted successfully .",
-                            cursor.getName(), persistentTopic.getName());
-                    }
-                }
-
-                @Override
-                public void deleteCursorFailed(ManagedLedgerException exception, Object ctx) {
-                    log.error("[{}] Error deleting cursor {} for topic {} for reason: {}.",
-                        cursor.getName(), persistentTopic.getName(), exception);
-                }
-            }, null);
+        CompletableFuture<ManagedCursor> cursorFuture = cursors.remove(name);
+        if (cursorFuture == null) {
+            log.warn("The cursor {} of the exchange {} is null.", name, exchangeName);
+            return;
         }
+        cursorFuture.thenAccept(cursor -> {
+            if (cursor != null) {
+                persistentTopic.getManagedLedger().asyncDeleteCursor(cursor.getName(),
+                        new AsyncCallbacks.DeleteCursorCallback() {
+                            @Override
+                            public void deleteCursorComplete(Object ctx) {
+                                if (log.isDebugEnabled()) {
+                                    log.debug("Cursor {} for topic {} deleted successfully .",
+                                            cursor.getName(), persistentTopic.getName());
+                                }
+                            }
 
+                            @Override
+                            public void deleteCursorFailed(ManagedLedgerException exception, Object ctx) {
+                                log.error("[{}] Error deleting cursor for topic {}.",
+                                        cursor.getName(), persistentTopic.getName(), exception);
+                            }
+                        }, null);
+            }
+        });
     }
 
     public static String getExchangeTopicName(NamespaceName namespaceName, String exchangeName) {

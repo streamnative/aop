@@ -212,10 +212,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public void addQueue(AmqpQueue queue) {
+    public CompletableFuture<Void> addQueue(AmqpQueue queue) {
         queues.add(queue);
         updateExchangeProperties();
-        createCursorIfNotExists(queue.getName());
+        return createCursorIfNotExists(queue.getName()).thenApply(__ -> null);
     }
 
     @Override
@@ -254,9 +254,9 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return queueNames;
     }
 
-    private void createCursorIfNotExists(String name) {
+    private CompletableFuture<ManagedCursor> createCursorIfNotExists(String name) {
         CompletableFuture<ManagedCursor> cursorFuture = new CompletableFuture<>();
-        cursors.computeIfAbsent(name, cusrsor -> {
+        return cursors.computeIfAbsent(name, cusrsor -> {
             ManagedLedgerImpl ledger = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
             if (log.isDebugEnabled()) {
                 log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());

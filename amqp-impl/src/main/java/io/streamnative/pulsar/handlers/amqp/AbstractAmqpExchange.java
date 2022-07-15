@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Base class of AMQP exchange.
@@ -38,8 +39,9 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     }
 
     @Override
-    public void addQueue(AmqpQueue queue) {
+    public CompletableFuture<Void> addQueue(AmqpQueue queue) {
         queues.add(queue);
+        return CompletableFuture.completedFuture(null);
     }
 
     @Override

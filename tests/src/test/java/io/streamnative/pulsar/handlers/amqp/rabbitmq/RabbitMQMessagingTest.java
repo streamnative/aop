@@ -41,6 +41,7 @@ import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 /**
@@ -48,6 +49,13 @@ import org.testng.annotations.Test;
  */
 @Slf4j
 public class RabbitMQMessagingTest extends AmqpTestBase {
+
+    @DataProvider(name = "consumeExclusiveProvider")
+    public Object[][] consumeExclusiveProvider() {
+        return new Object[][]{
+                { false }, { true }
+        };
+    }
 
     @Test(timeOut = 1000 * 5)
     public void basicConsumeCaseWithNewAddedHost() throws Exception {
@@ -66,12 +74,12 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         if (unknownConn.isOpen()) {
             unknownConn.close();
         }
-        basicDirectConsume(newAddedVhost);
+        basicDirectConsume(newAddedVhost, false);
     }
 
-    @Test(timeOut = 1000 * 5)
-    public void basicConsumeCase() throws Exception {
-        basicDirectConsume("vhost1");
+    @Test(timeOut = 1000 * 5, dataProvider = "consumeExclusiveProvider")
+    public void basicConsumeCase(boolean consumeExclusive) throws Exception {
+        basicDirectConsume("vhost1", consumeExclusive);
     }
 
     @Test(timeOut = 1000 * 5)
@@ -375,7 +383,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         } catch (InterruptedException e) {
             // ignored
         }
-        Assert.assertEquals(messageCnt, consumeIndex2.get());
+        Assert.assertTrue(consumeIndex2.get() >= messageCnt);
         channel3.close();
         conn.close();
     }

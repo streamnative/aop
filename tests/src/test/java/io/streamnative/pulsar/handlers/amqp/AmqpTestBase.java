@@ -101,7 +101,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         return connectionFactory.newConnection();
     }
 
-    protected void basicDirectConsume(String vhost) throws Exception {
+    protected void basicDirectConsume(String vhost, boolean exclusiveConsume) throws Exception {
         String exchangeName = randExName();
         String routingKey = "test.key";
         String queueName = randQuName();
@@ -117,7 +117,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
 
         AtomicInteger consumeIndex = new AtomicInteger(0);
-        channel.basicConsume(queueName, false,
+        channel.basicConsume(queueName, false, "", false, exclusiveConsume, null,
                 new DefaultConsumer(channel) {
                     @Override
                     public void handleDelivery(String consumerTag,

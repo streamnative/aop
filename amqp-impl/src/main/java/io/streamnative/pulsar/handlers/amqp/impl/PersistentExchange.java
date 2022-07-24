@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
@@ -61,13 +62,14 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String TYPE = "TYPE";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
-    private PersistentTopic persistentTopic;
+    private final PersistentTopic persistentTopic;
     private ObjectMapper jsonMapper = new JsonMapper();
     private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
     private AmqpExchangeReplicator messageReplicator;
-    private AmqpEntryWriter amqpEntryWriter;
+    private final AmqpEntryWriter amqpEntryWriter;
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
+    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete,
+                              ScheduledExecutorService exchangeRouteAckExecutor) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
@@ -80,7 +82,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         }
 
         if (messageReplicator == null) {
-            messageReplicator = new AmqpExchangeReplicator(this) {
+            messageReplicator = new AmqpExchangeReplicator(this, exchangeRouteAckExecutor) {
                 @Override
                 public CompletableFuture<Void> readProcess(Entry entry) {
                     Map<String, Object> props;

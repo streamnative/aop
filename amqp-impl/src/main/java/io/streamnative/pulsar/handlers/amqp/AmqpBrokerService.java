@@ -14,6 +14,9 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.netty.util.concurrent.DefaultThreadFactory;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
@@ -36,11 +39,13 @@ public class AmqpBrokerService {
     private ConnectionContainer connectionContainer;
     @Getter
     private PulsarService pulsarService;
+    private ScheduledExecutorService exchangeRouteAckExecutor = Executors.newSingleThreadScheduledExecutor(
+            new DefaultThreadFactory("ex-route-ack"));
 
     public AmqpBrokerService(PulsarService pulsarService) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, exchangeRouteAckExecutor);
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
@@ -50,7 +55,7 @@ public class AmqpBrokerService {
     public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, exchangeRouteAckExecutor);
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);

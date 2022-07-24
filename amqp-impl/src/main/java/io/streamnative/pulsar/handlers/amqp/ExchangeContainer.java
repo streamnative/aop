@@ -18,6 +18,7 @@ import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -33,12 +34,15 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class ExchangeContainer {
 
-    private AmqpTopicManager amqpTopicManager;
-    private PulsarService pulsarService;
+    private final AmqpTopicManager amqpTopicManager;
+    private final PulsarService pulsarService;
+    private final ScheduledExecutorService exchangeRouteAckExecutor;
 
-    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService) {
+    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
+                                ScheduledExecutorService exchangeRouteAckExecutor) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
+        this.exchangeRouteAckExecutor = exchangeRouteAckExecutor;
     }
 
     @Getter
@@ -108,7 +112,7 @@ public class ExchangeContainer {
                             amqpExchangeType = AmqpExchange.Type.value(exchangeType);
                         }
                         PersistentExchange amqpExchange = new PersistentExchange(exchangeName,
-                                amqpExchangeType, persistentTopic, false);
+                                amqpExchangeType, persistentTopic, false, exchangeRouteAckExecutor);
                         amqpExchangeCompletableFuture.complete(amqpExchange);
                     }
                 }

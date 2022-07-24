@@ -100,7 +100,7 @@ public abstract class AmqpProtocolTestBase {
         mockPulsarService();
         mockBrokerService();
         ConnectionContainer connectionContainer = mock(ConnectionContainer.class);
-        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, new AmqpServiceConfiguration(), connectionContainer);
         amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.

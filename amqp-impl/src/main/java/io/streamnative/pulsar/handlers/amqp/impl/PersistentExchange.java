@@ -17,6 +17,7 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPE
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
@@ -29,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
@@ -70,7 +72,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private AmqpEntryWriter amqpEntryWriter;
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
-                              boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments) {
+                              boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
+                              Executor routeExecutor, int routeQueueSize) {
         super(exchangeName, type, new HashSet<>(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
@@ -82,12 +85,12 @@ public class PersistentExchange extends AbstractAmqpExchange {
         }
 
         if (messageReplicator == null) {
-            messageReplicator = new AmqpExchangeReplicator(this) {
+            messageReplicator = new AmqpExchangeReplicator(this, routeExecutor, routeQueueSize) {
                 @Override
-                public CompletableFuture<Void> readProcess(Entry entry) {
+                public CompletableFuture<Void> readProcess(ByteBuf data, Position position) {
                     Map<String, Object> props;
                     try {
-                        MessageImpl<byte[]> message = MessageImpl.deserialize(entry.getDataBuffer());
+                        MessageImpl<byte[]> message = MessageImpl.deserialize(data);
                         props = message.getMessageBuilder().getPropertiesList().stream()
                                 .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
                     } catch (IOException e) {
@@ -97,7 +100,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                     List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
                     for (AmqpQueue queue : queues) {
                         CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
-                                entry.getLedgerId(), entry.getEntryId(),
+                                position.getLedgerId(), position.getEntryId(),
                                 props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
                                 props);
                         routeFutureList.add(routeFuture);

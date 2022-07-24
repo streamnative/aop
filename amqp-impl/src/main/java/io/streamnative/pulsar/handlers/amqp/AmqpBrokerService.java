@@ -14,6 +14,10 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
@@ -37,24 +41,35 @@ public class AmqpBrokerService {
     @Getter
     private PulsarService pulsarService;
 
-    public AmqpBrokerService(PulsarService pulsarService) {
+    public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        initRouteExecutor(config);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, initRouteExecutor(config),
+                config.getAmqpExchangeRouteQueueSize());
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
     }
 
-    public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
+    public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config,
+                             ConnectionContainer connectionContainer) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        initRouteExecutor(config);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, initRouteExecutor(config),
+                config.getAmqpExchangeRouteQueueSize());
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = connectionContainer;
+    }
+
+    private Executor initRouteExecutor(AmqpServiceConfiguration config) {
+        return new ThreadPoolExecutor(config.getAmqpExchangeRouteExecutorThreads(),
+                config.getAmqpExchangeRouteExecutorThreads(), 30, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(1000));
     }
 
     public boolean isAuthenticationEnabled() {

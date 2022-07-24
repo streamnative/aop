@@ -21,6 +21,7 @@ import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import java.util.concurrent.Executors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
@@ -50,7 +51,8 @@ public class TopicNameTest {
         Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
         try {
             new PersistentExchange(
-                    exchangeName, exchangeType, exchangeTopic1, true, false, false, null);
+                    exchangeName, exchangeType, exchangeTopic1, true, false, false, null,
+                    Executors.newSingleThreadExecutor(), 200);
         } catch (IllegalArgumentException e) {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
@@ -60,7 +62,8 @@ public class TopicNameTest {
         Mockito.when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
-                    exchangeName, exchangeType, exchangeTopic2, true, false, false, null);
+                    exchangeName, exchangeType, exchangeTopic2, true, false, false, null,
+                    Executors.newSingleThreadExecutor(), 200);
         } catch (IllegalArgumentException e) {
             assertNotNull(e);
             log.info("This is expected behavior.");

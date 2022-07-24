@@ -71,7 +71,8 @@ public class ProxyHandler {
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast("consolidation", new FlushConsolidationHandler(1000, true));
+                        ch.pipeline().addLast("consolidation", new FlushConsolidationHandler(
+                                proxyService.getProxyConfig().getAmqpExplicitFlushAfterFlushes(), true));
                         ch.pipeline().addLast("frameEncoder", new AmqpEncoder());
                         ch.pipeline().addLast("processor", new ProxyBackendHandler(responseBody));
                     }

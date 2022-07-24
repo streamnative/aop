@@ -154,8 +154,16 @@ public class AmqpConsumer extends Consumer {
         asyncGetQueue()
                 .thenCompose(amqpQueue -> amqpQueue.readEntryAsync(
                         indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
-                .thenAccept(msg -> {
+                .whenCompleteAsync((msg, ex) -> {
                     try {
+                        if (ex != null) {
+                            log.error("Failed to read entries data.", ex);
+                            channel.getCreditManager().restoreCredit(1, 0);
+                            incrementPermits(1);
+                            sendFuture.completeExceptionally(ex);
+                            msg.release();
+                            return;
+                        }
                         long deliveryTag = channel.getNextDeliveryTag();
 
                         addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
@@ -278,12 +286,13 @@ public class AmqpConsumer extends Consumer {
         getSubscription().getDispatcher().consumerFlow(this, permits);
     }
 
-    public void incrementPermits(int permits) {
+    public synchronized void incrementPermits(int permits) {
         int var = ADD_PERMITS_UPDATER.addAndGet(this, permits);
         if (var > maxPermits / 2) {
             MESSAGE_PERMITS_UPDATER.addAndGet(this, var);
-            this.getSubscription().consumerFlow(this, availablePermits);
+            this.getSubscription().consumerFlow(this, var);
             ADD_PERMITS_UPDATER.set(this, 0);
         }
     }
+
 }

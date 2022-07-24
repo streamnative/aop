@@ -142,7 +142,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         super.channelInactive(ctx);
         completeAndCloseAllChannels();
         amqpBrokerService.getConnectionContainer().removeConnection(namespaceName, this);
-        this.brokerDecoder.close();
+        if (this.brokerDecoder != null) {
+            this.brokerDecoder.close();
+            if (namespaceName != null) {
+                this.amqpBrokerService.getAmqpMetrics().connectionDec(namespaceName.getLocalName());
+            }
+        }
     }
 
     @Override
@@ -345,6 +350,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         // Policies policies = getPolicies(namespaceName);
 //        if (policies != null) {
         this.namespaceName = namespaceName;
+        this.amqpBrokerService.getAmqpMetrics().connectionInc(namespaceName.getLocalName());
 
         MethodRegistry methodRegistry = getMethodRegistry();
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);

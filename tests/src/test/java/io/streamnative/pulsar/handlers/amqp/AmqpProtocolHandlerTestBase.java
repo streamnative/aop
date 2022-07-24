@@ -139,7 +139,7 @@ public abstract class AmqpProtocolHandlerTestBase {
             protocolHandlerDir
         );
         amqpConfig.setMessagingProtocols(Sets.newHashSet("amqp"));
-
+        amqpConfig.setAmqpEnableMetrics(true);
         this.conf = amqpConfig;
     }
 

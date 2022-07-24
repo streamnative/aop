@@ -174,6 +174,7 @@ public class AmqpConsumer extends Consumer {
                                     getRedeliveryTracker().contains(index.getPosition()),
                                     deliveryTag,
                                     AMQShortString.createAMQShortString(consumerTag));
+                            amqpQueue.recordDispatchEvent();
                             sendFuture.complete(null);
                         } catch (Exception e) {
                             log.error("[{}-{}] Failed to send message to consumer.", queueName, consumerTag, e);

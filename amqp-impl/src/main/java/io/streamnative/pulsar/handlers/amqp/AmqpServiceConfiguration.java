@@ -97,4 +97,12 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
             doc = "Whether start amqp protocol handler with proxy"
     )
     private boolean amqpProxyEnable = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false,
+            doc = "Whether enable amqp metrics"
+    )
+    private boolean amqpEnableMetrics = false;
+
 }

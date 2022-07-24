@@ -14,6 +14,7 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.metrics.AmqpMetrics;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
@@ -36,22 +37,26 @@ public class AmqpBrokerService {
     private ConnectionContainer connectionContainer;
     @Getter
     private PulsarService pulsarService;
+    @Getter
+    private AmqpMetrics amqpMetrics;
 
-    public AmqpBrokerService(PulsarService pulsarService) {
+    public AmqpBrokerService(PulsarService pulsarService, boolean enableMetrics) {
+        this.amqpMetrics = AmqpMetrics.create(enableMetrics);
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, amqpMetrics);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, amqpMetrics);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
     }
 
     public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
+        this.amqpMetrics = AmqpMetrics.create(true);
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, amqpMetrics);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, amqpMetrics);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = connectionContainer;

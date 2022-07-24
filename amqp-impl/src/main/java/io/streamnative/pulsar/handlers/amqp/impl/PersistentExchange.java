@@ -125,8 +125,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
         CompletableFuture<Entry> future = new CompletableFuture<>();
         getCursor(queueName).thenAccept(cursor -> {
             if (cursor == null) {
-                future.completeExceptionally(new RuntimeException(
-                        "The cursor " + queueName + " of the exchange " + exchangeName + " is null"));
+                future.completeExceptionally(new RuntimeException("Failed to read entry, the cursor "
+                        + queueName + " of the exchange " + exchangeName + " is null"));
                 return;
             }
             ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();
@@ -158,8 +158,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
         CompletableFuture<Void> future = new CompletableFuture<>();
         getCursor(queueName).thenAccept(cursor -> {
             if (cursor == null) {
-                future.completeExceptionally(new RuntimeException(
-                        "The cursor " + queueName + " of the exchange " + exchangeName + " is null."));
+                future.completeExceptionally(new RuntimeException("Failed to make delete, the cursor "
+                        + queueName + " of the exchange " + exchangeName + " is null."));
                 return;
             }
             if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
@@ -196,7 +196,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
         return getCursor(queueName).thenApply(cursor -> {
             if (cursor == null) {
-                throw new RuntimeException("The cursor " + queueName + " is null.");
+                throw new RuntimeException("Failed to get mark delete position, the cursor "
+                        + queueName + " of the exchange " + exchangeName + " is null.");
             }
             return cursor.getMarkDeletedPosition();
         });
@@ -285,7 +286,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public void deleteCursor(String name) {
         CompletableFuture<ManagedCursor> cursorFuture = cursors.remove(name);
         if (cursorFuture == null) {
-            log.warn("The cursor {} of the exchange {} is null.", name, exchangeName);
+            log.warn("Failed to delete cursor, the cursor {} of the exchange {} is not exist.", name, exchangeName);
             return;
         }
         cursorFuture.thenAccept(cursor -> {

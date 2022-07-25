@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.streamnative.pulsar.handlers.amqp.AmqpConnection.SUPPORT_MECHANISM;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -172,7 +173,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                     (short) pv.getActualMinorVersion(),
                     null,
                     // TODO temporary modification
-                    "PLAIN token".getBytes(US_ASCII),
+                    SUPPORT_MECHANISM.getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
         } catch (QpidException e) {

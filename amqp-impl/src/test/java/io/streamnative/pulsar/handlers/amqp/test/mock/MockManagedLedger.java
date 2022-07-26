@@ -352,12 +352,16 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public ManagedCursor openCursor(String name, CommandSubscribe.InitialPosition initialPosition, Map<String, Long> properties, Map<String, String> cursorProperties) throws InterruptedException, ManagedLedgerException {
+    public ManagedCursor openCursor(String name, CommandSubscribe.InitialPosition initialPosition,
+                                    Map<String, Long> properties, Map<String, String> cursorProperties)
+            throws InterruptedException, ManagedLedgerException {
         return null;
     }
 
     @Override
-    public void asyncOpenCursor(String name, CommandSubscribe.InitialPosition initialPosition, Map<String, Long> properties, Map<String, String> cursorProperties, AsyncCallbacks.OpenCursorCallback callback, Object ctx) {
+    public void asyncOpenCursor(String name, CommandSubscribe.InitialPosition initialPosition,
+                                Map<String, Long> properties, Map<String, String> cursorProperties,
+                                AsyncCallbacks.OpenCursorCallback callback, Object ctx) {
 
     }
 

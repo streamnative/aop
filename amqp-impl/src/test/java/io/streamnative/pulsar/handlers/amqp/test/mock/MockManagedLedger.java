@@ -362,7 +362,7 @@ public class MockManagedLedger implements ManagedLedger {
     public void asyncOpenCursor(String name, CommandSubscribe.InitialPosition initialPosition,
                                 Map<String, Long> properties, Map<String, String> cursorProperties,
                                 AsyncCallbacks.OpenCursorCallback callback, Object ctx) {
-
+        // nothing to do
     }
 
 }

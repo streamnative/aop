@@ -14,7 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.Assert.assertTrue;
+import static org.testng.Assert.assertTrue;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
@@ -42,10 +42,9 @@ import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionSecureBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 /**
  * Amqp Encode Handler Tests.
@@ -61,7 +60,7 @@ public class AmqpEncodeHandlerTest {
 
     private AmqpClientChannel clientChannel;
 
-    @Before
+    @BeforeMethod
     public void setup() {
         group = new NioEventLoopGroup();
         clientChannel = new AmqpClientChannel();
@@ -70,7 +69,7 @@ public class AmqpEncodeHandlerTest {
 
     }
 
-    @After
+    @AfterMethod
     public void destroy() {
         group.shutdownGracefully();
     }
@@ -134,7 +133,7 @@ public class AmqpEncodeHandlerTest {
                 try {
                     clientDecoder.decodeBuffer(buffer.nioBuffer());
                     AMQBody response = (AMQBody) clientChannel.poll(1, SECONDS);
-                    Assert.assertTrue(response instanceof ConnectionSecureBody);
+                    assertTrue(response instanceof ConnectionSecureBody);
                     latch.countDown();
                 } catch (Exception e) {
 

@@ -13,10 +13,13 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -59,6 +62,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.ChannelFlowOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
@@ -156,18 +161,81 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
                                        boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
-        this.exchangeService.exchangeDeclare(this, exchange, type, passive, durable, autoDelete, internal, nowait,
-                arguments);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
+                            + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
+                            + "nowait: {}, arguments: {} ]", channelId, exchange,
+                    type, passive, durable, autoDelete, internal, nowait, arguments);
+        }
+
+        this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(), type.toString(),
+                passive, durable, autoDelete, internal, arguments).thenAccept(__ -> {
+            if (!nowait) {
+                connection.writeFrame(
+                        connection.getMethodRegistry().createExchangeDeclareOkBody().generateFrame(channelId));
+            }
+        }).exceptionally(t -> {
+            log.error("Failed to declare exchange {} in vhost {}. type: {}, passive: {}, durable: {}, "
+                            + "autoDelete: {}, nowait: {}", type, passive, durable, autoDelete, nowait,
+                    exchange, connection.getNamespaceName(), t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
     public void receiveExchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
-        exchangeService.exchangeDelete(this, exchange, ifUnused, nowait);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeDelete[ exchange: {}, ifUnused: {}, nowait:{} ]", channelId, exchange, ifUnused,
+                    nowait);
+        }
+
+        exchangeService.exchangeDelete(connection.getNamespaceName(), exchange.toString(), ifUnused)
+                .thenAccept(__ -> {
+                    ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to delete exchange {} in vhost {}.",
+                            exchange, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
     }
 
     @Override
     public void receiveExchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queueName) {
-        exchangeService.exchangeBound(this, exchange, routingKey, queueName);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeBound[ exchange: {}, routingKey: {}, queue:{} ]", channelId, exchange,
+                    routingKey, queueName);
+        }
+
+        exchangeService.exchangeBound(
+                connection.getNamespaceName(), exchange.toString(), routingKey.toString(), queueName.toString())
+                .thenAccept(replyCode -> {
+                    String replyText = null;
+                    switch (replyCode) {
+                        case ExchangeBoundOkBody.EXCHANGE_NOT_FOUND:
+                            replyText = "Exchange '" + exchange + "' not found in vhost " + connection.getNamespaceName();
+                            break;
+                        case ExchangeBoundOkBody.QUEUE_NOT_FOUND:
+                            replyText = "Queue '" + queueName + "' not found in vhost " + connection.getNamespaceName();
+                            break;
+                        default:
+                            // do nothing
+                    }
+
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
+                            .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
+                    connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to bound queue {} to exchange {} with routingKey {} in vhost {}",
+                            queueName, exchange, routingKey, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
     }
 
     @Override
@@ -538,7 +606,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             boolean createIfMissing = false;
             String exchangeType = null;
             if (isDefaultExchange(AMQShortString.valueOf(exchangeName))
-                    || isBuildInExchange(AMQShortString.valueOf(exchangeName))) {
+                    || isBuildInExchange(exchangeName)) {
                 // Auto create default and buildIn exchanges if use.
                 createIfMissing = true;
                 exchangeType = getExchangeType(exchangeName);
@@ -737,16 +805,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
     }
 
-    public boolean isBuildInExchange(final AMQShortString exchangeName) {
-        if (exchangeName.toString().equals(ExchangeDefaults.DIRECT_EXCHANGE_NAME)
-                || (exchangeName.toString().equals(ExchangeDefaults.FANOUT_EXCHANGE_NAME))
-                || (exchangeName.toString().equals(ExchangeDefaults.TOPIC_EXCHANGE_NAME))) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     public void closeChannel(int cause, final String message) {
         connection.closeChannelAndWriteFrame(this, cause, message);
     }
@@ -868,20 +926,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return creditManager;
     }
 
-    public String getExchangeType(String exchangeName) {
-        if (null == exchangeName) {
-            exchangeName = "";
+    private void handleAoPException(Throwable t) {
+        if (!(t instanceof AoPException)) {
+            return;
         }
-        switch (exchangeName) {
-            case "":
-            case ExchangeDefaults.DIRECT_EXCHANGE_NAME:
-                return ExchangeDefaults.DIRECT_EXCHANGE_CLASS;
-            case ExchangeDefaults.FANOUT_EXCHANGE_NAME:
-                return ExchangeDefaults.FANOUT_EXCHANGE_CLASS;
-            case ExchangeDefaults.TOPIC_EXCHANGE_NAME:
-                return ExchangeDefaults.TOPIC_EXCHANGE_CLASS;
-            default:
-                return "";
+        AoPException exception = (AoPException) t;
+        if (exception.isCloseChannel()) {
+            closeChannel(exception.getErrorCode(), exception.getMessage());
+        }
+        if (exception.isCloseConnection()) {
+            connection.sendConnectionClose(exception.getErrorCode(), exception.getMessage(), channelId);
         }
     }
+
 }

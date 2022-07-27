@@ -88,15 +88,22 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
     }
 
     protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
+        int port;
+        if (amqpProxyEnable) {
+            port = getProxyPort();
+            log.info("use proxyPort: {}", port);
+            return getConnection(vhost, port);
+        } else {
+            port = getAmqpBrokerPortList().get(0);
+            log.info("use amqpBrokerPort: {}", port);
+        }
+        return getConnection(vhost, port);
+    }
+
+    protected Connection getConnection(String vhost, int port) throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        if (amqpProxyEnable) {
-            int proxyPort = getProxyPort();
-            log.info("use proxyPort: {}", proxyPort);
-        } else {
-            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
-            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
-        }
+        connectionFactory.setPort(port);
         connectionFactory.setVirtualHost(vhost);
         return connectionFactory.newConnection();
     }

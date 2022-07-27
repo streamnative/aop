@@ -90,4 +90,6 @@ public interface AmqpQueue {
     boolean isAutoDelete();
 
     Topic getTopic();
+
+    void recordDispatchEvent();
 }

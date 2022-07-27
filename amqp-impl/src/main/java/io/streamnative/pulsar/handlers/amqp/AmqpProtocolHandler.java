@@ -88,7 +88,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public void start(BrokerService service) {
         brokerService = service;
-        amqpBrokerService = new AmqpBrokerService(service.getPulsar());
+        amqpBrokerService = new AmqpBrokerService(service.getPulsar(), amqpConfig.isAmqpEnableMetrics());
         if (amqpConfig.isAmqpProxyEnable()) {
             ProxyConfiguration proxyConfig = new ProxyConfiguration();
             proxyConfig.setAmqpTenant(amqpConfig.getAmqpTenant());

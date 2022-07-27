@@ -26,6 +26,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
+import io.streamnative.pulsar.handlers.amqp.metrics.QueueMetrics;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
@@ -61,36 +62,54 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private AmqpEntryWriter amqpEntryWriter;
 
+    protected QueueMetrics queueMetrics;
+
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
-                           boolean exclusive, boolean autoDelete) {
+                           boolean exclusive, boolean autoDelete,
+                           QueueMetrics queueMetrics) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
         topicNameValidate();
         this.jsonMapper = new ObjectMapper();
         this.amqpEntryWriter = new AmqpEntryWriter(indexTopic);
+        this.queueMetrics = queueMetrics;
     }
 
     @Override
     public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId) {
         try {
+            queueMetrics.writeInc();
             IndexMessage indexMessage = IndexMessage.create(exchangeName, ledgerId, entryId);
             MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(indexMessage);
-            return amqpEntryWriter.publishMessage(message).thenApply(__ -> null);
+            return amqpEntryWriter.publishMessage(message).whenComplete((__, t) -> {
+                if (t != null) {
+                    log.error("Failed to publish index messages from exchange {} to queue {}.",
+                            exchangeName, queueName);
+                    queueMetrics.writeFailed();
+                }
+            }).thenApply(__ -> null);
         } catch (Exception e) {
             log.error("Failed to writer index message for exchange {} with position {}:{}.",
                     exchangeName, ledgerId, entryId);
+            queueMetrics.writeFailed();
             return FutureUtil.failedFuture(e);
         }
     }
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String exchangeName, long ledgerId, long entryId) {
-        return getRouter(exchangeName).getExchange().readEntryAsync(getName(), ledgerId, entryId);
+        return getRouter(exchangeName).getExchange().readEntryAsync(getName(), ledgerId, entryId)
+                .whenComplete((__, t) -> {
+            if (t != null) {
+                queueMetrics.readFailed();
+            }
+        });
     }
 
     @Override
     public CompletableFuture<Void> acknowledgeAsync(String exchangeName, long ledgerId, long entryId) {
+        queueMetrics.ackInc();
         return getRouter(exchangeName).getExchange().markDeleteAsync(getName(), ledgerId, entryId);
     }
 
@@ -181,6 +200,11 @@ public class PersistentQueue extends AbstractAmqpQueue {
         checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + queueName),
                 "The queue topic name does not conform to the rules(%s%s).",
                 TOPIC_PREFIX, "exchangeName");
+    }
+
+    @Override
+    public void recordDispatchEvent() {
+        queueMetrics.dispatchInc();
     }
 
 }

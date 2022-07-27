@@ -21,6 +21,8 @@ import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.metrics.ExchangeMetrics;
+import io.streamnative.pulsar.handlers.amqp.metrics.QueueMetrics;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
@@ -50,7 +52,8 @@ public class TopicNameTest {
         Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
         try {
             new PersistentExchange(
-                    exchangeName, exchangeType, exchangeTopic1, false);
+                    exchangeName, exchangeType, exchangeTopic1, false,
+                    ExchangeMetrics.create(true, "default", exchangeName));
         } catch (IllegalArgumentException e) {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
@@ -60,7 +63,8 @@ public class TopicNameTest {
         Mockito.when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
-                    exchangeName, exchangeType, exchangeTopic2, false);
+                    exchangeName, exchangeType, exchangeTopic2, false,
+                    ExchangeMetrics.create(true, "default", exchangeName));
         } catch (IllegalArgumentException e) {
             assertNotNull(e);
             log.info("This is expected behavior.");
@@ -77,7 +81,8 @@ public class TopicNameTest {
         Mockito.when(queueTopic1.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentQueue(
-                    queueName, queueTopic1, 0, false, false);
+                    queueName, queueTopic1, 0, false, false,
+                    QueueMetrics.create(true, "default", queueName));
         } catch (IllegalArgumentException e) {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
@@ -87,7 +92,8 @@ public class TopicNameTest {
         Mockito.when(queueTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentQueue(
-                    queueName, queueTopic2, 0, false, false);
+                    queueName, queueTopic2, 0, false, false,
+                    QueueMetrics.create(true, "default", queueName));
         } catch (IllegalArgumentException e) {
             assertNotNull(e);
             log.info("This is expected behavior.");

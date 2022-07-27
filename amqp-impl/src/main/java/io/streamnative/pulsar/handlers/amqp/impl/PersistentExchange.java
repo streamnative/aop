@@ -22,6 +22,7 @@ import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
+import io.streamnative.pulsar.handlers.amqp.metrics.ExchangeMetrics;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.IOException;
@@ -66,8 +67,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
+    private ExchangeMetrics exchangeMetrics;
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
+    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete,
+                              ExchangeMetrics exchangeMetrics) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
@@ -83,6 +86,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             messageReplicator = new AmqpExchangeReplicator(this) {
                 @Override
                 public CompletableFuture<Void> readProcess(Entry entry) {
+                    exchangeMetrics.routeInc();
                     Map<String, Object> props;
                     try {
                         MessageImpl<byte[]> message = MessageImpl.deserialize(entry.getDataBuffer());
@@ -100,17 +104,27 @@ public class PersistentExchange extends AbstractAmqpExchange {
                                 props);
                         routeFutureList.add(routeFuture);
                     }
-                    return FutureUtil.waitForAll(routeFutureList);
+                    return FutureUtil.waitForAll(routeFutureList).whenComplete((__, t) -> {
+                        if (t != null) {
+                            exchangeMetrics.routeFailedInc();
+                        }
+                    });
                 }
             };
             messageReplicator.startReplicate();
         }
         this.amqpEntryWriter = new AmqpEntryWriter(persistentTopic);
+        this.exchangeMetrics = exchangeMetrics;
     }
 
     @Override
     public CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey) {
-        return amqpEntryWriter.publishMessage(message);
+        exchangeMetrics.writeInc();
+        return amqpEntryWriter.publishMessage(message).whenComplete((__, t) -> {
+            if (t != null) {
+                exchangeMetrics.writeFailed();
+            }
+        });
     }
 
     @Override
@@ -120,7 +134,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
-        CompletableFuture<Entry> future = new CompletableFuture();
+        exchangeMetrics.readInc();
+        CompletableFuture<Entry> future = new CompletableFuture<>();
         // TODO Temporarily put the creation operation here, and later put the operation in router
         ManagedCursor cursor = cursors.get(queueName);
         if (cursor == null) {
@@ -137,6 +152,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
                 @Override
                 public void readEntryFailed(ManagedLedgerException e, Object o) {
+                    exchangeMetrics.readFailed();
                     future.completeExceptionally(e);
                 }
             }
@@ -151,6 +167,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> markDeleteAsync(String queueName, Position position) {
+        exchangeMetrics.ackInc();
         CompletableFuture<Void> future = new CompletableFuture();
         ManagedCursor cursor = cursors.get(queueName);
         if (cursor == null) {

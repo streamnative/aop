@@ -15,6 +15,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.metrics.AmqpMetrics;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,12 +37,14 @@ public class QueueContainer {
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
     private ExchangeContainer exchangeContainer;
+    private AmqpMetrics amqpMetrics;
 
     protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                             ExchangeContainer exchangeContainer) {
+                             ExchangeContainer exchangeContainer, AmqpMetrics amqpMetrics) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.exchangeContainer = exchangeContainer;
+        this.amqpMetrics = amqpMetrics;
     }
 
     @Getter
@@ -96,7 +99,8 @@ public class QueueContainer {
 
                         // TODO: reset connectionId, exclusive and autoDelete
                         PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
-                                0, false, false);
+                                0, false, false,
+                                amqpMetrics.addQueueMetrics(namespaceName.getLocalName(), queueName));
                         try {
                             amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
                                     namespaceName);
@@ -132,6 +136,7 @@ public class QueueContainer {
         if (queueMap.containsKey(namespaceName)) {
             queueMap.get(namespaceName).remove(queueName);
         }
+        amqpMetrics.deleteQueueMetrics(namespaceName.getLocalName(), queueName);
     }
 
 }

@@ -15,6 +15,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.metrics.AmqpMetrics;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,10 +36,13 @@ public class ExchangeContainer {
 
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
+    private AmqpMetrics amqpMetrics;
 
-    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService) {
+    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
+                                AmqpMetrics amqpMetrics) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
+        this.amqpMetrics = amqpMetrics;
     }
 
     @Getter
@@ -108,7 +112,8 @@ public class ExchangeContainer {
                             amqpExchangeType = AmqpExchange.Type.value(exchangeType);
                         }
                         PersistentExchange amqpExchange = new PersistentExchange(exchangeName,
-                                amqpExchangeType, persistentTopic, false);
+                                amqpExchangeType, persistentTopic, false,
+                                amqpMetrics.addExchangeMetrics(namespaceName.getLocalName(), exchangeName));
                         amqpExchangeCompletableFuture.complete(amqpExchange);
                     }
                 }
@@ -134,6 +139,7 @@ public class ExchangeContainer {
         if (exchangeMap.containsKey(namespaceName)) {
             exchangeMap.get(namespaceName).remove(exchangeName);
         }
+        amqpMetrics.deleteExchangeMetrics(namespaceName.getLocalName(), exchangeName);
     }
 
 }

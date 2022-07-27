@@ -66,6 +66,7 @@
     <qpid-client-version>6.4.0</qpid-client-version>
     <geronimo-jms-version>1.1.1</geronimo-jms-version>
     <hamcrest-version>2.2</hamcrest-version>
+    <awaitility.version>4.0.3</awaitility.version>
   </properties>
 
   <licenses>
@@ -273,6 +274,13 @@
       <artifactId>managed-ledger</artifactId>
       <version>${pulsar.version}</version>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <version>${awaitility.version}</version>
       <scope>test</scope>
     </dependency>
 

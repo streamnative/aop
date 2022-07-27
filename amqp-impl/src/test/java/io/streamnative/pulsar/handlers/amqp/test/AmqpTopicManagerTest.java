@@ -14,10 +14,11 @@
 
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import static org.testng.Assert.assertFalse;
+
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.AbstractTopic;
-import org.junit.Assert;
 import org.testng.annotations.Test;
 
 /**
@@ -31,6 +32,6 @@ public class AmqpTopicManagerTest extends AmqpProtocolTestBase {
         AmqpTopicManager amqpTopicManager = new AmqpTopicManager(pulsarService);
         AbstractTopic abstractTopic = (AbstractTopic) amqpTopicManager.getOrCreateTopic(
                 "public/vhost1/test", true);
-        Assert.assertFalse(abstractTopic.isDeleteWhileInactive());
+        assertFalse(abstractTopic.isDeleteWhileInactive());
     }
 }

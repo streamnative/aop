@@ -14,6 +14,8 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.fail;
 
 import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
@@ -24,7 +26,6 @@ import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
-import org.junit.Assert;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
@@ -51,7 +52,7 @@ public class TopicNameTest {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic1, false);
         } catch (IllegalArgumentException e) {
-            Assert.fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
+            fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
 
         PersistentTopic exchangeTopic2 = Mockito.mock(PersistentTopic.class);
@@ -61,7 +62,7 @@ public class TopicNameTest {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic2, false);
         } catch (IllegalArgumentException e) {
-            Assert.assertNotNull(e);
+            assertNotNull(e);
             log.info("This is expected behavior.");
         }
     }
@@ -78,7 +79,7 @@ public class TopicNameTest {
             new PersistentQueue(
                     queueName, queueTopic1, 0, false, false);
         } catch (IllegalArgumentException e) {
-            Assert.fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
+            fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
 
         PersistentTopic queueTopic2 = Mockito.mock(PersistentTopic.class);
@@ -88,7 +89,7 @@ public class TopicNameTest {
             new PersistentQueue(
                     queueName, queueTopic2, 0, false, false);
         } catch (IllegalArgumentException e) {
-            Assert.assertNotNull(e);
+            assertNotNull(e);
             log.info("This is expected behavior.");
         }
     }

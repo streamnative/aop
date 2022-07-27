@@ -87,6 +87,13 @@
     <dependencies>
       <!-- provided dependencies -->
       <dependency>
+        <groupId>io.streamnative</groupId>
+        <artifactId>pulsar</artifactId>
+        <version>${pulsar.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-annotations</artifactId>
         <version>${spotbugs-annotations.version}</version>

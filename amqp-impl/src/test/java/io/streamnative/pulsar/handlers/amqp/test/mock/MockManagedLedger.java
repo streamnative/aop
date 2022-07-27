@@ -78,20 +78,6 @@ public class MockManagedLedger implements ManagedLedger {
     }
 
     @Override
-    public ManagedCursor openCursor(String name, CommandSubscribe.InitialPosition initialPosition,
-                                    Map<String, Long> properties, Map<String, String> cursorProperties)
-            throws InterruptedException, ManagedLedgerException {
-        return null;
-    }
-
-    @Override
-    public void asyncOpenCursor(String name, CommandSubscribe.InitialPosition initialPosition,
-                                Map<String, Long> properties, Map<String, String> cursorProperties,
-                                AsyncCallbacks.OpenCursorCallback callback, Object ctx) {
-
-    }
-
-    @Override
     public ManagedCursor newNonDurableCursor(Position position) throws ManagedLedgerException {
         return null;
     }
@@ -362,6 +348,20 @@ public class MockManagedLedger implements ManagedLedger {
 
     @Override
     public void removeWaitingCursor(ManagedCursor cursor) {
+        // nothing to do
+    }
+
+    @Override
+    public ManagedCursor openCursor(String name, CommandSubscribe.InitialPosition initialPosition,
+                                    Map<String, Long> properties, Map<String, String> cursorProperties)
+            throws InterruptedException, ManagedLedgerException {
+        return null;
+    }
+
+    @Override
+    public void asyncOpenCursor(String name, CommandSubscribe.InitialPosition initialPosition,
+                                Map<String, Long> properties, Map<String, String> cursorProperties,
+                                AsyncCallbacks.OpenCursorCallback callback, Object ctx) {
         // nothing to do
     }
 

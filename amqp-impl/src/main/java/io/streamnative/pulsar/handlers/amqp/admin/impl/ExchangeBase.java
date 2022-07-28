@@ -87,14 +87,14 @@ public class ExchangeBase extends BaseResources {
         });
     }
 
-    protected CompletableFuture<AmqpExchange> declareExchange(String vhost, String exchangeName,
+    protected CompletableFuture<AmqpExchange> declareExchange(String vhost, String exchange,
                                                               ExchangeDeclareParams declareParams) {
-        return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName, declareParams.getType(),
+        return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchange, declareParams.getType(),
                 false, declareParams.isDurable(), declareParams.isAuto_delete(), declareParams.isInternal(), null);
     }
 
-    protected CompletableFuture<Void> deleteExchange(String vhost, String exchangeName, boolean ifUnused) {
-        return exchangeService().exchangeDelete(NamespaceName.get(tenant, vhost), exchangeName, ifUnused);
+    protected CompletableFuture<Void> deleteExchange(String vhost, String exchange, boolean ifUnused) {
+        return exchangeService().exchangeDelete(NamespaceName.get(tenant, vhost), exchange, ifUnused);
     }
 
 }

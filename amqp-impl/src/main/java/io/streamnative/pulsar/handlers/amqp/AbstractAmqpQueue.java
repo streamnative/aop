@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,6 +62,11 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     @Override
     public AmqpMessageRouter getRouter(String exchangeName) {
         return routers.get(exchangeName);
+    }
+
+    @Override
+    public Collection<AmqpMessageRouter> getRouters() {
+        return routers.values();
     }
 
     @Override

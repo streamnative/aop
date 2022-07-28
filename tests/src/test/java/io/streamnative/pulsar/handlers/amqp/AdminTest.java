@@ -28,29 +28,26 @@ public class AdminTest extends AmqpTestBase{
         channel.exchangeDeclare("ex1-2", BuiltinExchangeType.DIRECT, true);
         channel.exchangeDeclare("ex1-3", BuiltinExchangeType.DIRECT, true);
 
+//        channel.queueDeclare("qu1-1", true, true, false, null);
+//        channel.queueDeclare("qu1-2", true, true, false, null);
+//        channel.queueDeclare("qu1-3", true, true, false, null);
+
         Connection connection2 = getConnection("vhost2", false);
         Channel channel2 = connection2.createChannel();
         channel2.exchangeDeclare("ex2-1", BuiltinExchangeType.DIRECT, true);
         channel2.exchangeDeclare("ex2-2", BuiltinExchangeType.DIRECT, true);
         channel2.exchangeDeclare("ex2-3", BuiltinExchangeType.DIRECT, true);
 
+//        channel2.queueDeclare("qu1-1", true, true, false, null);
+//        channel2.queueDeclare("qu1-2", true, true, false, null);
+        channel2.queueDeclare("qu1-3", true, true, false, null);
+
+        Connection connection3 = getConnection("vhost2", false);
+        Channel channel3 = connection3.createChannel();
+        channel3.queueDeclare("qu1-3", true, true, false, null);
+
         System.out.println("aop server start");
         Thread.sleep(1000 * 60 * 60);
-    }
-
-    @Test
-    public void test2() throws Exception {
-        Connection connection = getConnection("vhost1", 5672);
-        Channel channel = connection.createChannel();
-        channel.exchangeDeclare("ex1-1", BuiltinExchangeType.DIRECT, true);
-        channel.exchangeDeclare("ex1-2", BuiltinExchangeType.DIRECT, true);
-        channel.exchangeDeclare("ex1-3", BuiltinExchangeType.DIRECT, true);
-
-        Connection connection2 = getConnection("vhost2", 5672);
-        Channel channel2 = connection2.createChannel();
-        channel2.exchangeDeclare("ex2-1", BuiltinExchangeType.DIRECT, true);
-        channel2.exchangeDeclare("ex2-2", BuiltinExchangeType.DIRECT, true);
-        channel2.exchangeDeclare("ex2-3", BuiltinExchangeType.DIRECT, true);
     }
 
 }

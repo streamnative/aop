@@ -295,18 +295,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
                     ifUnused, ifEmpty, nowait);
         }
-//        String queueName;
-//        if (queue == null || queue.length() == 0) {
-//            if (getDefaultQueue() != null) {
-//                checkExclusiveQueue(getDefaultQueue());
-//                queueName = getDefaultQueue().getName();
-//            } else {
-//                closeChannel(ErrorCodes.ARGUMENT_INVALID, "The queue name is empty.");
-//                return;
-//            }
-//        } else {
-//            queueName = queue.toString();
-//        }
         queueService.queueDelete(connection.getNamespaceName(), getQueueName(queue), ifUnused,
                         ifEmpty, connection.getConnectionId())
                 .thenAccept(__ -> {
@@ -958,14 +946,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     protected AmqpQueue getDefaultQueue() {
         return defaultQueue;
     }
-
-//    public void checkExclusiveQueue(AmqpQueue amqpQueue) {
-//        if (amqpQueue != null && amqpQueue.isExclusive()
-//            && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
-//            closeChannel(ErrorCodes.ALREADY_EXISTS,
-//                "Exclusive queue can not be used form other connection, queueName: '" + amqpQueue.getName() + "'");
-//        }
-//    }
 
     @VisibleForTesting
     public Map<String, Consumer> getTag2ConsumersMap() {

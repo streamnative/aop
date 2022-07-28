@@ -242,15 +242,10 @@ public class QueueServiceImpl implements QueueService {
             try {
                 amqpQueue.bindExchange(amqpExchange, messageRouter, bindingKey, arguments);
                 future.complete(null);
-//                MethodRegistry methodRegistry = connection.getMethodRegistry();
-//                AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
-//                connection.writeFrame(responseBody.generateFrame(channelId));
             } catch (Exception e) {
                 log.warn("Failed to bind queue[{}] with exchange[{}].", amqpQueue.getName(), exchange, e);
                 future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR,
                         "Catch a PulsarAdminException: " + e.getMessage() + ". ", false, true));
-//                connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
-//                        "Catch a PulsarAdminException: " + e.getMessage() + ". ", channelId);
             }
         });
         return future;

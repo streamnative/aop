@@ -44,7 +44,6 @@ public class BindingBase extends BaseResources {
                     if (router == null) {
                         return;
                     }
-                    router.getBindingKey();
                     for (String key : router.getBindingKey()) {
                         if (propsKey != null && !propsKey.equals(key)) {
                             continue;

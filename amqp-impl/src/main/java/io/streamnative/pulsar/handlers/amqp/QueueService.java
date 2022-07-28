@@ -67,23 +67,21 @@ public interface QueueService {
     /**
      * Unbinds a queue from an exchange.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param exchange the name of the exchange
      * @param bindingKey the key to use for the binding
      * @param arguments other properties (binding parameters)
      */
-    void queueUnbind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+    CompletableFuture<Void> queueUnbind(NamespaceName namespaceName, String queue, String exchange, String bindingKey,
                      FieldTable arguments, long connectionId);
 
     /**
      * Purges the contents of the given queue.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param nowait set true will return nothing (as there will be no response from the server)
      */
-    void queuePurge(AmqpChannel channel, AMQShortString queue, boolean nowait, long connectionId);
+    CompletableFuture<Void> queuePurge(NamespaceName namespaceName, String queue, boolean nowait, long connectionId);
 
     CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
                                           long connectionId);

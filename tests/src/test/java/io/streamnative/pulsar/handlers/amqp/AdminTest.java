@@ -28,9 +28,9 @@ public class AdminTest extends AmqpTestBase{
         channel.exchangeDeclare("ex1-2", BuiltinExchangeType.DIRECT, true);
         channel.exchangeDeclare("ex1-3", BuiltinExchangeType.DIRECT, true);
 
-//        channel.queueDeclare("qu1-1", true, true, false, null);
-//        channel.queueDeclare("qu1-2", true, true, false, null);
-//        channel.queueDeclare("qu1-3", true, true, false, null);
+        channel.queueDeclare("qu1-1", true, true, false, null);
+        channel.queueDeclare("qu1-2", true, true, false, null);
+        channel.queueDeclare("qu1-3", true, true, false, null);
 
         Connection connection2 = getConnection("vhost2", false);
         Channel channel2 = connection2.createChannel();
@@ -38,13 +38,9 @@ public class AdminTest extends AmqpTestBase{
         channel2.exchangeDeclare("ex2-2", BuiltinExchangeType.DIRECT, true);
         channel2.exchangeDeclare("ex2-3", BuiltinExchangeType.DIRECT, true);
 
-//        channel2.queueDeclare("qu1-1", true, true, false, null);
-//        channel2.queueDeclare("qu1-2", true, true, false, null);
+        channel2.queueDeclare("qu1-1", true, true, false, null);
+        channel2.queueDeclare("qu1-2", true, true, false, null);
         channel2.queueDeclare("qu1-3", true, true, false, null);
-
-        Connection connection3 = getConnection("vhost2", false);
-        Channel channel3 = connection3.createChannel();
-        channel3.queueDeclare("qu1-3", true, true, false, null);
 
         System.out.println("aop server start");
         Thread.sleep(1000 * 60 * 60);

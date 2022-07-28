@@ -53,7 +53,7 @@ public class Queues extends QueueBase {
         getQueueListByVhostAsync(vhost)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
-                    log.error("Failed to get queue list by vhost {} for tenant {}", vhost, tenant, t);
+                    log.error("Failed to get queue list in vhost {}", vhost, t);
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -67,8 +67,7 @@ public class Queues extends QueueBase {
         getQueueBeanAsync(vhost, queue)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
-                    log.error("Failed to get queue {} for tenant {} belong to vhost {}",
-                            queue, tenant, vhost, t);
+                    log.error("Failed to get queue {} in vhost {}", queue, vhost, t);
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -83,8 +82,7 @@ public class Queues extends QueueBase {
         declareQueueAsync(vhost, queue, params)
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
-                    log.error("Failed to declare queue {} for tenant {} belong to vhost {}",
-                            queue, tenant, vhost, t);
+                    log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -104,8 +102,7 @@ public class Queues extends QueueBase {
                     response.resume(Response.noContent().build());
                 })
                 .exceptionally(t -> {
-                    log.error("Failed to delete queue {} for tenant {} belong to vhost {}",
-                            queue, tenant, vhost, t);
+                    log.error("Failed to delete queue {} in vhost {}", queue, vhost, t);
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

@@ -284,7 +284,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveQueuePurge(AMQShortString queue, boolean nowait) {
-        queueService.queuePurge(this, queue, nowait, connection.getConnectionId());
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueuePurge[ queue: {}, nowait:{} ]", channelId, queue, nowait);
+        }
+        queueService.queuePurge(connection.getNamespaceName(), queue.toString(), nowait, connection.getConnectionId())
+                .thenAccept(__ -> {
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    AMQMethodBody responseBody = methodRegistry.createQueuePurgeOkBody(0);
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                }).exceptionally(t -> {
+                    log.error("Failed to purge queue {} in vhost {}", queue, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
     }
 
     @Override
@@ -336,7 +348,20 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                    FieldTable arguments) {
-        queueService.queueUnbind(this, queue, exchange, bindingKey, arguments, connection.getConnectionId());
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
+                    exchange, bindingKey, arguments);
+        }
+        queueService.queueUnbind(connection.getNamespaceName(), queue.toString(), exchange.toString(),
+                bindingKey.toString(), arguments, connection.getConnectionId()).thenAccept(__ -> {
+            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to unbind queue {} with exchange {} in vhost {}",
+                    queue, exchange, connection.getNamespaceName(), t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override

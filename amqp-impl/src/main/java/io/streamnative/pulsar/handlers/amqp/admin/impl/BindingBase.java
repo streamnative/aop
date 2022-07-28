@@ -55,6 +55,7 @@ public class BindingBase extends BaseResources {
                         bean.setDestination(queue);
                         bean.setRoutingKey(key);
                         bean.setPropertiesKey(key);
+                        bean.setDestinationType("queue");
                         beans.add(bean);
                     }
                 }).thenApply(__ -> beans);

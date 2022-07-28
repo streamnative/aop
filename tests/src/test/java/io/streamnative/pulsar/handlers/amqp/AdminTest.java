@@ -18,6 +18,7 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.test.HttpUtil;
 import com.rabbitmq.client.test.JsonUtil;
+import io.streamnative.pulsar.handlers.amqp.admin.model.BindingBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueBean;
 import java.io.IOException;
@@ -180,6 +181,57 @@ public class AdminTest extends AmqpTestBase{
         queueDelete(vhost, quName);
     }
 
+    @Test
+    public void bindingsTest() throws Exception {
+        String vhost = "vhost1";
+        String ex = randExName();
+        String qu = randQuName();
+        String key1 = randomName("key", 5);
+        String key2 = randomName("key", 5);
+
+        exchangeDeclare(vhost, ex, BuiltinExchangeType.TOPIC.getType());
+        queueDeclare(vhost, qu);
+        queueBind(vhost, ex, qu, key1);
+        queueBind(vhost, ex, qu, key2);
+
+        List<BindingBean> beans = listBindings(vhost, ex, qu);
+        Assert.assertEquals(beans.size(), 2);
+        Set<String> keySet = new HashSet<>();
+        keySet.add(key1);
+        keySet.add(key2);
+        for (BindingBean bean : beans) {
+            keySet.remove(bean.getPropertiesKey());
+        }
+        Assert.assertEquals(keySet.size(), 0);
+
+        BindingBean expectedBean = new BindingBean();
+        expectedBean.setVhost(vhost);
+        expectedBean.setSource(ex);
+        expectedBean.setDestination(qu);
+        expectedBean.setDestinationType("queue");
+        expectedBean.setRoutingKey(key2);
+        expectedBean.setPropertiesKey(key2);
+        expectedBean.setArguments(null);
+
+        BindingBean bean = getBinding(vhost, ex, qu, key2);
+        Assert.assertNotNull(bean);
+        Assert.assertEquals(bean, expectedBean);
+
+        // TODO currently, unbind operation will remove all bindings between exchange and queue,
+        //  the right operation is only remove the specific key binding
+        queueUnbind(vhost, ex, qu, key1);
+        beans = listBindings(vhost, ex, qu);
+        Assert.assertEquals(beans.size(), 0);
+//        Assert.assertEquals(beans.get(0).getPropertiesKey(), key2);
+//
+//        queueUnbind(vhost, ex, qu, key2);
+//        beans = listBindings(vhost, ex, qu);
+//        Assert.assertEquals(beans.size(), 0);
+//
+//        exchangeDelete(vhost, ex);
+//        queueDelete(vhost, qu);
+    }
+
     private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {
         Map<String, Object> declareParams = new HashMap<>();
         declareParams.put("type", type);
@@ -234,6 +286,27 @@ public class AdminTest extends AmqpTestBase{
     private QueueBean getQueue(String vhost, String queue) throws IOException {
         String json = HttpUtil.get(api("queues/" + vhost + "/" + queue));
         return JsonUtil.parseObject(json, QueueBean.class);
+    }
+
+    private void queueBind(String vhost, String exchange, String queue, String routingKey) throws IOException {
+        Map<String, Object> params = new HashMap<>();
+        params.put("routing_key", routingKey);
+        params.put("arguments", null);
+        HttpUtil.post(api("bindings/" + vhost + "/e/" + exchange + "/q/" + queue), params);
+    }
+
+    private void queueUnbind(String vhost, String exchange, String queue, String routingKey) throws IOException {
+        HttpUtil.delete(api("bindings/" + vhost + "/e/" + exchange + "/q/" + queue + "/" + routingKey));
+    }
+
+    private List<BindingBean> listBindings(String vhost, String exchange, String queue) throws IOException {
+        String json = HttpUtil.get(api("bindings/" + vhost + "/e/" + exchange + "/q/" + queue));
+        return JsonUtil.parseObjectList(json, BindingBean.class);
+    }
+
+    private BindingBean getBinding(String vhost, String exchange, String queue, String propsKey) throws IOException {
+        String json = HttpUtil.get(api("bindings/" + vhost + "/e/" + exchange + "/q/" + queue + "/" + propsKey));
+        return JsonUtil.parseObject(json, BindingBean.class);
     }
 
     private String api(String path) {

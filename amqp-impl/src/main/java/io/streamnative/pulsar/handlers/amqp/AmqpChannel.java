@@ -271,8 +271,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
-        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue),
-                exchange.toString(), bindingKey.toString(), nowait, argumentsTable,
+        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
+                bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
                 connection.getConnectionId()).thenAccept(__ -> {
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();

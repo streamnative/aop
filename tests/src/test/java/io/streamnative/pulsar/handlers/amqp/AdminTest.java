@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.collections.CollectionUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -159,7 +160,7 @@ public class AdminTest extends AmqpTestBase{
     }
 
     @Test(timeOut = 1000 * 5)
-    public void queueDeclareTest() throws IOException {
+    public void queueDeclareDeleteTest() throws IOException {
         String vhost = "vhost3";
         Set<String> queueNameSet = new HashSet<>();
         for (int i = 0; i < 3; i++) {
@@ -175,9 +176,16 @@ public class AdminTest extends AmqpTestBase{
         }
         Assert.assertEquals(queueNameSet.size(), 0);
 
-        String quName = randQuName();
-        queueDelete(vhost, quName);
-        queueDelete(vhost, quName);
+        String qu = beans.get(0).getName();
+        queueDelete(vhost, qu);
+        beans = listQueuesByVhost(vhost);
+        Assert.assertTrue(beans.size() > 0);
+        for (QueueBean bean : beans) {
+            Assert.assertNotEquals(bean.getName(), qu);
+            queueDelete(vhost, bean.getName());
+        }
+        beans = listQueuesByVhost(vhost);
+        Assert.assertTrue(CollectionUtils.isEmpty(beans));
     }
 
     private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {

@@ -20,10 +20,12 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInE
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
+import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -95,9 +97,20 @@ public class QueueServiceImpl implements QueueService {
                     future.completeExceptionally(
                             new AoPException(ErrorCodes.NOT_FOUND, "No such queue: " + queue, true, false));
                 } else {
-                    queueContainer.deleteQueue(namespaceName, amqpQueue.getName());
-                    // TODO delete the binding with the default exchange and delete the topic in pulsar.
-                    future.complete(null);
+                    Collection<AmqpMessageRouter> routers = amqpQueue.getRouters();
+                    if (!CollectionUtils.isEmpty(routers)) {
+                        for (AmqpMessageRouter router : routers) {
+                            // TODO need to change to async way
+                            amqpQueue.unbindExchange(router.getExchange());
+                        }
+                    }
+                    amqpQueue.getTopic().delete().thenAccept(__ -> {
+                        queueContainer.deleteQueue(namespaceName, amqpQueue.getName());
+                        future.complete(null);
+                    }).exceptionally(t -> {
+                        future.completeExceptionally(t);
+                        return null;
+                    });
                 }
             }
         });

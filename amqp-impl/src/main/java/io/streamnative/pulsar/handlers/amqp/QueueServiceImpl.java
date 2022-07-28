@@ -14,6 +14,8 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 
 import java.util.Map;
@@ -242,9 +244,9 @@ public class QueueServiceImpl implements QueueService {
         }
         String exchangeType = null;
         boolean createIfMissing = false;
-        if (channel.isBuildInExchange(exchange)) {
+        if (isBuildInExchange(exchange.toString())) {
             createIfMissing = true;
-            exchangeType = channel.getExchangeType(exchange.toString());
+            exchangeType = getExchangeType(exchange.toString());
         }
 
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =

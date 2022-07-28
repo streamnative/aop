@@ -16,19 +16,23 @@ package io.streamnative.pulsar.handlers.amqp.admin.impl;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.ExchangeService;
-import org.apache.pulsar.broker.namespace.NamespaceService;
-import org.apache.pulsar.broker.resources.NamespaceResources;
-import org.apache.pulsar.broker.service.BrokerServiceException;
-import org.apache.pulsar.broker.web.RestException;
-import org.apache.pulsar.client.admin.PulsarAdminException;
-import org.apache.pulsar.common.util.FutureUtil;
-
+import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import javax.servlet.ServletContext;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.pulsar.broker.namespace.NamespaceService;
+import org.apache.pulsar.broker.resources.NamespaceResources;
+import org.apache.pulsar.broker.web.RestException;
+import org.apache.pulsar.common.util.FutureUtil;
 
+/**
+ * Base resources.
+ */
 public class BaseResources {
 
     protected String tenant = "public";
@@ -88,6 +92,19 @@ public class BaseResources {
         } else {
             asyncResponse.resume(new RestException(Response.Status.BAD_REQUEST, realCause.getMessage()));
         }
+    }
+
+    protected CompletableFuture<List<VhostBean>> getVhostListAsync() {
+        return namespaceResource().listNamespacesAsync(tenant)
+                .thenApply(nsList -> {
+                    List<VhostBean> vhostBeanList = new ArrayList<>();
+                    nsList.forEach(ns -> {
+                        VhostBean bean = new VhostBean();
+                        bean.setName(ns);
+                        vhostBeanList.add(bean);
+                    });
+                    return vhostBeanList;
+                });
     }
 
 }

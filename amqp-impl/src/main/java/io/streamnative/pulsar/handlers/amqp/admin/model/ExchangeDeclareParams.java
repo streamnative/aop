@@ -13,17 +13,21 @@
  */
 package io.streamnative.pulsar.handlers.amqp.admin.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
+/**
+ * This class is used to declare exchange params.
+ */
 @Data
 @NoArgsConstructor
 public class ExchangeDeclareParams {
 
     private String type;
-    private boolean auto_delete;
+    @JsonProperty(value = "auto_delete")
+    private boolean autoDelete;
     private boolean durable;
     private boolean internal;
     private Map<String, Object> arguments;

@@ -16,18 +16,19 @@ package io.streamnative.pulsar.handlers.amqp.admin.impl;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
-import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
-import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.common.util.FutureUtil;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.util.FutureUtil;
 
+/**
+ * Exchange base.
+ */
 public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<List<ExchangeBean>> getExchangeListAsync() {
@@ -40,19 +41,6 @@ public class ExchangeBase extends BaseResources {
                     }
                     return FutureUtil.waitForAll(futureList);
                 }).thenApply(__ -> exchangeList);
-    }
-
-    private CompletableFuture<List<VhostBean>> getVhostListAsync() {
-        return namespaceResource().listNamespacesAsync(tenant)
-                .thenApply(nsList -> {
-                    List<VhostBean> vhostBeanList = new ArrayList<>();
-                    nsList.forEach(ns -> {
-                        VhostBean bean = new VhostBean();
-                        bean.setName(ns);
-                        vhostBeanList.add(bean);
-                    });
-                    return vhostBeanList;
-                });
     }
 
     private CompletableFuture<List<String>> getExchangeListAsync(String tenant, String ns) {
@@ -82,6 +70,7 @@ public class ExchangeBase extends BaseResources {
             exchangeBean.setName(exchangeName);
             exchangeBean.setType(ex.getType().toString().toLowerCase());
             exchangeBean.setVhost(vhost);
+            exchangeBean.setAutoDelete(ex.getAutoDelete());
             exchangeBean.setInternal(false);
             return exchangeBean;
         });
@@ -89,8 +78,9 @@ public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<AmqpExchange> declareExchange(String vhost, String exchangeName,
                                                               ExchangeDeclareParams declareParams) {
-        return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName, declareParams.getType(),
-                false, declareParams.isDurable(), declareParams.isAuto_delete(), declareParams.isInternal(), null);
+        return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName,
+                declareParams.getType(), false, declareParams.isDurable(), declareParams.isAutoDelete(),
+                declareParams.isInternal(), null);
     }
 
     protected CompletableFuture<Void> deleteExchange(String vhost, String exchangeName, boolean ifUnused) {

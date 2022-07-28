@@ -104,4 +104,5 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
             doc = "The aop admin service port"
     )
     private int amqpAdminPort = 15673;
+
 }

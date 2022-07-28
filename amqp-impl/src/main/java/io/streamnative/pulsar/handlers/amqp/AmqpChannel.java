@@ -216,7 +216,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     String replyText = null;
                     switch (replyCode) {
                         case ExchangeBoundOkBody.EXCHANGE_NOT_FOUND:
-                            replyText = "Exchange '" + exchange + "' not found in vhost " + connection.getNamespaceName();
+                            replyText = "Exchange '" + exchange + "' not found in vhost "
+                                    + connection.getNamespaceName();
                             break;
                         case ExchangeBoundOkBody.QUEUE_NOT_FOUND:
                             replyText = "Queue '" + queueName + "' not found in vhost " + connection.getNamespaceName();

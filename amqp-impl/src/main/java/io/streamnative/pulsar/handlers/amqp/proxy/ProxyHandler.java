@@ -33,9 +33,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientMethodProcessor;
+import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 
 /**
@@ -142,7 +144,10 @@ public class ProxyHandler {
                     } catch (Throwable e) {
                         log.error("error while handle command:", e);
                         close();
+                    } finally {
+                        buffer.release();
                     }
+
                     break;
                 case Connected:
                     clientChannel.writeAndFlush(msg);
@@ -163,7 +168,6 @@ public class ProxyHandler {
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             log.warn("[{}] ProxyBackendHandler [channelInactive]", vhost);
             super.channelInactive(ctx);
-            proxyService.cacheVhostMapRemove(vhost);
             proxyConnection.close();
         }
 
@@ -221,10 +225,15 @@ public class ProxyHandler {
         }
 
         @Override
-        public void receiveConnectionClose(int i, AMQShortString amqShortString, int i1, int i2) {
+        public void receiveConnectionClose(int replyCode, AMQShortString replyText,
+                                           int classId, int methodId) {
             if (log.isDebugEnabled()) {
                 log.debug("ProxyBackendHandler [receiveConnectionClose]");
             }
+
+            AMQFrame frame = new AMQFrame(0,
+                    new ConnectionCloseBody(getProtocolVersion(), replyCode, replyText, classId, methodId));
+            clientChannel.writeAndFlush(frame);
         }
 
         @Override
@@ -232,6 +241,7 @@ public class ProxyHandler {
             if (log.isDebugEnabled()) {
                 log.debug("ProxyBackendHandler [receiveConnectionCloseOk]");
             }
+            close();
         }
 
         @Override

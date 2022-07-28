@@ -58,10 +58,10 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
 
     @FieldContext(
             category = CATEGORY_AMQP,
-            required = true,
+            required = false,
             doc = "The namespace used for storing Amqp metadata topics"
     )
-    private String amqpListeners = "amqp://127.0.0.1:5672";
+    private String amqpListeners;
 
     @FieldContext(
         category = CATEGORY_AMQP,
@@ -97,4 +97,12 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
             doc = "Whether start amqp protocol handler with proxy"
     )
     private boolean amqpProxyEnable = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = true,
+            doc = "The aop admin service port"
+    )
+    private int amqpAdminPort = 15673;
+
 }

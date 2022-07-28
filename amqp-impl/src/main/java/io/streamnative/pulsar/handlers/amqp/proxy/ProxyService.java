@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
 
@@ -53,8 +52,6 @@ public class ProxyService implements Closeable {
     private DefaultThreadFactory workerThreadFactory = new DefaultThreadFactory("amqp-redirect-io");
     private static final int numThreads = Runtime.getRuntime().availableProcessors();
 
-    @Getter
-    private static final Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();
     @Getter
     private static final Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
 
@@ -100,14 +97,6 @@ public class ProxyService implements Closeable {
                 proxyConnection.close();
             }
         }
-    }
-
-    public void cacheVhostMap(String vhost, Pair<String, Integer> lookupData) {
-        this.vhostBrokerMap.put(vhost, lookupData);
-    }
-
-    public void cacheVhostMapRemove(String vhost) {
-        this.vhostBrokerMap.remove(vhost);
     }
 
     @Override

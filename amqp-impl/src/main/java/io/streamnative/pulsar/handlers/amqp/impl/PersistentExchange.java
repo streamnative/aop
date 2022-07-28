@@ -19,9 +19,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
-import io.streamnative.pulsar.handlers.amqp.MessagePublishContext;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.IOException;
@@ -65,6 +65,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private ObjectMapper jsonMapper = new JsonMapper();
     private final ConcurrentOpenHashMap<String, ManagedCursor> cursors;
     private AmqpExchangeReplicator messageReplicator;
+    private AmqpEntryWriter amqpEntryWriter;
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
         super(exchangeName, type, new HashSet<>(), true, autoDelete);
@@ -104,13 +105,12 @@ public class PersistentExchange extends AbstractAmqpExchange {
             };
             messageReplicator.startReplicate();
         }
+        this.amqpEntryWriter = new AmqpEntryWriter(persistentTopic);
     }
 
     @Override
     public CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey) {
-        CompletableFuture<Position> publishFuture = new CompletableFuture<>();
-        MessagePublishContext.publishMessages(message, persistentTopic, publishFuture);
-        return publishFuture;
+        return amqpEntryWriter.publishMessage(message);
     }
 
     @Override

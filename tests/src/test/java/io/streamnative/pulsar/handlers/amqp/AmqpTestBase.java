@@ -14,14 +14,25 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Sets;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfo;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -74,6 +85,69 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
     @Override
     public void cleanup() throws Exception {
         super.internalCleanup();
+    }
+
+    protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
+        int port;
+        if (amqpProxyEnable) {
+            port = getProxyPort();
+            log.info("use proxyPort: {}", port);
+            return getConnection(vhost, port);
+        } else {
+            port = getAmqpBrokerPortList().get(0);
+            log.info("use amqpBrokerPort: {}", port);
+        }
+        return getConnection(vhost, port);
+    }
+
+    protected Connection getConnection(String vhost, int port) throws IOException, TimeoutException {
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+        connectionFactory.setHost("localhost");
+        connectionFactory.setPort(port);
+        connectionFactory.setVirtualHost(vhost);
+        return connectionFactory.newConnection();
+    }
+
+    protected void basicDirectConsume(String vhost, boolean exclusiveConsume) throws Exception {
+        String exchangeName = randExName();
+        String routingKey = "test.key";
+        String queueName = randQuName();
+
+        Connection conn = getConnection(vhost, false);
+        Channel channel = conn.createChannel();
+
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
+
+        int messageCnt = 100;
+        CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
+
+        AtomicInteger consumeIndex = new AtomicInteger(0);
+        channel.basicConsume(queueName, false, "", false, exclusiveConsume, null,
+                new DefaultConsumer(channel) {
+                    @Override
+                    public void handleDelivery(String consumerTag,
+                                               Envelope envelope,
+                                               AMQP.BasicProperties properties,
+                                               byte[] body) throws IOException {
+                        long deliveryTag = envelope.getDeliveryTag();
+                        Assert.assertEquals(new String(body), "Hello, world! - " + consumeIndex.getAndIncrement());
+                        // (process the message components here ...)
+                        channel.basicAck(deliveryTag, false);
+                        countDownLatch.countDown();
+                    }
+                });
+
+        for (int i = 0; i < messageCnt; i++) {
+            byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
+            channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
+        }
+
+        countDownLatch.await();
+        Assert.assertEquals(messageCnt, consumeIndex.get());
+        channel.close();
+        conn.close();
     }
 
 }

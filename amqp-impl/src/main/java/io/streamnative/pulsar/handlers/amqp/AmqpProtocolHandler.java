@@ -31,6 +31,10 @@ import org.apache.pulsar.broker.ServiceConfigurationUtils;
 import org.apache.pulsar.broker.protocol.ProtocolHandler;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.policies.data.loadbalancer.AdvertisedListener;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+import org.glassfish.jersey.servlet.ServletContainer;
 
 /**
  * Amqp Protocol Handler load and run by Pulsar Service.
@@ -50,8 +54,9 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     private BrokerService brokerService;
     @Getter
     private String bindAddress;
-
+    @Getter
     private AmqpBrokerService amqpBrokerService;
+    private Server webServer;
 
     @Override
     public String protocolName() {
@@ -80,9 +85,9 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public String getProtocolDataToAdvertise() {
         if (log.isDebugEnabled()) {
-            log.debug("Get configured listeners", amqpConfig.getAmqpListeners());
+            log.debug("Get configured listeners: {}", getAppliedAmqpListeners(amqpConfig));
         }
-        return amqpConfig.getAmqpListeners();
+        return getAppliedAmqpListeners(amqpConfig);
     }
 
     @Override
@@ -97,7 +102,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             proxyConfig.setAmqpHeartBeat(amqpConfig.getAmqpHeartBeat());
             proxyConfig.setAmqpProxyPort(amqpConfig.getAmqpProxyPort());
 
-            AdvertisedListener internalListener = ServiceConfigurationUtils.getInternalListener(amqpConfig);
+            AdvertisedListener internalListener = ServiceConfigurationUtils.getInternalListener(amqpConfig, "pulsar");
             checkArgument(internalListener.getBrokerServiceUrl() != null,
                     "plaintext must be configured on internal listener");
             proxyConfig.setBrokerServiceURL(internalListener.getBrokerServiceUrl().toString());
@@ -110,9 +115,9 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                 log.error("Failed to start amqp proxy service.");
             }
         }
-
+        startAdminResource(amqpConfig.getAmqpAdminPort());
         log.info("Starting AmqpProtocolHandler, listener: {}, aop version is: '{}'",
-                amqpConfig.getAmqpListeners(), AopVersion.getVersion());
+                getAppliedAmqpListeners(amqpConfig), AopVersion.getVersion());
         log.info("Git Revision {}", AopVersion.getGitSha());
         log.info("Built by {} on {} at {}",
             AopVersion.getBuildUser(),
@@ -120,14 +125,35 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             AopVersion.getBuildTime());
     }
 
+    private void startAdminResource(int port) {
+        ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
+        context.setContextPath("/api");
+        context.setAttribute("aop", this);
+
+        webServer = new Server(port);
+        webServer.setHandler(context);
+
+        ServletHolder jerseyServlet = context.addServlet(ServletContainer.class, "/*");
+        jerseyServlet.setInitOrder(0);
+
+        jerseyServlet.setInitParameter(
+                "jersey.config.server.provider.packages", "io.streamnative.pulsar.handlers.amqp.admin");
+
+        try {
+            webServer.start();
+        } catch (Exception e) {
+            log.error("Failed to start web service for aop", e);
+        }
+    }
+
     // this is called after initialize, and with amqpConfig, brokerService all set.
     @Override
     public Map<InetSocketAddress, ChannelInitializer<SocketChannel>> newChannelInitializers() {
         checkState(amqpConfig != null);
-        checkState(amqpConfig.getAmqpListeners() != null);
+        checkState(getAppliedAmqpListeners(amqpConfig) != null);
         checkState(brokerService != null);
 
-        String listeners = amqpConfig.getAmqpListeners();
+        String listeners = getAppliedAmqpListeners(amqpConfig);
         String[] parts = listeners.split(LISTENER_DEL);
 
         try {
@@ -154,6 +180,11 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
     @Override
     public void close() {
+        try {
+            webServer.stop();
+        } catch (Exception e) {
+            log.error("Failed to stop web server for aop", e);
+        }
     }
 
     public static int getListenerPort(String listener) {
@@ -161,5 +192,18 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
         int lastIndex = listener.lastIndexOf(':');
         return Integer.parseInt(listener.substring(lastIndex + 1));
+    }
+
+    public static String getAppliedAmqpListeners(AmqpServiceConfiguration configuration) {
+        String amqpListeners = configuration.getAmqpListeners();
+        if (amqpListeners == null) {
+            String fullyHostName = ServiceConfigurationUtils.unsafeLocalhostResolve();
+            return amqpUrl(fullyHostName, 5672);
+        }
+        return amqpListeners;
+    }
+
+    public static String amqpUrl(String host, int port) {
+        return String.format("amqp://%s:%d", host, port);
     }
 }

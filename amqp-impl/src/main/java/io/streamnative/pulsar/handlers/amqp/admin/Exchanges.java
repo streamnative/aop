@@ -15,8 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.ExchangeBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
-import lombok.extern.slf4j.Slf4j;
-
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -28,8 +26,11 @@ import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import lombok.extern.slf4j.Slf4j;
 
-
+/**
+ * Exchange endpoints.
+ */
 @Slf4j
 @Path("/exchanges")
 @Produces(MediaType.APPLICATION_JSON)
@@ -63,7 +64,7 @@ public class Exchanges extends ExchangeBase {
     @Path("/{vhost}/{exchange}")
     public void getExchange(@Suspended final AsyncResponse response,
                             @PathParam("vhost") String vhost,
-                            @PathParam("exchangeName") String exchange) {
+                            @PathParam("exchange") String exchange) {
         getExchangeBeanAsync(vhost, exchange)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {

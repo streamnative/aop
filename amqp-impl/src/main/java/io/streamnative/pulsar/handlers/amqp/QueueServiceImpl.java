@@ -19,11 +19,10 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchang
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
 
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.common.naming.NamespaceName;

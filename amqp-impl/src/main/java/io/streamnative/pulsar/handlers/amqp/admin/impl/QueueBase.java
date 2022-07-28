@@ -42,7 +42,7 @@ public class QueueBase extends BaseResources {
                 }).thenApply(__ -> list);
     }
 
-    private CompletableFuture<List<VhostBean>> getVhostListAsync() {
+    protected CompletableFuture<List<VhostBean>> getVhostListAsync() {
         return namespaceResource().listNamespacesAsync(tenant)
                 .thenApply(nsList -> {
                     List<VhostBean> vhostBeanList = new ArrayList<>();

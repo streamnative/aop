@@ -44,6 +44,7 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;
@@ -218,7 +219,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     String replyText = null;
                     switch (replyCode) {
                         case ExchangeBoundOkBody.EXCHANGE_NOT_FOUND:
-                            replyText = "Exchange '" + exchange + "' not found in vhost " + connection.getNamespaceName();
+                            replyText = "Exchange '" + exchange + "' not found in vhost "
+                                    + connection.getNamespaceName();
                             break;
                         case ExchangeBoundOkBody.QUEUE_NOT_FOUND:
                             replyText = "Queue '" + queueName + "' not found in vhost " + connection.getNamespaceName();
@@ -1002,11 +1004,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private void handleAoPException(Throwable t) {
-        if (!(t instanceof AoPException)) {
-            connection.sendConnectionClose(INTERNAL_ERROR, "Internal error: " + t.getMessage(), channelId);
+        Throwable cause = FutureUtil.unwrapCompletionException(t);
+        if (!(cause instanceof AoPException)) {
+            connection.sendConnectionClose(INTERNAL_ERROR, t.getMessage(), channelId);
             return;
         }
-        AoPException exception = (AoPException) t;
+        AoPException exception = (AoPException) cause;
         if (exception.isCloseChannel()) {
             closeChannel(exception.getErrorCode(), exception.getMessage());
         }

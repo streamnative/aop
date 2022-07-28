@@ -13,12 +13,14 @@
  */
 package io.streamnative.pulsar.handlers.amqp.admin.model;
 
-
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
+/**
+ * This class is used to as return value of the exchange list admin api.
+ */
 @Data
 @NoArgsConstructor
 public class ExchangeBean {
@@ -28,7 +30,8 @@ public class ExchangeBean {
     private String vhost;
     private boolean internal;
     private boolean durable;
-    private boolean auto_delete;
+    @JsonProperty("auto_delete")
+    private boolean autoDelete;
     private Map<String, Object> arguments;
 
 }

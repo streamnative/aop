@@ -107,7 +107,6 @@ public class BaseResources {
         return queueContainer;
     }
 
-
     protected static void resumeAsyncResponseExceptionally(AsyncResponse asyncResponse, Throwable exception) {
         Throwable realCause = FutureUtil.unwrapCompletionException(exception);
         if (realCause instanceof WebApplicationException) {

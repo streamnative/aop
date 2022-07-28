@@ -80,7 +80,7 @@ public class AdminTest extends AmqpTestBase{
     }
 
     @Test(timeOut = 1000 * 5)
-    public void exchangeDeclareAndDeleteTest() throws IOException {
+    public void exchangeDeclareAndDeleteTest() throws Exception {
         String vhost = "vhost3";
         String ex1 = randExName();
         exchangeDeclare(vhost, ex1, BuiltinExchangeType.DIRECT.getType());

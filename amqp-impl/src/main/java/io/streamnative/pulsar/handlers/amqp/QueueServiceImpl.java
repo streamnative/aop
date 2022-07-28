@@ -155,7 +155,7 @@ public class QueueServiceImpl implements QueueService {
             } else {
                 if (amqpQueue == null) {
                     future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
-                            "No such queue: '" + queue.toString() + "'", true, false));
+                            "No such queue: '" + queue + "'", true, false));
                     return;
                 }
                 String exchangeName;

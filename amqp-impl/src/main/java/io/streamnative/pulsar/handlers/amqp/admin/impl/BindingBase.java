@@ -19,17 +19,21 @@ import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javax.ws.rs.core.Response;
+import org.apache.pulsar.broker.web.RestException;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
-
+/**
+ * BindingBase.
+ */
 public class BindingBase extends BaseResources {
 
     protected CompletableFuture<BindingBean> getBindingsByPropsKeyAsync(String vhost, String exchange, String queue,
                                                                         String propsKey) {
         return getBindingsAsync(vhost, exchange, queue, propsKey).thenApply(list -> {
             if (list.size() == 0) {
-                throw new RuntimeException("Object Not Found.");
+                throw new RestException(Response.Status.NOT_FOUND.getStatusCode(), "Object Not Found");
             }
             return list.get(0);
         });
@@ -40,6 +44,9 @@ public class BindingBase extends BaseResources {
         List<BindingBean> beans = new ArrayList<>();
         return queueContainer().asyncGetQueue(NamespaceName.get(tenant, vhost), queue, false)
                 .thenAccept(amqpQueue -> {
+                    if (amqpQueue == null) {
+                        throw new RestException(Response.Status.NOT_FOUND.getStatusCode(), "Object Not Found");
+                    }
                     AmqpMessageRouter router = amqpQueue.getRouter(exchange);
                     if (router == null) {
                         return;

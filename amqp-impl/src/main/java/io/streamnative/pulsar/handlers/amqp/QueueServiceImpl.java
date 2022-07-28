@@ -30,8 +30,6 @@ import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
-import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
-import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 
 /**
  * Logic of queue.
@@ -145,68 +143,58 @@ public class QueueServiceImpl implements QueueService {
     }
 
     @Override
-    public void queueUnbind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange,
-                            AMQShortString bindingKey, FieldTable arguments, long connectionId) {
-        int channelId = channel.getChannelId();
-        AmqpConnection connection = channel.getConnection();
-        if (log.isDebugEnabled()) {
-            log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
-                    exchange, bindingKey, arguments);
-        }
-        getQueue(connection.getNamespaceName(), queue.toString(),  false, connectionId)
+    public CompletableFuture<Void> queueUnbind(NamespaceName namespaceName, String queue, String exchange,
+                                               String bindingKey, FieldTable arguments, long connectionId) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        getQueue(namespaceName, queue,  false, connectionId)
                 .whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Failed to get topic from queue container", throwable);
-                channel.closeChannel(ErrorCodes.INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
+                future.completeExceptionally(getAoPException(throwable,
+                        "Failed to get queue: " + throwable.getMessage(), true, false));
             } else {
                 if (amqpQueue == null) {
-                    channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
+                    future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
+                            "No such queue: '" + queue + "'", true, false));
                     return;
                 }
                 String exchangeName;
-                if (channel.isDefaultExchange(exchange)) {
+                if (isDefaultExchange(exchange)) {
                     exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
                 } else {
-                    exchangeName = exchange.toString();
+                    exchangeName = exchange;
                 }
                 CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
-                        exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, false, null);
-                amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable1) -> {
-                    if (throwable1 != null) {
-                        log.error("Failed to get topic from exchange container", throwable1);
-                        channel.closeChannel(ErrorCodes.INTERNAL_ERROR,
-                                "Failed to get exchange: " + throwable1.getMessage());
+                        exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
+                amqpExchangeCompletableFuture.whenComplete((amqpExchange, exThrowable) -> {
+                    if (exThrowable != null) {
+                        log.error("Failed to get topic from exchange container", exThrowable);
+                        future.completeExceptionally(getAoPException(exThrowable,
+                                "Failed to get exchange: " + exThrowable.getMessage(), true, false));
                     } else {
                         try {
                             amqpQueue.unbindExchange(amqpExchange);
                             if (amqpExchange.getAutoDelete() && (amqpExchange.getQueueSize() == 0)) {
-                                exchangeContainer.deleteExchange(connection.getNamespaceName(), exchangeName);
+                                exchangeContainer.deleteExchange(namespaceName, exchangeName);
                                 amqpExchange.getTopic().delete().get();
                             }
-                            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
-                            connection.writeFrame(responseBody.generateFrame(channelId));
+                            future.complete(null);
                         } catch (Exception e) {
-                            connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
-                                    "unbind failed:" + e.getMessage(), channelId);
+                            future.completeExceptionally(getAoPException(e,
+                                    "Unbind failed:" + e.getMessage(), false, true));
                         }
                     }
                 });
             }
         });
+        return future;
     }
 
     @Override
-    public void queuePurge(AmqpChannel channel, AMQShortString queue, boolean nowait, long connectionId) {
-        int channelId = channel.getChannelId();
-        AmqpConnection connection = channel.getConnection();
-        if (log.isDebugEnabled()) {
-            log.debug("RECV[{}] QueuePurge[ queue: {}, nowait:{} ]", channelId, queue, nowait);
-        }
+    public CompletableFuture<Void> queuePurge(NamespaceName namespaceName, String queue, boolean nowait,
+                                              long connectionId) {
         // TODO queue purge process
-
-        MethodRegistry methodRegistry = connection.getMethodRegistry();
-        AMQMethodBody responseBody = methodRegistry.createQueuePurgeOkBody(0);
-        connection.writeFrame(responseBody.generateFrame(channelId));
+        return CompletableFuture.completedFuture(null);
     }
 
     private CompletableFuture<Void> bind(NamespaceName namespaceName, String exchange, AmqpQueue amqpQueue,

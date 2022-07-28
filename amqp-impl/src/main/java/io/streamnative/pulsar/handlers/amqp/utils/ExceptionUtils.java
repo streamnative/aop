@@ -14,14 +14,16 @@
 package io.streamnative.pulsar.handlers.amqp.utils;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.ErrorCodes;
 
 public class ExceptionUtils {
 
     public static AoPException getAoPException(Throwable throwable, String msg,
                                                boolean closeChannel, boolean closeConnection) {
-        if (throwable instanceof AoPException) {
-            return (AoPException) throwable;
+        Throwable cause = FutureUtil.unwrapCompletionException(throwable);
+        if (cause instanceof AoPException) {
+            return (AoPException) cause;
         } else {
             return new AoPException(ErrorCodes.INTERNAL_ERROR, msg, closeChannel, closeConnection);
         }

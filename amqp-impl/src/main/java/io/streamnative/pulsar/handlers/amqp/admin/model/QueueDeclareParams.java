@@ -13,16 +13,20 @@
  */
 package io.streamnative.pulsar.handlers.amqp.admin.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
+/**
+ * This class is used to declare queue params.
+ */
 @Data
 @NoArgsConstructor
 public class QueueDeclareParams {
 
-    private boolean auto_delete;
+    @JsonProperty("auto_delete")
+    private boolean autoDelete;
     private boolean durable;
     private boolean exclusive;
     private String node;

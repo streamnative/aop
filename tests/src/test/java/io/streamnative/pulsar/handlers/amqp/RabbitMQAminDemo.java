@@ -22,6 +22,9 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+import org.testng.annotations.Test;
 
 public class RabbitMQAminDemo {
 

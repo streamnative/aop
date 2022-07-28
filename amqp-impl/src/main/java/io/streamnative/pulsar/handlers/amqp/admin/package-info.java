@@ -11,18 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.admin.model;
-
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 /**
- * This class is used to as return value of the vhost list admin api.
+ * Timer related classes.
+ *
+ * <p>The classes under this package are ported from Amqp.
  */
-@Data
-@NoArgsConstructor
-public class VhostBean {
-
-    private String name;
-
-}
+package io.streamnative.pulsar.handlers.amqp.admin;

@@ -15,8 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.QueueBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
-import lombok.extern.slf4j.Slf4j;
-
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
@@ -28,8 +26,11 @@ import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import lombok.extern.slf4j.Slf4j;
 
-
+/**
+ * Queue endpoints.
+ */
 @Slf4j
 @Path("/queues")
 @Produces(MediaType.APPLICATION_JSON)

@@ -25,10 +25,13 @@ public class ExchangeUtil {
     }
 
     public static String getExchangeType(String exchangeName) {
-        if (null == exchangeName) {
-            exchangeName = "";
+        String ex;
+        if (exchangeName == null) {
+            ex = "";
+        } else {
+            ex = exchangeName;
         }
-        switch (exchangeName) {
+        switch (ex) {
             case "":
             case ExchangeDefaults.DIRECT_EXCHANGE_NAME:
                 return ExchangeDefaults.DIRECT_EXCHANGE_CLASS;

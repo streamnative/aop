@@ -44,6 +44,7 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;
@@ -218,7 +219,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     String replyText = null;
                     switch (replyCode) {
                         case ExchangeBoundOkBody.EXCHANGE_NOT_FOUND:
-                            replyText = "Exchange '" + exchange + "' not found in vhost " + connection.getNamespaceName();
+                            replyText = "Exchange '" + exchange + "' not found in vhost "
+                                    + connection.getNamespaceName();
                             break;
                         case ExchangeBoundOkBody.QUEUE_NOT_FOUND:
                             replyText = "Queue '" + queueName + "' not found in vhost " + connection.getNamespaceName();
@@ -269,8 +271,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
-        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue),
-                exchange.toString(), bindingKey.toString(), nowait, argumentsTable,
+        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
+                bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
                 connection.getConnectionId()).thenAccept(__ -> {
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
@@ -305,18 +307,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
                     ifUnused, ifEmpty, nowait);
         }
-//        String queueName;
-//        if (queue == null || queue.length() == 0) {
-//            if (getDefaultQueue() != null) {
-//                checkExclusiveQueue(getDefaultQueue());
-//                queueName = getDefaultQueue().getName();
-//            } else {
-//                closeChannel(ErrorCodes.ARGUMENT_INVALID, "The queue name is empty.");
-//                return;
-//            }
-//        } else {
-//            queueName = queue.toString();
-//        }
         queueService.queueDelete(connection.getNamespaceName(), getQueueName(queue), ifUnused,
                         ifEmpty, connection.getConnectionId())
                 .thenAccept(__ -> {
@@ -982,14 +972,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return defaultQueue;
     }
 
-//    public void checkExclusiveQueue(AmqpQueue amqpQueue) {
-//        if (amqpQueue != null && amqpQueue.isExclusive()
-//            && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
-//            closeChannel(ErrorCodes.ALREADY_EXISTS,
-//                "Exclusive queue can not be used form other connection, queueName: '" + amqpQueue.getName() + "'");
-//        }
-//    }
-
     @VisibleForTesting
     public Map<String, Consumer> getTag2ConsumersMap() {
         return tag2ConsumersMap;
@@ -1027,11 +1009,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private void handleAoPException(Throwable t) {
-        if (!(t instanceof AoPException)) {
-            connection.sendConnectionClose(INTERNAL_ERROR, "Internal error: " + t.getMessage(), channelId);
+        Throwable cause = FutureUtil.unwrapCompletionException(t);
+        if (!(cause instanceof AoPException)) {
+            connection.sendConnectionClose(INTERNAL_ERROR, t.getMessage(), channelId);
             return;
         }
-        AoPException exception = (AoPException) t;
+        AoPException exception = (AoPException) cause;
         if (exception.isCloseChannel()) {
             closeChannel(exception.getErrorCode(), exception.getMessage());
         }

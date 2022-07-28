@@ -130,8 +130,8 @@ public class AmqpProtocolHandler implements ProtocolHandler {
         context.setContextPath("/api");
         context.setAttribute("aop", this);
 
-        Server jettyServer = new Server(port);
-        jettyServer.setHandler(context);
+        webServer = new Server(port);
+        webServer.setHandler(context);
 
         ServletHolder jerseyServlet = context.addServlet(ServletContainer.class, "/*");
         jerseyServlet.setInitOrder(0);
@@ -140,7 +140,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                 "jersey.config.server.provider.packages", "io.streamnative.pulsar.handlers.amqp.admin");
 
         try {
-            jettyServer.start();
+            webServer.start();
         } catch (Exception e) {
             log.error("Failed to start web service for aop", e);
         }
@@ -180,7 +180,11 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
     @Override
     public void close() {
-        webServer.destroy();
+        try {
+            webServer.stop();
+        } catch (Exception e) {
+            log.error("Failed to stop web server for aop", e);
+        }
     }
 
     public static int getListenerPort(String listener) {

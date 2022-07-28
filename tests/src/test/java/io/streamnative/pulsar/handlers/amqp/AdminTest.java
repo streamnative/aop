@@ -16,34 +16,228 @@ package io.streamnative.pulsar.handlers.amqp;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.test.HttpUtil;
+import com.rabbitmq.client.test.JsonUtil;
+import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeBean;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueBean;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
+/**
+ * Admin API test.
+ */
 public class AdminTest extends AmqpTestBase{
 
-    @Test
-    public void test() throws Exception {
+    @Test(timeOut = 1000 * 5)
+    public void listExchangeTest() throws Exception {
+        Connection connection = getConnection("vhost1", true);
+        Channel channel = connection.createChannel();
+        Set<String> vhost1Exs = new HashSet<>();
+        for (int i = 0; i < 3; i++) {
+            String ex = randExName();
+            vhost1Exs.add(ex);
+            channel.exchangeDeclare(ex, BuiltinExchangeType.DIRECT, true);
+        }
+        String ex1 = vhost1Exs.iterator().next();
+
+        Connection connection2 = getConnection("vhost2", true);
+        Channel channel2 = connection2.createChannel();
+        Set<String> vhost2Exs = new HashSet<>();
+        for (int i = 0; i < 3; i++) {
+            String ex = randExName();
+            vhost2Exs.add(ex);
+            channel2.exchangeDeclare(ex, BuiltinExchangeType.FANOUT, true);
+        }
+
+        List<ExchangeBean> exchangeBeans = exchangeList();
+        Assert.assertTrue(exchangeBeans.size() > 0);
+        for (ExchangeBean bean : exchangeBeans) {
+            if (vhost1Exs.remove(bean.getName())) {
+                Assert.assertEquals(bean.getType(), "direct");
+            }
+            if (vhost2Exs.remove(bean.getName())) {
+                Assert.assertEquals(bean.getType(), "fanout");
+            }
+        }
+        Assert.assertEquals(vhost1Exs.size(), 0);
+        Assert.assertEquals(vhost2Exs.size(), 0);
+
+        List<ExchangeBean> exchangeBeans1 = exchangeListByVhost("vhost1");
+        Assert.assertTrue(exchangeBeans1.size() > 0);
+        for (ExchangeBean bean : exchangeBeans1) {
+            Assert.assertEquals(bean.getVhost(), "vhost1");
+        }
+
+        ExchangeBean bean = exchangeByName("vhost1", ex1);
+        Assert.assertEquals(bean.getName(), ex1);
+    }
+
+    @Test(timeOut = 1000 * 5)
+    public void exchangeDeclareAndDeleteTest() throws IOException {
+        String vhost = "vhost3";
+        String ex1 = randExName();
+        exchangeDeclare(vhost, ex1, BuiltinExchangeType.DIRECT.getType());
+        String ex2 = randExName();
+        exchangeDeclare(vhost, ex2, BuiltinExchangeType.TOPIC.getType());
+        String ex3 = randExName();
+        exchangeDeclare(vhost, ex3, BuiltinExchangeType.FANOUT.getType());
+        String ex4 = randExName();
+        exchangeDeclare(vhost, ex4, BuiltinExchangeType.HEADERS.getType());
+
+        List<ExchangeBean> beans = exchangeListByVhost(vhost);
+        Assert.assertEquals(beans.size(), 4);
+        for (ExchangeBean bean : beans) {
+            if (bean.getName().equals(ex1)) {
+                Assert.assertEquals(bean.getType(), BuiltinExchangeType.DIRECT.getType().toLowerCase());
+            } else if (bean.getName().equals(ex2)) {
+                Assert.assertEquals(bean.getType(), BuiltinExchangeType.TOPIC.getType().toLowerCase());
+            } else if (bean.getName().equals(ex3)) {
+                Assert.assertEquals(bean.getType(), BuiltinExchangeType.FANOUT.getType().toLowerCase());
+            } else if (bean.getName().equals(ex4)) {
+                Assert.assertEquals(bean.getType(), BuiltinExchangeType.HEADERS.getType().toLowerCase());
+            }
+        }
+
+        exchangeDelete(vhost, ex1);
+        exchangeDelete(vhost, ex2);
+        exchangeDelete(vhost, ex3);
+        beans = exchangeListByVhost(vhost);
+        Assert.assertEquals(beans.size(), 1);
+        Assert.assertEquals(beans.get(0).getName(), ex4);
+        exchangeDelete(vhost, ex4);
+    }
+
+    @Test(timeOut = 1000 * 5)
+    public void listQueuesTest() throws Exception {
         Connection connection = getConnection("vhost1", false);
         Channel channel = connection.createChannel();
-        channel.exchangeDeclare("ex1-1", BuiltinExchangeType.DIRECT, true);
-        channel.exchangeDeclare("ex1-2", BuiltinExchangeType.DIRECT, true);
-        channel.exchangeDeclare("ex1-3", BuiltinExchangeType.DIRECT, true);
 
-        channel.queueDeclare("qu1-1", true, true, false, null);
-        channel.queueDeclare("qu1-2", true, true, false, null);
-        channel.queueDeclare("qu1-3", true, true, false, null);
+        Set<String> vhost1Queues = new HashSet<>();
+        for (int i = 0; i < 3; i++) {
+            String queueName = randQuName();
+            vhost1Queues.add(queueName);
+            channel.queueDeclare(queueName, true, false, false, null);
+        }
+        String qu1 = vhost1Queues.iterator().next();
 
         Connection connection2 = getConnection("vhost2", false);
         Channel channel2 = connection2.createChannel();
-        channel2.exchangeDeclare("ex2-1", BuiltinExchangeType.DIRECT, true);
-        channel2.exchangeDeclare("ex2-2", BuiltinExchangeType.DIRECT, true);
-        channel2.exchangeDeclare("ex2-3", BuiltinExchangeType.DIRECT, true);
+        Set<String> vhost2Queues = new HashSet<>();
+        for (int i = 0; i < 3; i++) {
+            String queueName = randQuName();
+            vhost2Queues.add(queueName);
+            channel2.queueDeclare(queueName, true, false, false, null);
+        }
 
-        channel2.queueDeclare("qu1-1", true, true, false, null);
-        channel2.queueDeclare("qu1-2", true, true, false, null);
-        channel2.queueDeclare("qu1-3", true, true, false, null);
+        List<QueueBean> queueBeans = listQueues();
+        Assert.assertTrue(queueBeans.size() > 0);
+        for (QueueBean bean : queueBeans) {
+            if (vhost1Queues.remove(bean.getName())) {
+                Assert.assertEquals(bean.getVhost(), "vhost1");
+            }
+            if (vhost2Queues.remove(bean.getName())) {
+                Assert.assertEquals(bean.getVhost(), "vhost2");
+            }
+        }
+        Assert.assertEquals(vhost1Queues.size(), 0);
+        Assert.assertEquals(vhost2Queues.size(), 0);
 
-        System.out.println("aop server start");
-        Thread.sleep(1000 * 60 * 60);
+        List<QueueBean> queueBeans1 = listQueuesByVhost("vhost1");
+        Assert.assertTrue(queueBeans1.size() > 0);
+        for (QueueBean bean : queueBeans1) {
+            Assert.assertEquals(bean.getVhost(), "vhost1");
+        }
+
+        QueueBean queueBean = getQueue("vhost1", qu1);
+        Assert.assertEquals(queueBean.getName(), qu1);
+    }
+
+    @Test(timeOut = 1000 * 5)
+    public void queueDeclareTest() throws IOException {
+        String vhost = "vhost3";
+        Set<String> queueNameSet = new HashSet<>();
+        for (int i = 0; i < 3; i++) {
+            String quName = randQuName();
+            queueNameSet.add(quName);
+            queueDeclare(vhost, quName);
+        }
+
+        List<QueueBean> beans = listQueuesByVhost(vhost);
+        Assert.assertTrue(beans.size() > 0);
+        for (QueueBean bean : beans) {
+            queueNameSet.remove(bean.getName());
+        }
+        Assert.assertEquals(queueNameSet.size(), 0);
+
+        String quName = randQuName();
+        queueDelete(vhost, quName);
+        queueDelete(vhost, quName);
+    }
+
+    private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {
+        Map<String, Object> declareParams = new HashMap<>();
+        declareParams.put("type", type);
+        declareParams.put("auto_delete", true);
+        declareParams.put("durable", true);
+        declareParams.put("internal", false);
+        HttpUtil.put(api("exchanges/" + vhost + "/" + exchange), declareParams);
+    }
+
+    private void exchangeDelete(String vhost, String exchange) throws IOException {
+        HttpUtil.delete(api("exchanges/" + vhost + "/" + exchange));
+    }
+
+    private List<ExchangeBean> exchangeList() throws IOException {
+        String exchangeJson = HttpUtil.get(api("exchanges"));
+        return JsonUtil.parseObjectList(exchangeJson, ExchangeBean.class);
+    }
+
+    private List<ExchangeBean> exchangeListByVhost(String vhost) throws IOException {
+        String exchangeJson = HttpUtil.get(api("exchanges/" + vhost));
+        return JsonUtil.parseObjectList(exchangeJson, ExchangeBean.class);
+    }
+
+    private ExchangeBean exchangeByName(String vhost, String exchange) throws IOException {
+        String exchangeJson = HttpUtil.get(api("exchanges/" + vhost + "/" + exchange));
+        return JsonUtil.parseObject(exchangeJson, ExchangeBean.class);
+    }
+
+    private void queueDeclare(String vhost, String queue) throws IOException {
+        Map<String, Object> declareParams = new HashMap<>();
+        declareParams.put("auto_delete", false);
+        declareParams.put("durable", true);
+        declareParams.put("arguments", null);
+        declareParams.put("node", null);
+        HttpUtil.put(api("queues/" + vhost + "/" + queue), declareParams);
+    }
+
+    private void queueDelete(String vhost, String queue) throws IOException {
+        HttpUtil.delete(api("queues/" + vhost + "/" + queue));
+    }
+
+    private List<QueueBean> listQueues() throws IOException {
+        String json = HttpUtil.get(api("queues"));
+        return JsonUtil.parseObjectList(json, QueueBean.class);
+    }
+
+    private List<QueueBean> listQueuesByVhost(String vhost) throws IOException {
+        String json = HttpUtil.get(api("queues/" + vhost));
+        return JsonUtil.parseObjectList(json, QueueBean.class);
+    }
+
+    private QueueBean getQueue(String vhost, String queue) throws IOException {
+        String json = HttpUtil.get(api("queues/" + vhost + "/" + queue));
+        return JsonUtil.parseObject(json, QueueBean.class);
+    }
+
+    private String api(String path) {
+        return "http://localhost:" + new AmqpServiceConfiguration().getAmqpAdminPort() + "/api/" + path;
     }
 
 }

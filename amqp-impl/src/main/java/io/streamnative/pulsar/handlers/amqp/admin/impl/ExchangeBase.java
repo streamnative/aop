@@ -29,6 +29,7 @@ import org.apache.pulsar.common.util.FutureUtil;
 /**
  * Exchange base.
  */
+
 public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<List<ExchangeBean>> getExchangeListAsync() {

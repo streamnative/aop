@@ -67,6 +67,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.TxCommitOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.TxRollbackOkBody;
@@ -243,29 +245,88 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
                                     boolean autoDelete, boolean nowait, FieldTable arguments) {
-        queueService.queueDeclare(this, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
+                            + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
+                    channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+        }
+        queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
+                autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
+            setDefaultQueue(amqpQueue);
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(
+                    AMQShortString.createAMQShortString(amqpQueue.getName()), 0, 0);
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to declare queue {} in vhost {}", queue, connection.getNamespaceName(), t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                  boolean nowait, FieldTable argumentsTable) {
-        queueService.queueBind(this, queue, exchange, bindingKey, nowait, argumentsTable);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
+                    channelId, queue, exchange, bindingKey, nowait, argumentsTable);
+        }
+        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
+                bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
+                connection.getConnectionId()).thenAccept(__ -> {
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
     public void receiveQueuePurge(AMQShortString queue, boolean nowait) {
-        queueService.queuePurge(this, queue, nowait);
+        queueService.queuePurge(this, queue, nowait, connection.getConnectionId());
     }
 
     @Override
     public void receiveQueueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait) {
-        queueService.queueDelete(this, queue, ifUnused, ifEmpty, nowait);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
+                    ifUnused, ifEmpty, nowait);
+        }
+        queueService.queueDelete(connection.getNamespaceName(), getQueueName(queue), ifUnused,
+                        ifEmpty, connection.getConnectionId())
+                .thenAccept(__ -> {
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    QueueDeleteOkBody responseBody = methodRegistry.createQueueDeleteOkBody(0);
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to delete queue " + queue, t);
+                    handleAoPException(t);
+                    return null;
+                });
+    }
+
+    private String getQueueName(AMQShortString queue) {
+        String queueName;
+        if (queue == null || queue.length() == 0) {
+            if (getDefaultQueue() != null) {
+                queueName = getDefaultQueue().getName();
+            } else {
+                return null;
+            }
+        } else {
+            queueName = queue.toString();
+        }
+        return queueName;
     }
 
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                    FieldTable arguments) {
-        queueService.queueUnbind(this, queue, exchange, bindingKey, arguments);
+        queueService.queueUnbind(this, queue, exchange, bindingKey, arguments, connection.getConnectionId());
     }
 
     @Override
@@ -296,11 +357,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     + " arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                queueService.getQueue(connection.getNamespaceName(), queue.toString(), false,
+                        connection.getConnectionId());
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Failed to get the queue from the queue container", throwable);
-                closeChannel(INTERNAL_ERROR, "Internal error: " + throwable.getMessage());
+                handleAoPException(throwable);
             } else {
                 if (amqpQueue == null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
@@ -442,11 +504,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicGet(AMQShortString queue, boolean noAck) {
         String queueName = AMQShortString.toString(queue);
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                queueService.getQueue(connection.getNamespaceName(), queue.toString(), false,
+                        connection.getConnectionId());
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
-                closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                handleAoPException(throwable);
             } else {
                 if (amqpQueue == null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + queueName);
@@ -882,14 +945,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     protected AmqpQueue getDefaultQueue() {
         return defaultQueue;
-    }
-
-    public void checkExclusiveQueue(AmqpQueue amqpQueue) {
-        if (amqpQueue != null && amqpQueue.isExclusive()
-            && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
-            closeChannel(ErrorCodes.ALREADY_EXISTS,
-                "Exclusive queue can not be used form other connection, queueName: '" + amqpQueue.getName() + "'");
-        }
     }
 
     @VisibleForTesting

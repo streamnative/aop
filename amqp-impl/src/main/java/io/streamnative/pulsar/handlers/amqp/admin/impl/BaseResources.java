@@ -16,6 +16,8 @@ package io.streamnative.pulsar.handlers.amqp.admin.impl;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.ExchangeService;
+import io.streamnative.pulsar.handlers.amqp.QueueContainer;
+import io.streamnative.pulsar.handlers.amqp.QueueService;
 import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,7 @@ import org.apache.pulsar.common.util.FutureUtil;
 /**
  * Base resources.
  */
+
 public class BaseResources {
 
     protected String tenant = "public";
@@ -49,6 +52,10 @@ public class BaseResources {
     private ExchangeService exchangeService;
 
     private ExchangeContainer exchangeContainer;
+
+    private QueueService queueService;
+
+    private QueueContainer queueContainer;
 
     protected AmqpProtocolHandler aop() {
         if (protocolHandler == null) {
@@ -71,6 +78,13 @@ public class BaseResources {
         return namespaceResources;
     }
 
+    protected ExchangeService exchangeService() {
+        if (exchangeService == null) {
+            exchangeService = aop().getAmqpBrokerService().getExchangeService();
+        }
+        return exchangeService;
+    }
+
     protected ExchangeContainer exchangeContainer() {
         if (exchangeContainer == null) {
             exchangeContainer = aop().getAmqpBrokerService().getExchangeContainer();
@@ -78,12 +92,21 @@ public class BaseResources {
         return exchangeContainer;
     }
 
-    protected ExchangeService exchangeService() {
-        if (exchangeService == null) {
-            exchangeService = aop().getAmqpBrokerService().getExchangeService();
+
+    protected QueueService queueService() {
+        if (queueService == null) {
+            queueService = aop().getAmqpBrokerService().getQueueService();
         }
-        return exchangeService;
+        return queueService;
     }
+
+    protected QueueContainer queueContainer() {
+        if (queueContainer == null) {
+            queueContainer = aop().getAmqpBrokerService().getQueueContainer();
+        }
+        return queueContainer;
+    }
+
 
     protected static void resumeAsyncResponseExceptionally(AsyncResponse asyncResponse, Throwable exception) {
         Throwable realCause = FutureUtil.unwrapCompletionException(exception);

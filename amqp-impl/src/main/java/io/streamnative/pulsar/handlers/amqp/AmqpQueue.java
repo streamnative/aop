@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
@@ -58,6 +59,8 @@ public interface AmqpQueue {
      * @return message router of the queue.
      */
     AmqpMessageRouter getRouter(String exchangeName);
+
+    Collection<AmqpMessageRouter> getRouters();
 
     /**
      * Bind to a exchange {@link AmqpExchange}.

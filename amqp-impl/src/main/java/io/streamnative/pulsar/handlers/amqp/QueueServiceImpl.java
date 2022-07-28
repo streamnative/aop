@@ -105,10 +105,9 @@ public class QueueServiceImpl implements QueueService {
     }
 
     @Override
-    public CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange, String bindingKey,
-                          boolean nowait, FieldTable argumentsTable, long connectionId) {
-//        int channelId = channel.getChannelId();
-//        AmqpConnection connection = channel.getConnection();
+    public CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange,
+                                             String bindingKey, boolean nowait, FieldTable argumentsTable,
+                                             long connectionId) {
         if (StringUtils.isEmpty(queue)) {
             return FutureUtil.failedFuture(new AoPException(ErrorCodes.ARGUMENT_INVALID,
                     "[QueueBind] The queue name is empty.", true, false));
@@ -143,35 +142,6 @@ public class QueueServiceImpl implements QueueService {
                     });
                 }));
         return future;
-//        Map<String, Object> arguments = FieldTable.convertToMap(argumentsTable);
-//        if (queue == null || StringUtils.isEmpty(queue.toString())) {
-//            AmqpQueue amqpQueue = channel.getDefaultQueue();
-//            if (amqpQueue != null && bindingKey == null) {
-//                bindingKey = AMQShortString.valueOf(amqpQueue.getName());
-//            }
-//            bind(channel, exchange, amqpQueue, bindingKey.toString(), arguments);
-//        } else {
-//            CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-//                    queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
-//            AMQShortString finalBindingKey = bindingKey;
-//            amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
-//                if (throwable != null) {
-//                    log.error("Failed to get topic from queue container", throwable);
-//                    channel.closeChannel(ErrorCodes.INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
-//                } else {
-//                    if (amqpQueue == null) {
-//                        channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
-//                        return;
-//                    }
-//                    channel.checkExclusiveQueue(amqpQueue);
-//                    if (null == finalBindingKey) {
-//                        bind(channel, exchange, amqpQueue, amqpQueue.getName(), arguments);
-//                    } else {
-//                        bind(channel, exchange, amqpQueue, finalBindingKey.toString(), arguments);
-//                    }
-//                }
-//            });
-//        }
     }
 
     @Override
@@ -204,7 +174,8 @@ public class QueueServiceImpl implements QueueService {
                 amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable1) -> {
                     if (throwable1 != null) {
                         log.error("Failed to get topic from exchange container", throwable1);
-                        channel.closeChannel(ErrorCodes.INTERNAL_ERROR, "Failed to get exchange: " + throwable1.getMessage());
+                        channel.closeChannel(ErrorCodes.INTERNAL_ERROR,
+                                "Failed to get exchange: " + throwable1.getMessage());
                     } else {
                         try {
                             amqpQueue.unbindExchange(amqpExchange);

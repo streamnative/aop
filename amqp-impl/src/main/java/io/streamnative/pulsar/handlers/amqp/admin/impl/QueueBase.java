@@ -18,16 +18,18 @@ import io.streamnative.pulsar.handlers.amqp.admin.model.QueueBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
-import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicName;
-import org.apache.pulsar.common.util.FutureUtil;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.util.FutureUtil;
 
+/**
+ * QueueBase.
+ */
 public class QueueBase extends BaseResources {
 
     protected CompletableFuture<List<QueueBean>> getQueueListAsync() {
@@ -83,7 +85,7 @@ public class QueueBase extends BaseResources {
             bean.setVhost(vhost);
             bean.setDurable(true);
             bean.setExclusive(qu.isExclusive());
-            bean.setAuto_delete(qu.isAutoDelete());
+            bean.setAutoDelete(qu.isAutoDelete());
             return bean;
         });
     }
@@ -91,7 +93,7 @@ public class QueueBase extends BaseResources {
     protected CompletableFuture<AmqpQueue> declareQueueAsync(String vhost, String queue,
                                                            QueueDeclareParams declareParams) {
         return queueService().queueDeclare(NamespaceName.get(tenant, vhost), queue, false,
-                declareParams.isDurable(), declareParams.isExclusive(), declareParams.isAuto_delete(),
+                declareParams.isDurable(), declareParams.isExclusive(), declareParams.isAutoDelete(),
                 true, null, -1);
     }
 

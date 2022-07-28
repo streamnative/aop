@@ -145,8 +145,6 @@ public class QueueServiceImpl implements QueueService {
     @Override
     public CompletableFuture<Void> queueUnbind(NamespaceName namespaceName, String queue, String exchange,
                                                String bindingKey, FieldTable arguments, long connectionId) {
-//        int channelId = channel.getChannelId();
-//        AmqpConnection connection = channel.getConnection();
         CompletableFuture<Void> future = new CompletableFuture<>();
         getQueue(namespaceName, queue,  false, connectionId)
                 .whenComplete((amqpQueue, throwable) -> {
@@ -154,12 +152,10 @@ public class QueueServiceImpl implements QueueService {
                 log.error("Failed to get topic from queue container", throwable);
                 future.completeExceptionally(getAoPException(throwable,
                         "Failed to get queue: " + throwable.getMessage(), true, false));
-//                channel.closeChannel(ErrorCodes.INTERNAL_ERROR, "Failed to get queue: " + throwable.getMessage());
             } else {
                 if (amqpQueue == null) {
                     future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
                             "No such queue: '" + queue.toString() + "'", true, false));
-//                    channel.closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
                     return;
                 }
                 String exchangeName;
@@ -183,13 +179,9 @@ public class QueueServiceImpl implements QueueService {
                                 amqpExchange.getTopic().delete().get();
                             }
                             future.complete(null);
-//                            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
-//                            connection.writeFrame(responseBody.generateFrame(channelId));
                         } catch (Exception e) {
                             future.completeExceptionally(getAoPException(e,
                                     "Unbind failed:" + e.getMessage(), false, true));
-//                            connection.sendConnectionClose(ErrorCodes.INTERNAL_ERROR,
-//                                    "unbind failed:" + e.getMessage(), channelId);
                         }
                     }
                 });
@@ -201,8 +193,6 @@ public class QueueServiceImpl implements QueueService {
     @Override
     public CompletableFuture<Void> queuePurge(NamespaceName namespaceName, String queue, boolean nowait,
                                               long connectionId) {
-//        int channelId = channel.getChannelId();
-//        AmqpConnection connection = channel.getConnection();
         // TODO queue purge process
         return CompletableFuture.completedFuture(null);
     }

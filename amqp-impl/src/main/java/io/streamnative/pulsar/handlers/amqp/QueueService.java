@@ -16,10 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.concurrent.CompletableFuture;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Logic of queue.

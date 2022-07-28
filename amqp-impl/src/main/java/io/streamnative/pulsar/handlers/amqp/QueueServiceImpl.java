@@ -23,8 +23,6 @@ import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-
-import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -32,8 +30,6 @@ import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
-import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
-import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 
 /**
  * Logic of queue.
@@ -179,7 +175,6 @@ public class QueueServiceImpl implements QueueService {
                         log.error("Failed to get topic from exchange container", exThrowable);
                         future.completeExceptionally(getAoPException(exThrowable,
                                 "Failed to get exchange: " + exThrowable.getMessage(), true, false));
-//                        channel.closeChannel(ErrorCodes.INTERNAL_ERROR, "Failed to get exchange: " + throwable1.getMessage());
                     } else {
                         try {
                             amqpQueue.unbindExchange(amqpExchange);

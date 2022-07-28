@@ -60,12 +60,14 @@ public class BindingBase extends BaseResources {
                 }).thenApply(__ -> beans);
     }
 
-    protected CompletableFuture<Void> queueBindAsync(String vhost, String exchange, String queue, BindingParams params) {
+    protected CompletableFuture<Void> queueBindAsync(String vhost, String exchange, String queue,
+                                                     BindingParams params) {
         return queueService().queueBind(NamespaceName.get(tenant, vhost), queue, exchange, params.getRoutingKey(),
                 false, FieldTable.convertToFieldTable(params.getArguments()), -1);
     }
 
-    protected CompletableFuture<Void> queueUnbindAsync(String vhost, String exchange, String queue, String propertiesKey) {
+    protected CompletableFuture<Void> queueUnbindAsync(String vhost, String exchange, String queue,
+                                                       String propertiesKey) {
         return queueService().queueUnbind(NamespaceName.get(tenant, vhost), queue, exchange, propertiesKey, null, -1);
     }
 

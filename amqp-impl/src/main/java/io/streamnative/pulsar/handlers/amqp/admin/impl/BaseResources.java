@@ -31,10 +31,6 @@ import org.apache.pulsar.broker.namespace.NamespaceService;
 import org.apache.pulsar.broker.resources.NamespaceResources;
 import org.apache.pulsar.broker.web.RestException;
 import org.apache.pulsar.common.util.FutureUtil;
-import org.apache.pulsar.broker.namespace.NamespaceService;
-import org.apache.pulsar.broker.resources.NamespaceResources;
-import org.apache.pulsar.broker.web.RestException;
-import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Base resources.

@@ -116,7 +116,7 @@ public class MessageConvertTest {
     @Test
     private void positionConvert() {
         MessageImpl<byte[]> message;
-        IndexMessage indexMessage = IndexMessage.create("test-exchange", 1L, 1L);
+        IndexMessage indexMessage = IndexMessage.create("test-exchange", 1L, 1L, null);
         message = MessageConvertUtils.toPulsarMessage(indexMessage);
         IndexMessage indexMessageConverted = MessageConvertUtils.entryToIndexMessage(
                 EntryImpl.create(0, 0, MessageConvertUtils.messageToByteBuf(message)));

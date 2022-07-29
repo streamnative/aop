@@ -116,7 +116,7 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
         CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
         if (isMatch(properties)) {
             try {
-                return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId);
+                return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId, properties);
             } catch (Exception e) {
                 log.error("Failed to route message.", e);
                 completableFuture.completeExceptionally(e);

@@ -39,7 +39,8 @@ public class InMemoryQueue extends AbstractAmqpQueue {
     }
 
     @Override
-    public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId) {
+    public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId,
+                                                          Map<String, Object> properties) {
         List<PositionImpl> positions = indexStore.computeIfAbsent(exchangeName, (key) -> new LinkedList<>());
         positions.add(PositionImpl.get(ledgerId, entryId));
         return CompletableFuture.completedFuture(null);

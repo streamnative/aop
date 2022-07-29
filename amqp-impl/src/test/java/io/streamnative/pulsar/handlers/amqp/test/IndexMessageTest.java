@@ -24,7 +24,7 @@ public class IndexMessageTest {
 
     @Test
     public void testEncodeAndDecode() {
-        IndexMessage indexMessage = IndexMessage.create("test", 1L, 1L);
+        IndexMessage indexMessage = IndexMessage.create("test", 1L, 1L, null);
         byte[] bytes = indexMessage.encode();
         Assert.assertNotNull(bytes);
         IndexMessage decoded = IndexMessage.create(bytes);

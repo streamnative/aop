@@ -27,6 +27,7 @@ import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
@@ -356,8 +357,12 @@ public final class MessageConvertUtils {
 
     // Currently, one entry consist of one IndexMessage info
     public static MessageImpl<byte[]> toPulsarMessage(IndexMessage indexMessage) {
-        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
+        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl<>(null, Schema.BYTES);
         builder.value(indexMessage.encode());
+        long deliverAtTime;
+        if ((deliverAtTime = indexMessage.getDeliverAtTime()) > 0) {
+            builder.deliverAfter(deliverAtTime, TimeUnit.MILLISECONDS);
+        }
         return (MessageImpl<byte[]>) builder.getMessage();
     }
 
@@ -372,7 +377,7 @@ public final class MessageConvertUtils {
             long entryId = payload.readLong();
             String exchangeName = payload.readCharSequence(payload.readableBytes(), StandardCharsets.ISO_8859_1)
                     .toString();
-            return IndexMessage.create(exchangeName, ledgerId, entryId);
+            return IndexMessage.create(exchangeName, ledgerId, entryId, null);
         } finally {
             payload.release();
         }

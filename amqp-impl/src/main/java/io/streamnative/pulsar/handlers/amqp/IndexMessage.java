@@ -17,13 +17,18 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.Recycler;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Objects;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Index message used by index message persistent.
  * The queue can read the real message data from the exchange through the index message.
  */
+@Slf4j
 public class IndexMessage {
+
+    private static final String X_DELAY = "_bph_.x-delay";
 
     /**
      * Name of the exchange that the message data from.
@@ -40,11 +45,18 @@ public class IndexMessage {
      */
     private long entryId;
 
-    public static IndexMessage create(String exchangeName, long ledgerId, long entryId) {
+    /**
+     * Properties of the message.
+     */
+    private Map<String, Object> properties;
+
+    public static IndexMessage create(String exchangeName, long ledgerId, long entryId,
+                                      Map<String, Object> properties) {
         IndexMessage instance = RECYCLER.get();
         instance.exchangeName = exchangeName;
         instance.ledgerId = ledgerId;
         instance.entryId = entryId;
+        instance.properties = properties;
         return instance;
     }
 
@@ -93,6 +105,19 @@ public class IndexMessage {
         byteBuf.writeLong(entryId);
         byteBuf.writeCharSequence(exchangeName, StandardCharsets.ISO_8859_1);
         return byteBuf.array();
+    }
+
+    public long getDeliverAtTime(){
+        Object delayValue;
+        long delayTime = 0;
+        if (properties != null && (delayValue = properties.get(X_DELAY)) != null) {
+            try {
+                delayTime = Long.parseLong(delayValue.toString());
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse the number according to x-delay. x-delay value:{}", delayValue, e);
+            }
+        }
+        return delayTime;
     }
 
     @Override

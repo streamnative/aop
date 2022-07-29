@@ -72,9 +72,10 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
     @Override
-    public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId) {
+    public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId,
+                                                          Map<String, Object> properties) {
         try {
-            IndexMessage indexMessage = IndexMessage.create(exchangeName, ledgerId, entryId);
+            IndexMessage indexMessage = IndexMessage.create(exchangeName, ledgerId, entryId, properties);
             MessageImpl<byte[]> message = MessageConvertUtils.toPulsarMessage(indexMessage);
             return amqpEntryWriter.publishMessage(message).thenApply(__ -> null);
         } catch (Exception e) {

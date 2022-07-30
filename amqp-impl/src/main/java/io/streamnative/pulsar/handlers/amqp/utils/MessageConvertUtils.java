@@ -81,7 +81,7 @@ public final class MessageConvertUtils {
     private static final String PROP_CLUSTER_ID = BASIC_PROP_PRE + "cluster_id";
     private static final String PROP_PROPERTY_FLAGS = BASIC_PROP_PRE + "property_flags";
 
-    private static final String PROP_EXCHANGE = BASIC_PUBLISH_INFO_PRE + "exchange";
+    public static final String PROP_EXCHANGE = BASIC_PUBLISH_INFO_PRE + "exchange";
     private static final String PROP_IMMEDIATE = BASIC_PUBLISH_INFO_PRE + "immediate";
     private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
     public static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
@@ -155,6 +155,17 @@ public final class MessageConvertUtils {
                 builder.property(propName, String.valueOf(value));
             }
         }
+    }
+
+    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, Map<String, Object> properties) {
+        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
+        for (Map.Entry<String, Object> prop : properties.entrySet()) {
+            builder.property(prop.getKey(), prop.getValue().toString());
+        }
+        byte[] array = new byte[payload.readableBytes()];
+        payload.getBytes(payload.readerIndex(), array);
+        builder.value(array);
+        return (MessageImpl<byte[]>) builder.getMessage();
     }
 
     // convert message to ByteBuf payload for ledger.addEntry.

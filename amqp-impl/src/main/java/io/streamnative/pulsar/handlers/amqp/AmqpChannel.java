@@ -20,8 +20,12 @@ import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeBindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeUnbindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -81,7 +85,7 @@ import org.apache.qpid.server.txn.ServerTransaction;
  * Amqp Channel level method processor.
  */
 @Log4j2
-public class AmqpChannel implements ServerChannelMethodProcessor {
+public class AmqpChannel implements ExtensionServerChannelMethodProcessor {
 
     private final int channelId;
     private final AmqpConnection connection;
@@ -505,7 +509,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                 if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null
                                         || amqpExchange.getQueue(queueName) == null) {
                                     amqpQueue.bindExchange(amqpExchange,
-                                            AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
+                                            AbstractAmqpMessageRouter.generateRouter(ExchangeType.DIRECT),
                                             routingKey.toString(), null);
                                 }
                                 MessagePublishInfo info = new MessagePublishInfo(AMQShortString.
@@ -858,6 +862,42 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (!nowait) {
             connection.writeFrame(new AMQFrame(channelId, ConfirmSelectOkBody.INSTANCE));
         }
+    }
+
+    @Override
+    public void receiveExchangeBind(AMQShortString destination, AMQShortString source,
+                                    AMQShortString bindingKey, boolean nowait, FieldTable fieldTable) {
+        log.info("receive exchange bind destination: {}, source: {}, bindingKey: {}, fieldTable: {}",
+                destination, source, bindingKey, fieldTable);
+        Map<String, Object> params = fieldTable != null ? FieldTable.convertToMap(fieldTable) : null;
+        String key = bindingKey == null ? null : bindingKey.toString();
+        exchangeService.exchangeBind(connection.getNamespaceName(), destination.toString(), source.toString(),
+                key, params).thenAccept(__ -> {
+            ExchangeBindOkBody body = new ExchangeBindOkBody();
+            connection.writeFrame(body.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to bind exchange {} to source {} with bindingKey {} in vhost {}",
+                    destination, source, bindingKey, fieldTable, t);
+            handleAoPException(t);
+            return null;
+        });
+    }
+
+    @Override
+    public void receiveExchangeUnbind(AMQShortString destination, AMQShortString source, AMQShortString bindingKey, boolean nowait, FieldTable fieldTable) {
+        log.info("receive exchange unbind destination: {}, source: {}, bindingKey: {}, fieldTable: {}",
+                destination, source, bindingKey, fieldTable);
+        Map<String, Object> params = fieldTable != null ? FieldTable.convertToMap(fieldTable) : null;
+        String key = bindingKey == null ? null : bindingKey.toString();
+        exchangeService.exchangeUnbind(connection.getNamespaceName(), destination.toString(), source.toString(), key, params).thenAccept(__ -> {
+            ExchangeUnbindOkBody body = new ExchangeUnbindOkBody();
+            connection.writeFrame(body.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to unbind exchange {} to source {} with bindingKey {} in vhost {}",
+                    destination, source, bindingKey, fieldTable, t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     public void receivedComplete() {

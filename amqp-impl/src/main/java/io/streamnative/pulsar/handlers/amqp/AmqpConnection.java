@@ -33,6 +33,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.naming.AuthenticationException;
+
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
@@ -481,12 +483,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     @Override
-    public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
+    public ExtensionServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
         assertState(ConnectionState.OPEN);
-        ServerChannelMethodProcessor channelMethodProcessor = getChannel(channelId);
+        ExtensionServerChannelMethodProcessor channelMethodProcessor = getChannel(channelId);
         if (channelMethodProcessor == null) {
-            channelMethodProcessor =
-                (ServerChannelMethodProcessor) Proxy.newProxyInstance(ServerMethodDispatcher.class.getClassLoader(),
+            channelMethodProcessor = (ExtensionServerChannelMethodProcessor) Proxy.newProxyInstance(
+                    ServerMethodDispatcher.class.getClassLoader(),
                 new Class[] {ServerChannelMethodProcessor.class}, new InvocationHandler() {
                     @Override
                     public Object invoke(final Object proxy, final Method method, final Object[] args)

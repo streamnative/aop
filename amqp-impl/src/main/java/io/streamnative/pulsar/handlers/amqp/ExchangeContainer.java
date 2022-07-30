@@ -22,6 +22,7 @@ import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
 import java.util.Collections;
 import java.util.HashMap;
@@ -72,11 +73,11 @@ public class ExchangeContainer {
     /**
      * Get or create exchange.
      *
-     * @param namespaceName namespace used in pulsar
-     * @param exchangeName name of exchange
+     * @param namespaceName   namespace used in pulsar
+     * @param exchangeName    name of exchange
      * @param createIfMissing true to create the exchange if not existed, and exchangeType should be not null
      *                        false to get the exchange and return null if not existed
-     * @param exchangeType type of exchange: direct,fanout,topic and headers
+     * @param exchangeType    type of exchange: direct,fanout,topic and headers
      * @param arguments other properties (construction arguments) for the exchange
      * @return the completableFuture of get result
      */
@@ -123,7 +124,7 @@ public class ExchangeContainer {
                     log.error("Failed to generate topic properties for exchange {} in vhost {}.",
                             exchangeName, namespaceName, e);
                     amqpExchangeCompletableFuture.completeExceptionally(e);
-                    removeExchangeFuture(namespaceName, exchangeName);
+                    removeExchangeFuture(namespaceName, exchangeName, amqpExchangeCompletableFuture);
                     return amqpExchangeCompletableFuture;
                 }
             }
@@ -134,12 +135,12 @@ public class ExchangeContainer {
                 if (throwable != null) {
                     log.error("[{}][{}] Failed to get exchange topic.", namespaceName, exchangeName, throwable);
                     amqpExchangeCompletableFuture.completeExceptionally(throwable);
-                    removeExchangeFuture(namespaceName, exchangeName);
+                    removeExchangeFuture(namespaceName, exchangeName, amqpExchangeCompletableFuture);
                 } else {
                     if (null == topic) {
                         log.warn("[{}][{}] The exchange topic did not exist.", namespaceName, exchangeName);
                         amqpExchangeCompletableFuture.complete(null);
-                        removeExchangeFuture(namespaceName, exchangeName);
+                        removeExchangeFuture(namespaceName, exchangeName, amqpExchangeCompletableFuture);
                     } else {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;
@@ -162,14 +163,15 @@ public class ExchangeContainer {
                             boolean currentInternal = Boolean.parseBoolean(
                                     properties.getOrDefault(INTERNAL, "false"));
                             amqpExchange = new PersistentExchange(exchangeName,
-                                    AmqpExchange.Type.value(currentType),
+                                    ExchangeType.value(currentType),
                                     persistentTopic, currentDurable, currentAutoDelete, currentInternal,
                                     currentArguments, routeExecutor, routeQueueSize);
+                            amqpExchange.recover(properties, this, namespaceName);
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
                                     exchangeName, namespaceName.getLocalName(), e);
                             amqpExchangeCompletableFuture.completeExceptionally(e);
-                            removeExchangeFuture(namespaceName, exchangeName);
+                            removeExchangeFuture(namespaceName, exchangeName, amqpExchangeCompletableFuture);
                             return;
                         }
                         amqpExchangeCompletableFuture.complete(amqpExchange);
@@ -221,18 +223,23 @@ public class ExchangeContainer {
      * Delete the exchange by namespace and exchange name.
      *
      * @param namespaceName namespace name in pulsar
-     * @param exchangeName name of exchange
+     * @param exchangeName  name of exchange
      */
     public void deleteExchange(NamespaceName namespaceName, String exchangeName) {
         if (StringUtils.isEmpty(exchangeName)) {
             return;
         }
-        removeExchangeFuture(namespaceName, exchangeName);
+        removeExchangeFuture(namespaceName, exchangeName, null);
     }
 
-    private void removeExchangeFuture(NamespaceName namespaceName, String exchangeName) {
+    private void removeExchangeFuture(NamespaceName namespaceName, String exchangeName,
+                                      CompletableFuture<AmqpExchange> future) {
         if (exchangeMap.containsKey(namespaceName)) {
-            exchangeMap.get(namespaceName).remove(exchangeName);
+            if (future != null) {
+                exchangeMap.get(namespaceName).remove(exchangeName, future);
+            } else {
+                exchangeMap.get(namespaceName).remove(exchangeName);
+            }
         }
     }
 

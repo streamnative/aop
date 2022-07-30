@@ -29,6 +29,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
 import java.net.SocketAddress;
 import java.util.Map;
@@ -68,7 +69,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionStartBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
-import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -250,7 +250,7 @@ public abstract class AmqpProtocolTestBase {
         }
 
         @Override
-        public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
+        public ExtensionServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
             return channelMethodProcessor;
         }
 

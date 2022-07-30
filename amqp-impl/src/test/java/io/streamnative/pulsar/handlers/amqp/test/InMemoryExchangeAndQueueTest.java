@@ -20,6 +20,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.impl.FanoutMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -50,7 +51,7 @@ public class InMemoryExchangeAndQueueTest {
     @Test
     public void testQueueBind() {
         String exchangeName = "test";
-        AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
+        AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
         AmqpQueue queue = new InMemoryQueue("test", 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         Assert.assertNotNull(queue.getRouter(exchangeName));
@@ -63,7 +64,7 @@ public class InMemoryExchangeAndQueueTest {
     public void testWriteAndRead() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
-        AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
+        AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
         AmqpQueue queue = new InMemoryQueue(queueName, 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
 
@@ -90,7 +91,7 @@ public class InMemoryExchangeAndQueueTest {
     public void testMarkDelete() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
-        AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
+        AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
         AmqpQueue queue = new InMemoryQueue(queueName, 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -118,7 +119,7 @@ public class InMemoryExchangeAndQueueTest {
     public void testQueueAcknowledge() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
-        AmqpExchange exchange = new InMemoryExchange(exchangeName, AmqpExchange.Type.Direct, false);
+        AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
         AmqpQueue queue = new InMemoryQueue(queueName, 0);
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         byte[] singleContent = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -161,8 +162,8 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName2 = "test-exchange-2";
         String queueName1 = "test-queue-1";
         String queueName2 = "test-queue-2";
-        AmqpExchange exchange1 = new InMemoryExchange(exchangeName1, AmqpExchange.Type.Direct, false);
-        AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct, false);
+        AmqpExchange exchange1 = new InMemoryExchange(exchangeName1, ExchangeType.DIRECT, false);
+        AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, ExchangeType.DIRECT, false);
         AmqpQueue queue1 = new InMemoryQueue(queueName1, 0);
         AmqpQueue queue2 = new InMemoryQueue(queueName2, 0);
         queue1.bindExchange(exchange1, new FanoutMessageRouter(), "", null);
@@ -194,8 +195,8 @@ public class InMemoryExchangeAndQueueTest {
         String exchangeName2 = "test-exchange-2";
         String queueName1 = "test-queue-1";
         String queueName2 = "test-queue-2";
-        AmqpExchange exchange1 = new InMemoryExchange(exchangeName1, AmqpExchange.Type.Direct, false);
-        AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, AmqpExchange.Type.Direct, false);
+        AmqpExchange exchange1 = new InMemoryExchange(exchangeName1, ExchangeType.DIRECT, false);
+        AmqpExchange exchange2 = new InMemoryExchange(exchangeName2, ExchangeType.DIRECT, false);
         AmqpQueue queue1 = new InMemoryQueue(queueName1, 0);
         AmqpQueue queue2 = new InMemoryQueue(queueName2, 0);
         queue1.bindExchange(exchange1, new FanoutMessageRouter(), "", null);

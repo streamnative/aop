@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.netty.buffer.ByteBuf;
+import org.apache.bookkeeper.mledger.Entry;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -24,10 +27,10 @@ public interface AmqpMessageRouter {
 
     /**
      * Message router type.
-     * Direct message router is used to bind {@link AmqpExchange.Type#Direct} exchange.
-     * Fanout message router is used to bind {@link AmqpExchange.Type#Fanout} exchange.
-     * Topic message router is used to bind {@link AmqpExchange.Type#Topic} exchange.
-     * Headers message router is used to bind {@link AmqpExchange.Type#Headers} exchange.
+     * Direct message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#DIRECT} exchange.
+     * Fanout message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#FANOUT} exchange.
+     * Topic message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#TOPIC} exchange.
+     * Headers message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#HEADERS} exchange.
      */
     enum Type {
         Direct,
@@ -55,6 +58,10 @@ public interface AmqpMessageRouter {
      * @return the {@link AmqpExchange} exchange of the message router
      */
     AmqpExchange getExchange();
+
+    void setDestinationExchange(AmqpExchange exchange);
+
+    AmqpExchange getDestinationExchange();
 
     /**
      * Set AMQP queue {@link AmqpQueue} for the message router.
@@ -91,6 +98,27 @@ public interface AmqpMessageRouter {
     Set<String> getBindingKey();
 
     /**
+     * bindingKey is the value when create bind.
+     *
+     * @param binding bindingKey
+     */
+    void addBinding(AmqpBinding binding);
+
+    /**
+     * bindingKeys is the value when create bind.
+     *
+     * @param bindings bindingKeys
+     */
+    void setBindings(Set<AmqpBinding> bindings);
+
+    /**
+     * Get binding keys.
+     *
+     * @return list of bindingKeys.
+     */
+    Set<AmqpBinding> getBindings();
+
+    /**
      * header properties.
      *
      * @param arguments header properties
@@ -114,5 +142,7 @@ public interface AmqpMessageRouter {
      */
     CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
                                            Map<String, Object> properties);
+
+    CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, Map<String, Object> properties);
 
 }

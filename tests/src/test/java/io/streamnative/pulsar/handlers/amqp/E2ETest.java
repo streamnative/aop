@@ -39,6 +39,9 @@ public class E2ETest extends AmqpTestBase{
         qu3 = "ex3_1";
         channel.exchangeDeclare(ex1, BuiltinExchangeType.FANOUT, true);
         channel.exchangeDeclare(ex2, BuiltinExchangeType.TOPIC, true);
+
+        Thread.sleep(1000 * 60 * 60);
+
         channel.exchangeBind(ex2, ex1, "");
 
         channel.queueDeclare(qu1, true, false, false, null);
@@ -105,7 +108,6 @@ public class E2ETest extends AmqpTestBase{
         }
 
         System.out.println("finish publish messages");
-        Thread.sleep(1000 * 60 * 60);
     }
 
 }

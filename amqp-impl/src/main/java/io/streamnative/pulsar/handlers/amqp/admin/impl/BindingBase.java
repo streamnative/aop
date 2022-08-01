@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.admin.impl;
 
+import io.streamnative.pulsar.handlers.amqp.AmqpBinding;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
@@ -57,7 +58,7 @@ public class BindingBase extends BaseResources {
                         }
                         BindingBean bean = new BindingBean();
                         bean.setVhost(vhost);
-                        bean.setSource(router.getExchange().getName());
+                        bean.setSource(exchange);
                         bean.setDestination(queue);
                         bean.setRoutingKey(key);
                         bean.setPropertiesKey(key);
@@ -76,6 +77,61 @@ public class BindingBase extends BaseResources {
     protected CompletableFuture<Void> queueUnbindAsync(String vhost, String exchange, String queue,
                                                        String propertiesKey) {
         return queueService().queueUnbind(NamespaceName.get(tenant, vhost), queue, exchange, propertiesKey, null, -1);
+    }
+
+
+    protected CompletableFuture<BindingBean> getExchangeBindingByPropsKeyAsync(String vhost,
+                                                                               String exchange,
+                                                                               String queue,
+                                                                               String propsKey) {
+        return getExchangeBindingsAsync(vhost, exchange, queue, propsKey).thenApply(list -> {
+            if (list.size() == 0) {
+                throw new RestException(Response.Status.NOT_FOUND.getStatusCode(), "Object Not Found");
+            }
+            return list.get(0);
+        });
+    }
+
+    protected CompletableFuture<List<BindingBean>> getExchangeBindingsAsync(String vhost,
+                                                                            String source,
+                                                                            String destination,
+                                                                            String propsKey) {
+        List<BindingBean> beans = new ArrayList<>();
+        return exchangeContainer().asyncGetExchange(NamespaceName.get(tenant, vhost), destination, false, null)
+                .thenAccept(amqpExchange -> {
+                    if (amqpExchange == null) {
+                        throw new RestException(Response.Status.NOT_FOUND.getStatusCode(), "Object Not Found");
+                    }
+                    AmqpMessageRouter router = amqpExchange.getRouter(source);
+                    if (router == null) {
+                        return;
+                    }
+                    for (AmqpBinding binding : router.getBindings().values()) {
+                        if (propsKey != null && !propsKey.equals(binding.getPropsKey())) {
+                            continue;
+                        }
+                        BindingBean bean = new BindingBean();
+                        bean.setVhost(vhost);
+                        bean.setSource(source);
+                        bean.setDestination(destination);
+                        bean.setRoutingKey(binding.getBindingKey());
+                        bean.setPropertiesKey(binding.getPropsKey());
+                        bean.setDestinationType("exchange");
+                        beans.add(bean);
+                    }
+                }).thenApply(__ -> beans);
+    }
+
+    protected CompletableFuture<Void> exchangeBindAsync(String vhost, String source, String destination,
+                                                     BindingParams params) {
+        return exchangeService().exchangeBind(NamespaceName.get(tenant, vhost), destination, source,
+                params.getRoutingKey(), params.getArguments());
+    }
+
+    protected CompletableFuture<Void> exchangeUnbindAsync(String vhost, String source, String destination,
+                                                          String propsKey) {
+        return exchangeService().exchangeUnbind(NamespaceName.get(tenant, vhost), destination, source,
+                propsKey, null);
     }
 
 }

@@ -85,17 +85,83 @@ public class Bindings extends BindingBase {
 
     @DELETE
     @Path("/{vhost}/e/{exchange}/q/{queue}/{props}")
-    public void queuUnbind(@Suspended final AsyncResponse response,
+    public void queueUnbind(@Suspended final AsyncResponse response,
                                 @PathParam("vhost") String vhost,
                                 @PathParam("exchange") String exchange,
                                 @PathParam("queue") String queue,
-                                @PathParam("props") String propsKey,
-                                QueueDeclareParams params) {
+                                @PathParam("props") String propsKey) {
         queueUnbindAsync(vhost, exchange, queue, propsKey)
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",
                             queue, exchange, propsKey, vhost, t);
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @GET
+    @Path("/{vhost}/e/{source}/e/{destination}")
+    public void getExchangeBindings(@Suspended final AsyncResponse response,
+                        @PathParam("vhost") String vhost,
+                        @PathParam("source") String source,
+                        @PathParam("destination") String destination) {
+        getExchangeBindingsAsync(vhost, source, destination, null)
+                .thenAccept(response::resume)
+                .exceptionally(t -> {
+                    log.error("Failed to get binding list for destination {} bound to source {} in vhost {}",
+                            destination, source, vhost, t);
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @POST
+    @Path("/{vhost}/e/{source}/e/{destination}")
+    public void exchangeBind(@Suspended final AsyncResponse response,
+                             @PathParam("vhost") String vhost,
+                             @PathParam("source") String source,
+                             @PathParam("destination") String destination,
+                             BindingParams params) {
+        exchangeBindAsync(vhost, source, destination, params)
+                .thenAccept(response::resume)
+                .exceptionally(t -> {
+                    log.error("Failed to bind destination {} to source {} in vhost {}",
+                            destination, source, vhost, t);
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @GET
+    @Path("/{vhost}/e/{source}/e/{destination}/{props}")
+    public void getExchangeBinding(@Suspended final AsyncResponse response,
+                                   @PathParam("vhost") String vhost,
+                                   @PathParam("source") String source,
+                                   @PathParam("destination") String destination,
+                                   @PathParam("props") String propsKey) {
+        getExchangeBindingByPropsKeyAsync(vhost, source, destination, propsKey)
+                .thenAccept(response::resume)
+                .exceptionally(t -> {
+                    log.error("Failed to get destination {} bind to source {} with key {} in vhost {}",
+                            destination, source, propsKey, vhost, t);
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @DELETE
+    @Path("/{vhost}/e/{source}/e/{destination}/{props}")
+    public void exchangeUnbind(@Suspended final AsyncResponse response,
+                           @PathParam("vhost") String vhost,
+                           @PathParam("source") String source,
+                           @PathParam("destination") String destination,
+                           @PathParam("props") String propsKey) {
+        exchangeUnbindAsync(vhost, source, destination, propsKey)
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    log.error("Failed to unbind destination {} to source {} with key {} in vhost {}",
+                            destination, source, propsKey, vhost, t);
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

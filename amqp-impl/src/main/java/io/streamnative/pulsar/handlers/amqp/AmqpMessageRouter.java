@@ -109,14 +109,14 @@ public interface AmqpMessageRouter {
      *
      * @param bindings bindingKeys
      */
-    void setBindings(Set<AmqpBinding> bindings);
+    void setBindings(Map<String, AmqpBinding> bindings);
 
     /**
      * Get binding keys.
      *
      * @return list of bindingKeys.
      */
-    Set<AmqpBinding> getBindings();
+    Map<String, AmqpBinding> getBindings();
 
     /**
      * header properties.

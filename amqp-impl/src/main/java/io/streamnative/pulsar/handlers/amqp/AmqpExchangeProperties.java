@@ -15,10 +15,9 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
+import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.Set;
 
 /**
  * Properties for queue.
@@ -28,5 +27,5 @@ import java.util.Set;
 public class AmqpExchangeProperties {
     private String exchangeName;
     private ExchangeType type;
-    private Set<AmqpBinding> bindings;
+    private Map<String, AmqpBinding> bindings;
 }

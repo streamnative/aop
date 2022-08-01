@@ -24,6 +24,8 @@ import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.util.FutureUtil;
 
@@ -38,12 +40,13 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     protected AmqpQueue queue;
     protected final AmqpMessageRouter.Type routerType;
     protected Set<String> bindingKeys;
-    protected Set<AmqpBinding> bindings = Sets.newConcurrentHashSet();
+    protected ConcurrentHashMap<String, AmqpBinding> bindings;
     protected Map<String, Object> arguments;
 
     protected AbstractAmqpMessageRouter(Type routerType) {
         this.routerType = routerType;
         this.bindingKeys = Sets.newConcurrentHashSet();
+        this.bindings = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -98,16 +101,16 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
 
     @Override
     public void addBinding(AmqpBinding binding) {
-        this.bindings.add(binding);
+        this.bindings.put(binding.getPropsKey(), binding);
     }
 
     @Override
-    public void setBindings(Set<AmqpBinding> bindings) {
-        this.bindings = bindings;
+    public void setBindings(Map<String, AmqpBinding> bindings) {
+        this.bindings = new ConcurrentHashMap<>(bindings);
     }
 
     @Override
-    public Set<AmqpBinding> getBindings() {
+    public Map<String, AmqpBinding> getBindings() {
         return bindings;
     }
 

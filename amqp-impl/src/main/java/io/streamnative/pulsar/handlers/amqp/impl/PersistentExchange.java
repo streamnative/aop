@@ -309,7 +309,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public CompletableFuture<Void> unbindExchange(AmqpExchange sourceEx, String routingKey, Map<String, Object> params) {
         routerMap.computeIfPresent(sourceEx.getName(), (k, router) -> {
-            router.getBindings().remove(new AmqpBinding(sourceEx.getName(), routingKey, params));
+            router.getBindings().remove(new AmqpBinding(sourceEx.getName(), routingKey, params).getPropsKey());
             return router;
         });
         updateExchangeProperties();

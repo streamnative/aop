@@ -40,7 +40,7 @@ public class E2ETest extends AmqpTestBase{
         channel.exchangeDeclare(ex1, BuiltinExchangeType.FANOUT, true);
         channel.exchangeDeclare(ex2, BuiltinExchangeType.TOPIC, true);
 
-        Thread.sleep(1000 * 60 * 60);
+//        Thread.sleep(1000 * 60 * 60);
 
         channel.exchangeBind(ex2, ex1, "");
 

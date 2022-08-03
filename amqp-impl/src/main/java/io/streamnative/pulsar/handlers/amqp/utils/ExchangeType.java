@@ -2,11 +2,17 @@ package io.streamnative.pulsar.handlers.amqp.utils;
 
 public enum ExchangeType {
 
-    DIRECT,
-    FANOUT,
-    TOPIC,
-    HEADERS,
-    X_CONSISTENT_HASH;
+    DIRECT("direct"),
+    FANOUT("fanout"),
+    TOPIC("topic"),
+    HEADERS("headers"),
+    X_CONSISTENT_HASH("x-consistent-hash");
+
+    private String value;
+
+    ExchangeType(String value) {
+        this.value = value;
+    }
 
     public static ExchangeType value(String type) {
         if (type == null || type.length() == 0) {
@@ -29,5 +35,8 @@ public enum ExchangeType {
         }
     }
 
+    public String getValue() {
+        return value;
+    }
 
 }

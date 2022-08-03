@@ -69,7 +69,7 @@ public class ExchangeBase extends BaseResources {
                 NamespaceName.get(tenant, vhost), exchangeName, false, null).thenApply(ex -> {
             ExchangeBean exchangeBean = new ExchangeBean();
             exchangeBean.setName(exchangeName);
-            exchangeBean.setType(ex.getType().toString().toLowerCase());
+            exchangeBean.setType(ex.getType().getValue());
             exchangeBean.setVhost(vhost);
             exchangeBean.setAutoDelete(ex.getAutoDelete());
             exchangeBean.setDurable(ex.getDurable());

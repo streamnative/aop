@@ -142,6 +142,11 @@ public abstract class AmqpProtocolHandlerTestBase {
         );
         amqpConfig.setMessagingProtocols(Sets.newHashSet("amqp"));
 
+        amqpConfig.setDispatcherMaxReadBatchSize(10000);
+        amqpConfig.setManagedLedgerCacheEvictionFrequency(0.001);
+        amqpConfig.setManagedLedgerCacheEvictionTimeThresholdMillis(1000000);
+        amqpConfig.setManagedLedgerCacheSizeMB(500);
+
         this.conf = amqpConfig;
     }
 

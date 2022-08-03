@@ -18,7 +18,6 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.formatExch
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
-
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -73,7 +72,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                                 "Get empty exchange " + exchange + " in vhost " + namespaceName, true, false));
                         return;
                     }
-                    if (!ex.getType().toString().equalsIgnoreCase(exchangeType)) {
+                    if (!passive && !ex.getType().toString().equalsIgnoreCase(exchangeType)) {
                         future.completeExceptionally(new AoPException(ErrorCodes.NOT_ALLOWED,
                                 "Attempt to redeclare exchange: '" + exchange + "' of type " + ex.getType()
                                         + " to " + exchangeType + ".", false, true));

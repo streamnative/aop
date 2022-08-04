@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
 /**
  * Exchange base.
@@ -73,6 +74,7 @@ public class ExchangeBase extends BaseResources {
             exchangeBean.setVhost(vhost);
             exchangeBean.setAutoDelete(ex.getAutoDelete());
             exchangeBean.setInternal(false);
+            exchangeBean.setArguments(ex.getProperties());
             return exchangeBean;
         });
     }
@@ -81,7 +83,7 @@ public class ExchangeBase extends BaseResources {
                                                               ExchangeDeclareParams declareParams) {
         return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName,
                 declareParams.getType(), false, declareParams.isDurable(), declareParams.isAutoDelete(),
-                declareParams.isInternal(), null);
+                declareParams.isInternal(), FieldTable.convertToFieldTable(declareParams.getArguments()));
     }
 
     protected CompletableFuture<Void> deleteExchange(String vhost, String exchangeName, boolean ifUnused) {

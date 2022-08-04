@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import io.streamnative.pulsar.handlers.amqp.common.exception.EmptyLookupResultException;
 import io.streamnative.pulsar.handlers.amqp.common.exception.NamespaceNotFoundException;
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarServerException;
@@ -43,10 +44,15 @@ public class AmqpTopicManager {
     }
 
     public Topic getOrCreateTopic(String topicName, boolean createIfMissing) {
-        return getTopic(topicName, createIfMissing).join();
+        return getTopic(topicName, createIfMissing, null).join();
     }
 
-    public CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing) {
+    public Topic getOrCreateTopic(String topicName, boolean createIfMissing, Map<String, String> properties) {
+        return getTopic(topicName, createIfMissing, properties).join();
+    }
+
+    public CompletableFuture<Topic> getTopic(String topicName, boolean createIfMissing,
+                                             Map<String, String> properties) {
         CompletableFuture<Topic> topicCompletableFuture = new CompletableFuture<>();
         if (null == pulsarService) {
             log.error("PulsarService is not set.");
@@ -73,7 +79,7 @@ public class AmqpTopicManager {
                         log.debug("Get broker service url for {}. lookupResult: {}",
                                 topicName, lookupOp.get().getLookupData().getBrokerUrl());
                     }
-                    return pulsarService.getBrokerService().getTopic(topicName, createIfMissing);
+                    return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
                 })
                 .thenAccept(topicOp -> {
                     if (!topicOp.isPresent()) {

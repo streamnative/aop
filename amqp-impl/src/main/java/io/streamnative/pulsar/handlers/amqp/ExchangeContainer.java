@@ -14,6 +14,7 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.covertObjectMapAsStringMap;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -26,6 +27,7 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
 /**
  * Container for all exchanges in the broker.
@@ -44,6 +46,14 @@ public class ExchangeContainer {
     @Getter
     private Map<NamespaceName, Map<String, CompletableFuture<AmqpExchange>>> exchangeMap = new ConcurrentHashMap<>();
 
+
+    public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
+                                                            String exchangeName,
+                                                            boolean createIfMissing,
+                                                            String exchangeType) {
+        return asyncGetExchange(namespaceName, exchangeName, createIfMissing, exchangeType, null);
+    }
+
     /**
      * Get or create exchange.
      *
@@ -57,7 +67,8 @@ public class ExchangeContainer {
     public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
                                                             String exchangeName,
                                                             boolean createIfMissing,
-                                                            String exchangeType) {
+                                                            String exchangeType,
+                                                            FieldTable arguments) {
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = new CompletableFuture<>();
         if (StringUtils.isEmpty(exchangeType) && createIfMissing) {
             log.error("[{}][{}] ExchangeType should be set when createIfMissing is true.", namespaceName, exchangeName);
@@ -83,7 +94,14 @@ public class ExchangeContainer {
             return existingAmqpExchangeFuture;
         } else {
             String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-            CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
+
+            Map<String, String> newProperties = null;
+            if (createIfMissing && arguments != null) {
+                newProperties = covertObjectMapAsStringMap(FieldTable.convertToMap(arguments));
+            }
+
+            CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing,
+                    newProperties);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     log.error("[{}][{}] Failed to get exchange topic.", namespaceName, exchangeName, throwable);

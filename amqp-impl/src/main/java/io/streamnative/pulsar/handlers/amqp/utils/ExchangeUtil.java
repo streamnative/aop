@@ -13,10 +13,19 @@
  */
 package io.streamnative.pulsar.handlers.amqp.utils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
+@Slf4j
 public class ExchangeUtil {
+
+    public static ObjectMapper jsonMapper = new JsonMapper();;
 
     public static boolean isBuildInExchange(final String exchangeName) {
         return exchangeName.equals(ExchangeDefaults.DIRECT_EXCHANGE_NAME)
@@ -51,6 +60,34 @@ public class ExchangeUtil {
 
     public static boolean isDefaultExchange(final String exchangeName) {
         return exchangeName == null || AMQShortString.EMPTY_STRING.toString().equals(exchangeName);
+    }
+
+    public static Map<String, String> covertObjectMapAsStringMap(Map<String, Object> properties) {
+        Map<String, String> stringProperties = new HashMap<>();
+        Set<String> keys = properties.keySet();
+        for (String key : keys) {
+            stringProperties.put(key, covertObjectValueAsString(properties.get(key)));
+        }
+        return stringProperties;
+    }
+
+    public static String covertObjectValueAsString(Object obj) {
+        try {
+            if (obj instanceof CharSequence) {
+                return obj.toString();
+            }
+            return jsonMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static <T> T covertStringValueAsObject(String value, Class<T> clazz) {
+        return jsonMapper.convertValue(value, clazz);
+    }
+
+    public static Object covertStringValueAsObject(String value) {
+        return covertStringValueAsObject(value, Object.class);
     }
 
 }

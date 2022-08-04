@@ -13,15 +13,15 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.covertStringValueAsObject;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.jsonMapper;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.IOException;
@@ -60,10 +60,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
+    public static final String INDEX = "index";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
-    private ObjectMapper jsonMapper = new JsonMapper();
     private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
@@ -215,6 +215,33 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return persistentTopic;
     }
 
+    @Override
+    public Map<String, Object> getProperties() {
+        Map<String, String> properties = this.persistentTopic.getManagedLedger().getProperties();
+        if (properties == null) {
+            return null;
+        }
+        Map<String, Object> map = new HashMap<>();
+
+        properties.forEach((k, v) -> {
+            switch (k) {
+                case QUEUES:
+                    map.put(k, ExchangeUtil.covertStringValueAsObject(v, List.class));
+                    break;
+                case TYPE:
+                case EXCHANGE:
+                    map.put(k, ExchangeUtil.covertStringValueAsObject(v, String.class));
+                    break;
+                case INDEX:
+                    map.put(k, ExchangeUtil.covertStringValueAsObject(v, Long.class));
+                    break;
+                default:
+                    map.put(k, covertStringValueAsObject(v));
+                }
+        });
+        return map;
+    }
+
     private void updateExchangeProperties() {
         Map<String, String> properties = new HashMap<>();
         try {
@@ -225,10 +252,15 @@ public class PersistentExchange extends AbstractAmqpExchange {
                 properties.put(QUEUES, jsonMapper.writeValueAsString(getQueueNames()));
             }
         } catch (JsonProcessingException e) {
-            log.error("[{}] covert map of routers to String error: {}", exchangeName, e.getMessage());
-            return;
+            throw new RuntimeException(e);
         }
-        PulsarTopicMetadataUtils.updateMetaData(this.persistentTopic, properties, exchangeName);
+        synchronized (this) {
+            Map<String, String> oldProperties = this.persistentTopic.getManagedLedger().getProperties();
+            if (oldProperties != null) {
+                oldProperties.forEach(properties::putIfAbsent);
+            }
+            PulsarTopicMetadataUtils.updateMetaData(this.persistentTopic, properties, exchangeName);
+        }
     }
 
     private List<String> getQueueNames() {

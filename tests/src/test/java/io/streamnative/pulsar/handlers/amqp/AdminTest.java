@@ -13,6 +13,9 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -27,6 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -58,7 +62,7 @@ public class AdminTest extends AmqpTestBase{
         }
 
         List<ExchangeBean> exchangeBeans = exchangeList();
-        Assert.assertTrue(exchangeBeans.size() > 0);
+        assertTrue(exchangeBeans.size() > 0);
         for (ExchangeBean bean : exchangeBeans) {
             if (vhost1Exs.remove(bean.getName())) {
                 Assert.assertEquals(bean.getType(), "direct");
@@ -71,7 +75,7 @@ public class AdminTest extends AmqpTestBase{
         Assert.assertEquals(vhost2Exs.size(), 0);
 
         List<ExchangeBean> exchangeBeans1 = exchangeListByVhost("vhost1");
-        Assert.assertTrue(exchangeBeans1.size() > 0);
+        assertTrue(exchangeBeans1.size() > 0);
         for (ExchangeBean bean : exchangeBeans1) {
             Assert.assertEquals(bean.getVhost(), "vhost1");
         }
@@ -138,7 +142,7 @@ public class AdminTest extends AmqpTestBase{
         }
 
         List<QueueBean> queueBeans = listQueues();
-        Assert.assertTrue(queueBeans.size() > 0);
+        assertTrue(queueBeans.size() > 0);
         for (QueueBean bean : queueBeans) {
             if (vhost1Queues.remove(bean.getName())) {
                 Assert.assertEquals(bean.getVhost(), "vhost1");
@@ -151,7 +155,7 @@ public class AdminTest extends AmqpTestBase{
         Assert.assertEquals(vhost2Queues.size(), 0);
 
         List<QueueBean> queueBeans1 = listQueuesByVhost("vhost1");
-        Assert.assertTrue(queueBeans1.size() > 0);
+        assertTrue(queueBeans1.size() > 0);
         for (QueueBean bean : queueBeans1) {
             Assert.assertEquals(bean.getVhost(), "vhost1");
         }
@@ -171,7 +175,7 @@ public class AdminTest extends AmqpTestBase{
         }
 
         List<QueueBean> beans = listQueuesByVhost(vhost);
-        Assert.assertTrue(beans.size() > 0);
+        assertTrue(beans.size() > 0);
         for (QueueBean bean : beans) {
             queueNameSet.remove(bean.getName());
         }
@@ -180,13 +184,13 @@ public class AdminTest extends AmqpTestBase{
         String qu = beans.get(0).getName();
         queueDelete(vhost, qu);
         beans = listQueuesByVhost(vhost);
-        Assert.assertTrue(beans.size() > 0);
+        assertTrue(beans.size() > 0);
         for (QueueBean bean : beans) {
             Assert.assertNotEquals(bean.getName(), qu);
             queueDelete(vhost, bean.getName());
         }
         beans = listQueuesByVhost(vhost);
-        Assert.assertTrue(CollectionUtils.isEmpty(beans));
+        assertTrue(CollectionUtils.isEmpty(beans));
     }
 
     @Test
@@ -321,4 +325,23 @@ public class AdminTest extends AmqpTestBase{
         return "http://localhost:" + new AmqpServiceConfiguration().getAmqpAdminPort() + "/api/" + path;
     }
 
+    @Test
+    public void test() throws IOException, TimeoutException {
+        Connection connection = getConnection("vhost1", false);
+        Channel channel = connection.createChannel();
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("testNum", 10);
+        properties.put("testDecimal", 10.1);
+        properties.put("testString", "hello");
+        channel.exchangeDeclare("exchange", "direct", false, false, properties);
+
+        ExchangeBean bean = exchangeByName("vhost1", "exchange");
+
+        Map<String, Object> arguments = bean.getArguments();
+        assertNotNull(arguments);
+        properties.forEach((k, v) -> {
+            assertEquals(arguments.get(k), String.valueOf(v));
+        });
+    }
 }

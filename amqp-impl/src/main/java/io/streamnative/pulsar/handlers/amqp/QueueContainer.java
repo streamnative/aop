@@ -78,7 +78,7 @@ public class QueueContainer {
         } else {
             String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
             CompletableFuture<Topic> topicCompletableFuture =
-                    amqpTopicManager.getTopic(topicName, createIfMissing);
+                    amqpTopicManager.getTopic(topicName, createIfMissing, null);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     log.error("[{}][{}] Failed to get queue topic.", namespaceName, queueName, throwable);

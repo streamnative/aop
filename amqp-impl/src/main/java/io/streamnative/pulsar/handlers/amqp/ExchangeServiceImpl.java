@@ -60,7 +60,8 @@ public class ExchangeServiceImpl implements ExchangeService {
             exchangeType = type;
         }
         CompletableFuture<AmqpExchange> future = new CompletableFuture<>();
-        exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType)
+        exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType,
+                        arguments)
                 .whenComplete((ex, throwable) -> {
                     if (throwable != null) {
                         future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,

@@ -79,7 +79,12 @@ public class AmqpTopicManager {
                         log.debug("Get broker service url for {}. lookupResult: {}",
                                 topicName, lookupOp.get().getLookupData().getBrokerUrl());
                     }
-                    return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
+                    if (properties != null) {
+                        return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
+                    } else {
+                        return pulsarService.getBrokerService().getTopic(topicName, createIfMissing);
+                    }
+
                 })
                 .thenAccept(topicOp -> {
                     if (!topicOp.isPresent()) {

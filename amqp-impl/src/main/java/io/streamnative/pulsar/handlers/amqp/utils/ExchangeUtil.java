@@ -17,7 +17,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -25,7 +24,7 @@ import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 @Slf4j
 public class ExchangeUtil {
 
-    public static ObjectMapper jsonMapper = new JsonMapper();;
+    public static final ObjectMapper JSON_MAPPER = new JsonMapper();
 
     public static boolean isBuildInExchange(final String exchangeName) {
         return exchangeName.equals(ExchangeDefaults.DIRECT_EXCHANGE_NAME)
@@ -64,10 +63,9 @@ public class ExchangeUtil {
 
     public static Map<String, String> covertObjectMapAsStringMap(Map<String, Object> properties) {
         Map<String, String> stringProperties = new HashMap<>();
-        Set<String> keys = properties.keySet();
-        for (String key : keys) {
-            stringProperties.put(key, covertObjectValueAsString(properties.get(key)));
-        }
+        properties.forEach((k, v) -> {
+            stringProperties.put(k, covertObjectValueAsString(v));
+        });
         return stringProperties;
     }
 
@@ -76,14 +74,14 @@ public class ExchangeUtil {
             if (obj instanceof CharSequence) {
                 return obj.toString();
             }
-            return jsonMapper.writeValueAsString(obj);
+            return JSON_MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
     public static <T> T covertStringValueAsObject(String value, Class<T> clazz) {
-        return jsonMapper.convertValue(value, clazz);
+        return JSON_MAPPER.convertValue(value, clazz);
     }
 
     public static Object covertStringValueAsObject(String value) {

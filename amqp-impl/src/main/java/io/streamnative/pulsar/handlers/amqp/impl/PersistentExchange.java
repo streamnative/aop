@@ -13,8 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.covertStringValueAsObject;
-import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.jsonMapper;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -250,7 +250,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             properties.put(TYPE, exchangeType.toString());
             List<String> queueNames = getQueueNames();
             if (queueNames.size() != 0) {
-                properties.put(QUEUES, jsonMapper.writeValueAsString(getQueueNames()));
+                properties.put(QUEUES, JSON_MAPPER.writeValueAsString(getQueueNames()));
             }
         } catch (JsonProcessingException e) {
             log.error("[{}] covert map of routers to String error: {}", exchangeName, e.getMessage());

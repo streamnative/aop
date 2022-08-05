@@ -327,7 +327,7 @@ public class AdminTest extends AmqpTestBase{
     }
 
     @Test
-    public void test() throws IOException, TimeoutException {
+    public void exchangePropertiesTest() throws IOException, TimeoutException {
         Connection connection = getConnection("vhost1", false);
         Channel channel = connection.createChannel();
 

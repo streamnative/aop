@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
@@ -76,16 +77,24 @@ public class ExchangeUtil {
             }
             return JSON_MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
+            log.error("Failed to covert object: {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }
 
     public static <T> T covertStringValueAsObject(String value, Class<T> clazz) {
-        return JSON_MAPPER.convertValue(value, clazz);
+        try {
+            if (List.class.isAssignableFrom(clazz)) {
+                return JSON_MAPPER.readValue(value, clazz);
+            }
+            return JSON_MAPPER.convertValue(value, clazz);
+        } catch (Exception e) {
+            log.error("Failed to covert string: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
     }
 
     public static Object covertStringValueAsObject(String value) {
         return covertStringValueAsObject(value, Object.class);
     }
-
 }

@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;

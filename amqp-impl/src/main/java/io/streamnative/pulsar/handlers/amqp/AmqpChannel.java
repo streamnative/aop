@@ -411,8 +411,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private synchronized void subscribe(String consumerTag, String queueName, Topic topic,
                            boolean ack, boolean exclusive, boolean nowait){
 
-        CompletableFuture<Void> exceptionFuture = new CompletableFuture<>();
-        exceptionFuture.whenComplete((ignored, e) -> {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        future.whenComplete((ignored, e) -> {
             if (e != null) {
                 closeChannel(ErrorCodes.SYNTAX_ERROR, e.getMessage());
                 log.error("BasicConsume error queue:{} consumerTag:{} ex {}",
@@ -421,7 +421,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         });
 
         if (tag2ConsumersMap.containsKey(consumerTag)) {
-            exceptionFuture.completeExceptionally(
+            future.completeExceptionally(
                     new ConsumerTagInUseException("Consumer already exists with same consumerTag: " + consumerTag));
             return;
         }
@@ -429,30 +429,31 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
                 defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
-            AmqpConsumer consumer;
-            try {
-                consumer = new AmqpConsumer(queueContainer, subscription, exclusive
-                        ? CommandSubscribe.SubType.Exclusive :
-                        CommandSubscribe.SubType.Shared, topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
+                AmqpConsumer consumer = new AmqpConsumer(queueContainer, subscription,
+                        exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
+                        topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
                         consumerTag, true, connection.getServerCnx(), "", null,
                         false, CommandSubscribe.InitialPosition.Latest,
                         null, this, consumerTag, queueName, ack);
-            } catch (BrokerServiceException e) {
-                exceptionFuture.completeExceptionally(e);
-                return;
-            }
-            subscription.addConsumer(consumer);
-            consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
-            tag2ConsumersMap.put(consumerTag, consumer);
+                subscription.addConsumer(consumer).thenAccept(__ -> {
+                    consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
+                    tag2ConsumersMap.put(consumerTag, consumer);
 
-            if (!nowait) {
-                MethodRegistry methodRegistry = connection.getMethodRegistry();
-                AMQMethodBody responseBody = methodRegistry.
-                        createBasicConsumeOkBody(AMQShortString.
-                                createAMQShortString(consumer.getConsumerTag()));
-                connection.writeFrame(responseBody.generateFrame(channelId));
-            }
-            exceptionFuture.complete(null);
+                    if (!nowait) {
+                        MethodRegistry methodRegistry = connection.getMethodRegistry();
+                        AMQMethodBody responseBody = methodRegistry.
+                                createBasicConsumeOkBody(AMQShortString.
+                                        createAMQShortString(consumer.getConsumerTag()));
+                        connection.writeFrame(responseBody.generateFrame(channelId));
+                    }
+                    future.complete(null);
+                }).exceptionally(t -> {
+                    future.completeExceptionally(t);
+                    return null;
+                });
+        }).exceptionally(t -> {
+            future.completeExceptionally(t);
+            return null;
         });
     }
 

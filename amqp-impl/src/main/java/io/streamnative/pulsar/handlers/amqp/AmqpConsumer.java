@@ -81,7 +81,7 @@ public class AmqpConsumer extends Consumer {
         String appId, Map<String, String> metadata, boolean readCompacted,
         CommandSubscribe.InitialPosition subscriptionInitialPosition,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) throws BrokerServiceException {
+        boolean autoAck) {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
             cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null,
                 Commands.DEFAULT_CONSUMER_EPOCH);

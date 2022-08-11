@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
+import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.PROP_CUSTOM_JSON;
 import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.PROP_EXCHANGE;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
@@ -47,6 +48,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -111,6 +113,9 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         MessageImpl<byte[]> message = MessageImpl.deserialize(data);
                         for (KeyValue keyValue : message.getMessageBuilder().getPropertiesList()) {
                             props.put(keyValue.getKey(), keyValue.getValue());
+                            if (keyValue.getKey().equals(PROP_CUSTOM_JSON)) {
+                                props.putAll(JsonUtil.fromJson(keyValue.getValue(), Map.class));
+                            }
                         }
                         Collection<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
                         String bindingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
@@ -147,6 +152,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                             CompletableFuture<Void> routeFuture = exchange.getRouter(exchangeName).routingMessageToEx(
                                     data,
                                     props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                                    message.getMessageBuilder().getPropertiesList(),
                                     props
                             );
                             routeFutureList.add(routeFuture);
@@ -300,6 +306,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             router.addBinding(binding);
             router.setExchange(sourceEx);
             router.setDestinationExchange(this);
+            router.setArguments(params);
             return router;
         });
         updateExchangeProperties();
@@ -402,6 +409,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             properties.setExchangeName(router.getExchange().getName());
             properties.setType(router.getExchange().getType());
             properties.setBindings(router.getBindings());
+            properties.setArguments(router.getArguments());
             propertiesList.add(properties);
         }
         return propertiesList;
@@ -424,6 +432,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         messageRouter.setExchange(ex);
                         messageRouter.setDestinationExchange(this);
                         messageRouter.setBindings(props.getBindings());
+                        messageRouter.setArguments(props.getArguments());
                     });
         }
     }

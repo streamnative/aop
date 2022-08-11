@@ -21,12 +21,13 @@ import io.streamnative.pulsar.handlers.amqp.impl.HeadersMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.TopicMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.util.FutureUtil;
 
 /**
@@ -160,29 +161,11 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     }
 
     @Override
-    public CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, Map<String, Object> properties) {
+    public CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, List<KeyValue> messageKeyValues, Map<String, Object> properties) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         if (isMatch(properties)) {
-            return destinationEx.writeMessageAsync(MessageConvertUtils.entryToMessage(payload, properties), routingKey)
+            return destinationEx.writeMessageAsync(MessageConvertUtils.entryToMessage(payload, messageKeyValues), routingKey)
                     .thenApply(__ -> null);
-//            try {
-//                ((PersistentTopic) destinationEx.getTopic()).getManagedLedger().asyncAddEntry(entry.getDataBuffer(), new AsyncCallbacks.AddEntryCallback() {
-//                    @Override
-//                    public void addComplete(Position position, ByteBuf entryData, Object ctx) {
-//                        future.complete(null);
-//                    }
-//
-//                    @Override
-//                    public void addFailed(ManagedLedgerException exception, Object ctx) {
-//                        log.error("Failed to write message to destination exchange {}",
-//                                destinationEx.getName(), exception);
-//                        future.completeExceptionally(exception);
-//                    }
-//                }, null);
-//            } catch (Exception e) {
-//                log.error("Failed to route message to exchange.", e);
-//                return FutureUtil.failedFuture(e);
-//            }
         } else {
             future.complete(null);
         }

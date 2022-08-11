@@ -28,4 +28,5 @@ public class AmqpExchangeProperties {
     private String exchangeName;
     private ExchangeType type;
     private Map<String, AmqpBinding> bindings;
+    private Map<String, Object> arguments;
 }

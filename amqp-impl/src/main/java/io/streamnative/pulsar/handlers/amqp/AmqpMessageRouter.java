@@ -14,11 +14,11 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.buffer.ByteBuf;
-import org.apache.bookkeeper.mledger.Entry;
-
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import org.apache.pulsar.common.api.proto.KeyValue;
 
 /**
  * Message router is used to replicate message IDs from exchange to queue.
@@ -143,6 +143,6 @@ public interface AmqpMessageRouter {
     CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
                                            Map<String, Object> properties);
 
-    CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, Map<String, Object> properties);
+    CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, List<KeyValue> messageKeyValues, Map<String, Object> properties);
 
 }

@@ -157,10 +157,10 @@ public final class MessageConvertUtils {
         }
     }
 
-    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, Map<String, Object> properties) {
+    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, List<KeyValue> keyValues) {
         TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
-        for (Map.Entry<String, Object> prop : properties.entrySet()) {
-            builder.property(prop.getKey(), prop.getValue().toString());
+        for (KeyValue kv : keyValues) {
+            builder.property(kv.getKey(), kv.getValue());
         }
         byte[] array = new byte[payload.readableBytes()];
         payload.getBytes(payload.readerIndex(), array);

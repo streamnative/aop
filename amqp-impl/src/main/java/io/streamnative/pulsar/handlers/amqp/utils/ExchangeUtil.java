@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.utils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.util.HashMap;
@@ -62,19 +63,8 @@ public class ExchangeUtil {
         return exchangeName == null || AMQShortString.EMPTY_STRING.toString().equals(exchangeName);
     }
 
-    public static Map<String, String> covertObjectMapAsStringMap(Map<String, Object> properties) {
-        Map<String, String> stringProperties = new HashMap<>();
-        properties.forEach((k, v) -> {
-            stringProperties.put(k, covertObjectValueAsString(v));
-        });
-        return stringProperties;
-    }
-
     public static String covertObjectValueAsString(Object obj) {
         try {
-            if (obj instanceof CharSequence) {
-                return obj.toString();
-            }
             return JSON_MAPPER.writeValueAsString(obj);
         } catch (Exception e) {
             log.error("Failed to covert object: {}", e.getMessage());
@@ -82,19 +72,13 @@ public class ExchangeUtil {
         }
     }
 
-    public static <T> T covertStringValueAsObject(String value, Class<T> clazz) {
+    public static Map<String, Object> covertStringValueAsObjectMap(String value) {
         try {
-            if (List.class.isAssignableFrom(clazz)) {
-                return JSON_MAPPER.readValue(value, clazz);
-            }
-            return JSON_MAPPER.convertValue(value, clazz);
+            return JSON_MAPPER.readValue(value, new TypeReference<Map<String, Object>>() {
+            });
         } catch (Exception e) {
             log.error("Failed to covert string: {}", e.getMessage());
             throw new RuntimeException(e);
         }
-    }
-
-    public static Object covertStringValueAsObject(String value) {
-        return covertStringValueAsObject(value, Object.class);
     }
 }

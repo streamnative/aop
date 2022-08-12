@@ -158,7 +158,7 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public Map<String, Object> getProperties() {
+    public Map<String, Object> getCustomProperties() {
         return this.properties;
     }
 }

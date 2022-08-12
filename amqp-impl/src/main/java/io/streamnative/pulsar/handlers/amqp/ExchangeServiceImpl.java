@@ -18,9 +18,9 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.formatExch
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
-
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -28,7 +28,6 @@ import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
-import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 
 /**
@@ -45,7 +44,8 @@ public class ExchangeServiceImpl implements ExchangeService {
 
     @Override
     public CompletableFuture<AmqpExchange> exchangeDeclare(NamespaceName namespaceName, String exchange, String type,
-                        boolean passive, boolean durable, boolean autoDelete, boolean internal, FieldTable arguments) {
+                                                           boolean passive, boolean durable, boolean autoDelete,
+                                                           boolean internal, Map<String, Object> arguments) {
 
         if (isDefaultExchange(exchange)) {
             String sb = "Attempt to redeclare default exchange: of type " + ExchangeDefaults.DIRECT_EXCHANGE_CLASS;

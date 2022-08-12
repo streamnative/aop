@@ -14,6 +14,7 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -38,7 +39,7 @@ public interface ExchangeService {
      */
     CompletableFuture<AmqpExchange> exchangeDeclare(NamespaceName namespaceName, String exchange, String type,
                                                     boolean passive, boolean durable, boolean autoDelete,
-                                                    boolean internal, FieldTable arguments);
+                                                    boolean internal, Map<String, Object> arguments);
 
     /**
      * Delete a exchange.

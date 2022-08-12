@@ -14,7 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
-import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.covertStringValueAsObject;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.covertStringValueAsObjectMap;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,7 +22,6 @@ import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
-import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.IOException;
@@ -61,7 +60,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
-    public static final String INDEX = "index";
+
+    public static final String PROPERTIES = "__properties__";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
@@ -217,30 +217,12 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public Map<String, Object> getProperties() {
+    public Map<String, Object> getCustomProperties() {
         Map<String, String> properties = this.persistentTopic.getManagedLedger().getProperties();
         if (properties == null) {
             return null;
         }
-        Map<String, Object> map = new HashMap<>();
-
-        properties.forEach((k, v) -> {
-            switch (k) {
-                case QUEUES:
-                    map.put(k, ExchangeUtil.covertStringValueAsObject(v, List.class));
-                    break;
-                case TYPE:
-                case EXCHANGE:
-                    map.put(k, ExchangeUtil.covertStringValueAsObject(v, String.class));
-                    break;
-                case INDEX:
-                    map.put(k, ExchangeUtil.covertStringValueAsObject(v, Long.class));
-                    break;
-                default:
-                    map.put(k, covertStringValueAsObject(v));
-                }
-        });
-        return map;
+        return covertStringValueAsObjectMap(properties.get(PROPERTIES));
     }
 
     private void updateExchangeProperties() {

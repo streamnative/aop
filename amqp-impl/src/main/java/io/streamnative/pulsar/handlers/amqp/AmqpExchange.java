@@ -71,7 +71,7 @@ public interface AmqpExchange {
 
     Topic getTopic();
 
-    Map<String, Object> getProperties();
+    Map<String, Object> getCustomProperties();
 
     /**
      * Get the type {@link Type} of the exchange.

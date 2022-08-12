@@ -174,7 +174,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
         this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(),
                 type != null ? type.toString() : null,
-                passive, durable, autoDelete, internal, arguments).thenAccept(__ -> {
+                passive, durable, autoDelete, internal, FieldTable.convertToMap(arguments)).thenAccept(__ -> {
             if (!nowait) {
                 connection.writeFrame(
                         connection.getMethodRegistry().createExchangeDeclareOkBody().generateFrame(channelId));

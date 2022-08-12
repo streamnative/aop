@@ -245,13 +245,19 @@ public class AdminTest extends AmqpTestBase{
 //        queueDelete(vhost, qu);
     }
 
-    private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {
+    private void exchangeDeclare(String vhost, String exchange, String type, Map<String, Object> arguments)
+            throws IOException {
         Map<String, Object> declareParams = new HashMap<>();
         declareParams.put("type", type);
         declareParams.put("auto_delete", true);
         declareParams.put("durable", true);
         declareParams.put("internal", false);
+        declareParams.put("arguments", arguments);
         HttpUtil.put(api("exchanges/" + vhost + "/" + exchange), declareParams);
+    }
+
+    private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {
+        exchangeDeclare(vhost, exchange, type, null);
     }
 
     private void exchangeDelete(String vhost, String exchange) throws IOException {
@@ -338,11 +344,18 @@ public class AdminTest extends AmqpTestBase{
         channel.exchangeDeclare("exchange", "direct", false, false, properties);
 
         ExchangeBean bean = exchangeByName("vhost1", "exchange");
-
         Map<String, Object> arguments = bean.getArguments();
         assertNotNull(arguments);
         properties.forEach((k, v) -> {
-            assertEquals(arguments.get(k), String.valueOf(v));
+            assertEquals(arguments.get(k), v);
+        });
+
+        exchangeDeclare("vhost1", "exchage2", "direct", properties);
+        ExchangeBean bean2 = exchangeByName("vhost1", "exchange");
+        Map<String, Object> arguments2 = bean2.getArguments();
+        assertNotNull(arguments2);
+        properties.forEach((k, v) -> {
+            assertEquals(arguments2.get(k), v);
         });
     }
 }

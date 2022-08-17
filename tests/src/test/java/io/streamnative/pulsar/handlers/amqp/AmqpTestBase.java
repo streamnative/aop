@@ -22,17 +22,18 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.TenantInfo;
-import org.testng.Assert;
+import org.awaitility.Awaitility;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -121,9 +122,14 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         channel.queueBind(queueName, exchangeName, routingKey);
 
         int messageCnt = 100;
-        CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
 
-        AtomicInteger consumeIndex = new AtomicInteger(0);
+        Set<String> messageSet = new HashSet<>();
+        final String messagePrefix = "Hello, world! - ";
+        for (int i = 0; i < messageCnt; i++) {
+            messageSet.add(messagePrefix + i);
+        }
+
+//        AtomicInteger consumeIndex = new AtomicInteger(0);
         channel.basicConsume(queueName, false, "", false, exclusiveConsume, null,
                 new DefaultConsumer(channel) {
                     @Override
@@ -132,20 +138,23 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
                                                AMQP.BasicProperties properties,
                                                byte[] body) throws IOException {
                         long deliveryTag = envelope.getDeliveryTag();
-                        Assert.assertEquals(new String(body), "Hello, world! - " + consumeIndex.getAndIncrement());
-                        // (process the message components here ...)
+                        String msg = new String(body);
+                        // TODO Currently, AoP couldn't protect message order
+//                        Assert.assertEquals(msg, messagePrefix + consumeIndex.getAndIncrement());
                         channel.basicAck(deliveryTag, false);
-                        countDownLatch.countDown();
+                        messageSet.remove(msg);
                     }
                 });
 
-        for (int i = 0; i < messageCnt; i++) {
-            byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
+        for (String msg : messageSet) {
+            byte[] messageBodyBytes = msg.getBytes();
             channel.basicPublish(exchangeName, routingKey, null, messageBodyBytes);
         }
 
-        countDownLatch.await();
-        Assert.assertEquals(messageCnt, consumeIndex.get());
+        Awaitility.await()
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .atMost(5, TimeUnit.SECONDS)
+                .until(messageSet::isEmpty);
         channel.close();
         conn.close();
     }

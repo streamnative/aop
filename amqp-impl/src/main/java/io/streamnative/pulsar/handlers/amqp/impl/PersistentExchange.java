@@ -123,28 +123,18 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
         // TODO Temporarily put the creation operation here, and later put the operation in router
         CompletableFuture<Entry> future = new CompletableFuture<>();
-        getCursor(queueName).thenAccept(cursor -> {
-            if (cursor == null) {
-                future.completeExceptionally(new RuntimeException("Failed to read entry, the cursor "
-                        + queueName + " of the exchange " + exchangeName + " is null"));
-                return;
-            }
-            ManagedLedgerImpl ledger = (ManagedLedgerImpl) cursor.getManagedLedger();
-            ledger.asyncReadEntry((PositionImpl) position, new AsyncCallbacks.ReadEntryCallback() {
-                        @Override
-                        public void readEntryComplete(Entry entry, Object o) {
-                            future.complete(entry);
-                        }
+        ((ManagedLedgerImpl) persistentTopic.getManagedLedger())
+                .asyncReadEntry((PositionImpl) position, new AsyncCallbacks.ReadEntryCallback() {
+                    @Override
+                    public void readEntryComplete(Entry entry, Object o) {
+                        future.complete(entry);
+                    }
 
-                        @Override
-                        public void readEntryFailed(ManagedLedgerException e, Object o) {
-                            future.completeExceptionally(e);
-                        }
-                    }, null);
-        }).exceptionally(t -> {
-            future.completeExceptionally(t);
-            return null;
-        });
+                    @Override
+                    public void readEntryFailed(ManagedLedgerException e, Object o) {
+                        future.completeExceptionally(e);
+                    }
+                }, null);
         return future;
     }
 
@@ -194,13 +184,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
-        return getCursor(queueName).thenApply(cursor -> {
-            if (cursor == null) {
-                throw new RuntimeException("Failed to get mark delete position, the cursor "
-                        + queueName + " of the exchange " + exchangeName + " is null.");
-            }
-            return cursor.getMarkDeletedPosition();
-        });
+        return getCursor(queueName).thenApply(ManagedCursor::getMarkDeletedPosition);
     }
 
     private CompletableFuture<ManagedCursor> getCursor(String queueName) {

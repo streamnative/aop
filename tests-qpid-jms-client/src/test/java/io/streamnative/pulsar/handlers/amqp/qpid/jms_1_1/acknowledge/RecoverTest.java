@@ -47,7 +47,9 @@ public class RecoverTest extends JmsTestBase
     private static final Logger LOGGER = LoggerFactory.getLogger(RecoverTest.class);
     private static final int SENT_COUNT = 4;
 
+    // TODO need message order protection
     @Test
+    @Ignore
     public void testRecoverForClientAcknowledge() throws Exception
     {
         Queue queue = createQueue(getTestName());

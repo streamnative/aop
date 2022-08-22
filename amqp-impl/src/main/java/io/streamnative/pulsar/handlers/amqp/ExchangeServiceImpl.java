@@ -18,6 +18,7 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.formatExch
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
+
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import java.util.List;
 import java.util.Map;

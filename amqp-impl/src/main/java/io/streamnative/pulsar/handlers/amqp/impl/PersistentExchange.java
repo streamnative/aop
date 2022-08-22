@@ -40,6 +40,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
@@ -61,7 +62,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
 
-    public static final String PROPERTIES = "__properties__";
+    public static final String CUSTOM_PROPERTIES = "__custom_properties__";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
@@ -222,7 +223,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
         if (properties == null) {
             return null;
         }
-        return covertStringValueAsObjectMap(properties.get(PROPERTIES));
+        String customProperties = properties.get(CUSTOM_PROPERTIES);
+        if (StringUtils.isEmpty(customProperties)) {
+            return null;
+        }
+        return covertStringValueAsObjectMap(properties.get(CUSTOM_PROPERTIES));
     }
 
     private void updateExchangeProperties() {

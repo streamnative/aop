@@ -102,7 +102,7 @@ public class ExchangeContainer {
             if (createIfMissing && MapUtils.isNotEmpty(arguments)) {
                 newProperties = new HashMap<>();
                 String argumentsStr = covertObjectValueAsString(arguments);
-                newProperties.put(PersistentExchange.PROPERTIES, argumentsStr);
+                newProperties.put(PersistentExchange.CUSTOM_PROPERTIES, argumentsStr);
             }
 
             CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing,

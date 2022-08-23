@@ -101,6 +101,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             proxyConfig.setAmqpMaxFrameSize(amqpConfig.getAmqpMaxFrameSize());
             proxyConfig.setAmqpHeartBeat(amqpConfig.getAmqpHeartBeat());
             proxyConfig.setAmqpProxyPort(amqpConfig.getAmqpProxyPort());
+            proxyConfig.setAmqpExplicitFlushAfterFlushes(amqpConfig.getAmqpExplicitFlushAfterFlushes());
 
             AdvertisedListener internalListener = ServiceConfigurationUtils.getInternalListener(amqpConfig, "pulsar");
             checkArgument(internalListener.getBrokerServiceUrl() != null,

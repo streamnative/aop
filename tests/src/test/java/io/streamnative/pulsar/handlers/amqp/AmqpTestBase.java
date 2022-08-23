@@ -88,20 +88,27 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
     }
 
     protected Connection getConnection(String vhost, boolean amqpProxyEnable) throws IOException, TimeoutException {
+        int port;
+        if (amqpProxyEnable) {
+            port = getProxyPort();
+            log.info("use proxyPort: {}", port);
+            return getConnection(vhost, port);
+        } else {
+            port = getAmqpBrokerPortList().get(0);
+            log.info("use amqpBrokerPort: {}", port);
+        }
+        return getConnection(vhost, port);
+    }
+
+    protected Connection getConnection(String vhost, int port) throws IOException, TimeoutException {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setHost("localhost");
-        if (amqpProxyEnable) {
-            int proxyPort = getProxyPort();
-            log.info("use proxyPort: {}", proxyPort);
-        } else {
-            connectionFactory.setPort(getAmqpBrokerPortList().get(0));
-            log.info("use amqpBrokerPort: {}", getAmqpBrokerPortList().get(0));
-        }
+        connectionFactory.setPort(port);
         connectionFactory.setVirtualHost(vhost);
         return connectionFactory.newConnection();
     }
 
-    protected void basicDirectConsume(String vhost) throws Exception {
+    protected void basicDirectConsume(String vhost, boolean exclusiveConsume) throws Exception {
         String exchangeName = randExName();
         String routingKey = "test.key";
         String queueName = randQuName();
@@ -117,7 +124,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
 
         AtomicInteger consumeIndex = new AtomicInteger(0);
-        channel.basicConsume(queueName, false,
+        channel.basicConsume(queueName, false, "", false, exclusiveConsume, null,
                 new DefaultConsumer(channel) {
                     @Override
                     public void handleDelivery(String consumerTag,

@@ -33,7 +33,7 @@ public class PulsarDeduplicationWorkAroundTest extends AmqpTestBase {
 
     @Test(timeOut = 1000 * 5)
     public void basicConsumeCase() throws Exception {
-        basicDirectConsume("vhost1");
+        basicDirectConsume("vhost1", false);
     }
 
 }

@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.authentication.AuthenticationService;
 
 /**
  * AMQP broker related.
@@ -54,5 +55,13 @@ public class AmqpBrokerService {
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = connectionContainer;
+    }
+
+    public boolean isAuthenticationEnabled() {
+        return pulsarService.getConfiguration().isAuthenticationEnabled();
+    }
+
+    public AuthenticationService getAuthenticationService() {
+        return pulsarService.getBrokerService().getAuthenticationService();
     }
 }

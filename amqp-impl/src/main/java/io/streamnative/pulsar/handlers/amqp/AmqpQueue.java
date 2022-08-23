@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
@@ -36,7 +37,8 @@ public interface AmqpQueue {
     /**
      * Write the index message into the queue.
      */
-    CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId);
+    CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId,
+                                                   Map<String, Object> properties);
 
     /**
      * Read entry by queue message. Since the queue just store message IDs, so it's need to read the real data from
@@ -58,6 +60,8 @@ public interface AmqpQueue {
      * @return message router of the queue.
      */
     AmqpMessageRouter getRouter(String exchangeName);
+
+    Collection<AmqpMessageRouter> getRouters();
 
     /**
      * Bind to a exchange {@link AmqpExchange}.

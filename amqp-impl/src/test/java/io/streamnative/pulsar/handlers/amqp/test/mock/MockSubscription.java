@@ -172,4 +172,15 @@ public class MockSubscription implements Subscription {
     public CompletableFuture<Void> endTxn(long txnidMostBits, long txnidLeastBits, int txnAction, long lowWaterMark) {
         return null;
     }
+
+    @Override
+    public Map<String, String> getSubscriptionProperties() {
+        return null;
+    }
+
+    @Override
+    public CompletableFuture<Void> updateSubscriptionProperties(Map<String, String> subscriptionProperties) {
+        return null;
+    }
+
 }

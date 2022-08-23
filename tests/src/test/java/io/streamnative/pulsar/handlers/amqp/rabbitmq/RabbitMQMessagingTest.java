@@ -26,6 +26,8 @@ import io.streamnative.pulsar.handlers.amqp.AmqpTestBase;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +43,7 @@ import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 /**
@@ -48,6 +51,13 @@ import org.testng.annotations.Test;
  */
 @Slf4j
 public class RabbitMQMessagingTest extends AmqpTestBase {
+
+    @DataProvider(name = "consumeExclusiveProvider")
+    public Object[][] consumeExclusiveProvider() {
+        return new Object[][]{
+                { false }, { true }
+        };
+    }
 
     @Test(timeOut = 1000 * 5)
     public void basicConsumeCaseWithNewAddedHost() throws Exception {
@@ -66,12 +76,12 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         if (unknownConn.isOpen()) {
             unknownConn.close();
         }
-        basicDirectConsume(newAddedVhost);
+        basicDirectConsume(newAddedVhost, false);
     }
 
-    @Test(timeOut = 1000 * 5)
-    public void basicConsumeCase() throws Exception {
-        basicDirectConsume("vhost1");
+    @Test(timeOut = 1000 * 5, dataProvider = "consumeExclusiveProvider")
+    public void basicConsumeCase(boolean consumeExclusive) throws Exception {
+        basicDirectConsume("vhost1", consumeExclusive);
     }
 
     @Test(timeOut = 1000 * 5)
@@ -375,9 +385,55 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         } catch (InterruptedException e) {
             // ignored
         }
-        Assert.assertEquals(messageCnt, consumeIndex2.get());
+        Assert.assertTrue(consumeIndex2.get() >= messageCnt);
         channel3.close();
         conn.close();
+    }
+
+    @Test(timeOut = 1000 * 5)
+    public void largeMessageTest() throws IOException, TimeoutException, InterruptedException {
+
+        final String vhost = "vhost1";
+        final int msgSize = 101 * 1024;
+        final String exchangeName = randExName();
+        final String queueName1 = randQuName();
+
+        @Cleanup
+        Connection connection = getConnection(vhost, false);
+        @Cleanup
+        Channel channel = connection.createChannel();
+
+        channel.exchangeDeclare(exchangeName, BuiltinExchangeType.FANOUT, true);
+        channel.queueDeclare(queueName1, true, false, false, null);
+        channel.queueBind(queueName1, exchangeName, "");
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < msgSize; i++) {
+            sb.append("a");
+        }
+        String contentMsg = sb.toString();
+        channel.basicPublish(exchangeName, "", null, contentMsg.getBytes());
+
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+        final AtomicInteger count = new AtomicInteger(0);
+
+        channel.basicConsume(queueName1, false, "myConsumerTag",
+                new DefaultConsumer(channel) {
+                    @Override
+                    public void handleDelivery(String consumerTag,
+                                               Envelope envelope,
+                                               AMQP.BasicProperties properties,
+                                               byte[] body) throws IOException {
+                        String message = new String(body, "UTF-8");
+                        Assert.assertEquals(message, contentMsg);
+                        count.incrementAndGet();
+                        countDownLatch.countDown();
+                    }
+                });
+
+        countDownLatch.await();
+        Assert.assertTrue(count.get() == 1);
+
     }
 
     private Channel createConsumer(String exchangeName, String routingKey, String queueName, Connection conn,
@@ -406,5 +462,54 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
                     }
                 });
         return channel;
+    }
+
+    @Test(timeOut = 1000 * 30)
+    public void persistentQueueDelayMessageTest() throws Exception {
+        String exchangeName = randExName();
+        String routingKey = "test.key";
+        String queueName = randQuName();
+
+        Connection conn = getConnection("vhost1", false);
+        Channel channel = conn.createChannel();
+
+        channel.exchangeDeclare(exchangeName, "direct", true);
+        channel.queueDeclare(queueName, true, false, false, null);
+        channel.queueBind(queueName, exchangeName, routingKey);
+
+        int messageCnt = 10;
+        CountDownLatch countDownLatch = new CountDownLatch(messageCnt);
+
+        AtomicInteger consumeIndex = new AtomicInteger(0);
+        AtomicReference<Long> receiveTime = new AtomicReference<>(System.currentTimeMillis());
+        channel.basicConsume(queueName, false,
+                new DefaultConsumer(channel) {
+                    @Override
+                    public void handleDelivery(String consumerTag,
+                                               Envelope envelope,
+                                               AMQP.BasicProperties properties,
+                                               byte[] body) throws IOException {
+                        consumeIndex.getAndIncrement();
+                        log.info("messages receive: {} timeInterval:{}ms", new String(body),
+                                System.currentTimeMillis() - receiveTime.getAndSet(System.currentTimeMillis()));
+                        // (process the message components here ...)
+                        channel.basicAck(envelope.getDeliveryTag(), false);
+                        countDownLatch.countDown();
+                    }
+                });
+
+        for (int i = 0; i < messageCnt; i++) {
+            byte[] messageBodyBytes = ("Hello, world! - " + i).getBytes();
+            AMQP.BasicProperties.Builder builder = new AMQP.BasicProperties.Builder();
+            Map<String, Object> map = new HashMap<>();
+            map.put("x-delay", 2000 * i);
+            builder.headers(map);
+            channel.basicPublish(exchangeName, routingKey, builder.build(), messageBodyBytes);
+        }
+
+        countDownLatch.await();
+        Assert.assertEquals(messageCnt, consumeIndex.get());
+        channel.close();
+        conn.close();
     }
 }

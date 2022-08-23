@@ -14,7 +14,8 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import org.apache.qpid.server.protocol.v0_8.AMQShortString;
+import java.util.concurrent.CompletableFuture;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
 /**
@@ -25,7 +26,6 @@ public interface QueueService {
     /**
      *  Declare a queue.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param passive Declare a queue passively; i.e., check if it exists.  In AMQP
      *       0-9-1, all arguments aside from nowait are ignored; and sending
@@ -36,51 +36,51 @@ public interface QueueService {
      * @param nowait set true will return nothing (as there will be no response from the server)
      * @param arguments other properties (construction arguments) for the queue
      */
-    void queueDeclare(AmqpChannel channel, AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
-                      boolean autoDelete, boolean nowait, FieldTable arguments);
+    CompletableFuture<AmqpQueue> queueDeclare(NamespaceName namespaceName, String queue, boolean passive,
+                                              boolean durable, boolean exclusive, boolean autoDelete, boolean nowait,
+                                              FieldTable arguments, long connectionId);
 
     /**
      *  Delete a queue.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param ifUnused true if the queue should be deleted only if not in use
      * @param ifEmpty true if the queue should be deleted only if empty
-     * @param nowait set true will return nothing (as there will be no response from the server)
      */
-    void queueDelete(AmqpChannel channel, AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait);
+    CompletableFuture<Void> queueDelete(NamespaceName namespaceName, String queue, boolean ifUnused, boolean ifEmpty,
+                                        long connectionId);
 
     /**
      * Bind a queue to an exchange.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param exchange the name of the exchange
      * @param bindingKey the key to use for the binding
      * @param nowait set true will return nothing (as there will be no response from the server)
      * @param argumentsTable other properties (binding parameters)
      */
-    void queueBind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-                   boolean nowait, FieldTable argumentsTable);
+    CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange, String bindingKey,
+                   boolean nowait, FieldTable argumentsTable, long connectionId);
 
     /**
      * Unbinds a queue from an exchange.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param exchange the name of the exchange
      * @param bindingKey the key to use for the binding
      * @param arguments other properties (binding parameters)
      */
-    void queueUnbind(AmqpChannel channel, AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
-                     FieldTable arguments);
+    CompletableFuture<Void> queueUnbind(NamespaceName namespaceName, String queue, String exchange, String bindingKey,
+                     FieldTable arguments, long connectionId);
 
     /**
      * Purges the contents of the given queue.
      *
-     * @param channel the channel used to do this action
      * @param queue the name of the queue
      * @param nowait set true will return nothing (as there will be no response from the server)
      */
-    void queuePurge(AmqpChannel channel, AMQShortString queue, boolean nowait);
+    CompletableFuture<Void> queuePurge(NamespaceName namespaceName, String queue, boolean nowait, long connectionId);
+
+    CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
+                                          long connectionId);
 }

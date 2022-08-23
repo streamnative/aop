@@ -40,14 +40,17 @@ public class AmqpEntryWriter implements AsyncCallbacks.AddEntryCallback {
 
     public CompletableFuture<Position> publishMessage(Message<byte[]> message) {
         CompletableFuture<Position> future = new CompletableFuture<>();
-        if (topic.getBrokerService().isBrokerEntryMetadataEnabled()) {
-            topic.getManagedLedger().asyncAddEntry(
-                    messageToByteBuf(message), 1, this,
-                    MessagePublishContext.get(System.nanoTime(), future));
-        } else {
-            topic.getManagedLedger().asyncAddEntry(
-                    messageToByteBuf(message), this,
-                    MessagePublishContext.get(System.nanoTime(), future));
+        ByteBuf data = messageToByteBuf(message);
+        try {
+            if (topic.getBrokerService().isBrokerEntryMetadataEnabled()) {
+                topic.getManagedLedger().asyncAddEntry(data, 1, this,
+                        MessagePublishContext.get(System.nanoTime(), future));
+            } else {
+                topic.getManagedLedger().asyncAddEntry(data, this,
+                        MessagePublishContext.get(System.nanoTime(), future));
+            }
+        } finally {
+            data.release();
         }
         return future;
     }

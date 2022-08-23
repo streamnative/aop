@@ -13,10 +13,13 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -41,6 +44,7 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.message.MessageDestination;
@@ -59,8 +63,12 @@ import org.apache.qpid.server.protocol.v0_8.transport.ChannelFlowOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.TxCommitOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.TxRollbackOkBody;
@@ -156,46 +164,194 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
                                        boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
-        this.exchangeService.exchangeDeclare(this, exchange, type, passive, durable, autoDelete, internal, nowait,
-                arguments);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
+                            + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
+                            + "nowait: {}, arguments: {} ]", channelId, exchange,
+                    type, passive, durable, autoDelete, internal, nowait, arguments);
+        }
+
+        this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(), type.toString(),
+                passive, durable, autoDelete, internal, arguments).thenAccept(__ -> {
+            if (!nowait) {
+                connection.writeFrame(
+                        connection.getMethodRegistry().createExchangeDeclareOkBody().generateFrame(channelId));
+            }
+        }).exceptionally(t -> {
+            log.error("Failed to declare exchange {} in vhost {}. type: {}, passive: {}, durable: {}, "
+                            + "autoDelete: {}, nowait: {}", type, passive, durable, autoDelete, nowait,
+                    exchange, connection.getNamespaceName(), t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
     public void receiveExchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
-        exchangeService.exchangeDelete(this, exchange, ifUnused, nowait);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeDelete[ exchange: {}, ifUnused: {}, nowait:{} ]", channelId, exchange, ifUnused,
+                    nowait);
+        }
+
+        exchangeService.exchangeDelete(connection.getNamespaceName(), exchange.toString(), ifUnused)
+                .thenAccept(__ -> {
+                    ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to delete exchange {} in vhost {}.",
+                            exchange, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
     }
 
     @Override
     public void receiveExchangeBound(AMQShortString exchange, AMQShortString routingKey, AMQShortString queueName) {
-        exchangeService.exchangeBound(this, exchange, routingKey, queueName);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeBound[ exchange: {}, routingKey: {}, queue:{} ]", channelId, exchange,
+                    routingKey, queueName);
+        }
+
+        exchangeService.exchangeBound(
+                connection.getNamespaceName(), exchange.toString(), routingKey.toString(), queueName.toString())
+                .thenAccept(replyCode -> {
+                    String replyText = null;
+                    switch (replyCode) {
+                        case ExchangeBoundOkBody.EXCHANGE_NOT_FOUND:
+                            replyText = "Exchange '" + exchange + "' not found in vhost "
+                                    + connection.getNamespaceName();
+                            break;
+                        case ExchangeBoundOkBody.QUEUE_NOT_FOUND:
+                            replyText = "Queue '" + queueName + "' not found in vhost " + connection.getNamespaceName();
+                            break;
+                        default:
+                            // do nothing
+                    }
+
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    ExchangeBoundOkBody exchangeBoundOkBody = methodRegistry
+                            .createExchangeBoundOkBody(replyCode, AMQShortString.validValueOf(replyText));
+                    connection.writeFrame(exchangeBoundOkBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to bound queue {} to exchange {} with routingKey {} in vhost {}",
+                            queueName, exchange, routingKey, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
     }
 
     @Override
     public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
                                     boolean autoDelete, boolean nowait, FieldTable arguments) {
-        queueService.queueDeclare(this, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueDeclare[ queue: {}, passive: {}, durable:{}, "
+                            + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
+                    channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
+        }
+        queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
+                autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
+            setDefaultQueue(amqpQueue);
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(
+                    AMQShortString.createAMQShortString(amqpQueue.getName()), 0, 0);
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to declare queue {} in vhost {}", queue, connection.getNamespaceName(), t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
     public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                  boolean nowait, FieldTable argumentsTable) {
-        queueService.queueBind(this, queue, exchange, bindingKey, nowait, argumentsTable);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
+                    channelId, queue, exchange, bindingKey, nowait, argumentsTable);
+        }
+        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
+                bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
+                connection.getConnectionId()).thenAccept(__ -> {
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
     public void receiveQueuePurge(AMQShortString queue, boolean nowait) {
-        queueService.queuePurge(this, queue, nowait);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueuePurge[ queue: {}, nowait:{} ]", channelId, queue, nowait);
+        }
+        queueService.queuePurge(connection.getNamespaceName(), queue.toString(), nowait, connection.getConnectionId())
+                .thenAccept(__ -> {
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    AMQMethodBody responseBody = methodRegistry.createQueuePurgeOkBody(0);
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                }).exceptionally(t -> {
+                    log.error("Failed to purge queue {} in vhost {}", queue, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
     }
 
     @Override
     public void receiveQueueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait) {
-        queueService.queueDelete(this, queue, ifUnused, ifEmpty, nowait);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
+                    ifUnused, ifEmpty, nowait);
+        }
+        queueService.queueDelete(connection.getNamespaceName(), getQueueName(queue), ifUnused,
+                        ifEmpty, connection.getConnectionId())
+                .thenAccept(__ -> {
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    QueueDeleteOkBody responseBody = methodRegistry.createQueueDeleteOkBody(0);
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to delete queue " + queue, t);
+                    handleAoPException(t);
+                    return null;
+                });
+    }
+
+    private String getQueueName(AMQShortString queue) {
+        String queueName;
+        if (queue == null || queue.length() == 0) {
+            if (getDefaultQueue() != null) {
+                queueName = getDefaultQueue().getName();
+            } else {
+                return null;
+            }
+        } else {
+            queueName = queue.toString();
+        }
+        return queueName;
     }
 
     @Override
     public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
                                    FieldTable arguments) {
-        queueService.queueUnbind(this, queue, exchange, bindingKey, arguments);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
+                    exchange, bindingKey, arguments);
+        }
+        queueService.queueUnbind(connection.getNamespaceName(), queue.toString(), exchange.toString(),
+                bindingKey.toString(), arguments, connection.getConnectionId()).thenAccept(__ -> {
+            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to unbind queue {} with exchange {} in vhost {}",
+                    queue, exchange, connection.getNamespaceName(), t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
@@ -226,11 +382,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     + " arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
         }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                queueService.getQueue(connection.getNamespaceName(), queue.toString(), false,
+                        connection.getConnectionId());
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Failed to get the queue from the queue container", throwable);
-                closeChannel(INTERNAL_ERROR, "Internal error: " + throwable.getMessage());
+                handleAoPException(throwable);
             } else {
                 if (amqpQueue == null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
@@ -270,7 +427,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
-                defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false);
+                defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
             AmqpConsumer consumer;
             try {
@@ -372,11 +529,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicGet(AMQShortString queue, boolean noAck) {
         String queueName = AMQShortString.toString(queue);
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                queueContainer.asyncGetQueue(connection.getNamespaceName(), queue.toString(), false);
+                queueService.getQueue(connection.getNamespaceName(), queue.toString(), false,
+                        connection.getConnectionId());
         amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Get Topic error:{}", throwable.getMessage());
-                closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable.getMessage());
+                handleAoPException(throwable);
             } else {
                 if (amqpQueue == null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + queueName);
@@ -390,7 +548,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         try {
                             if (subscription == null) {
                                 subscription = topic.createSubscription(defaultSubscription,
-                                        CommandSubscribe.InitialPosition.Earliest, false).get();
+                                        CommandSubscribe.InitialPosition.Earliest, false, null).get();
                             }
                             consumer = new AmqpPullConsumer(queueContainer, subscription,
                                     CommandSubscribe.SubType.Shared,
@@ -538,7 +696,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             boolean createIfMissing = false;
             String exchangeType = null;
             if (isDefaultExchange(AMQShortString.valueOf(exchangeName))
-                    || isBuildInExchange(AMQShortString.valueOf(exchangeName))) {
+                    || isBuildInExchange(exchangeName)) {
                 // Auto create default and buildIn exchanges if use.
                 createIfMissing = true;
                 exchangeType = getExchangeType(exchangeName);
@@ -737,16 +895,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return exchangeName == null || AMQShortString.EMPTY_STRING.equals(exchangeName);
     }
 
-    public boolean isBuildInExchange(final AMQShortString exchangeName) {
-        if (exchangeName.toString().equals(ExchangeDefaults.DIRECT_EXCHANGE_NAME)
-                || (exchangeName.toString().equals(ExchangeDefaults.FANOUT_EXCHANGE_NAME))
-                || (exchangeName.toString().equals(ExchangeDefaults.TOPIC_EXCHANGE_NAME))) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     public void closeChannel(int cause, final String message) {
         connection.closeChannelAndWriteFrame(this, cause, message);
     }
@@ -824,14 +972,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return defaultQueue;
     }
 
-    public void checkExclusiveQueue(AmqpQueue amqpQueue) {
-        if (amqpQueue != null && amqpQueue.isExclusive()
-            && (amqpQueue.getConnectionId() != connection.getConnectionId())) {
-            closeChannel(ErrorCodes.ALREADY_EXISTS,
-                "Exclusive queue can not be used form other connection, queueName: '" + amqpQueue.getName() + "'");
-        }
-    }
-
     @VisibleForTesting
     public Map<String, Consumer> getTag2ConsumersMap() {
         return tag2ConsumersMap;
@@ -868,20 +1008,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return creditManager;
     }
 
-    public String getExchangeType(String exchangeName) {
-        if (null == exchangeName) {
-            exchangeName = "";
+    private void handleAoPException(Throwable t) {
+        Throwable cause = FutureUtil.unwrapCompletionException(t);
+        if (!(cause instanceof AoPException)) {
+            connection.sendConnectionClose(INTERNAL_ERROR, t.getMessage(), channelId);
+            return;
         }
-        switch (exchangeName) {
-            case "":
-            case ExchangeDefaults.DIRECT_EXCHANGE_NAME:
-                return ExchangeDefaults.DIRECT_EXCHANGE_CLASS;
-            case ExchangeDefaults.FANOUT_EXCHANGE_NAME:
-                return ExchangeDefaults.FANOUT_EXCHANGE_CLASS;
-            case ExchangeDefaults.TOPIC_EXCHANGE_NAME:
-                return ExchangeDefaults.TOPIC_EXCHANGE_CLASS;
-            default:
-                return "";
+        AoPException exception = (AoPException) cause;
+        if (exception.isCloseChannel()) {
+            closeChannel(exception.getErrorCode(), exception.getMessage());
+        }
+        if (exception.isCloseConnection()) {
+            connection.sendConnectionClose(exception.getErrorCode(), exception.getMessage(), channelId);
         }
     }
+
 }

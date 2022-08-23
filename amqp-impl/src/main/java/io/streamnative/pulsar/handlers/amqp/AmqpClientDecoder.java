@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
@@ -141,7 +142,7 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
                     ConnectionRedirectBody.process(in, methodProcessor);
                     break;
                 case 0x000a0032:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
+                    if (Objects.equals(methodProcessor.getProtocolVersion(), ProtocolVersion.v0_8))
                     {
                         ConnectionRedirectBody.process(in, methodProcessor);
                     }
@@ -151,7 +152,7 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
                     }
                     break;
                 case 0x000a0033:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
+                    if (Objects.equals(methodProcessor.getProtocolVersion(), ProtocolVersion.v0_8))
                     {
                         throw newUnknownMethodException(classId, methodId,
                                                         methodProcessor.getProtocolVersion());
@@ -162,7 +163,7 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
                     }
                     break;
                 case 0x000a003c:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
+                    if (Objects.equals(methodProcessor.getProtocolVersion(), ProtocolVersion.v0_8))
                     {
                         ConnectionCloseBody.process(in, methodProcessor);
                     }
@@ -173,7 +174,7 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
                     }
                     break;
                 case 0x000a003d:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
+                    if (Objects.equals(methodProcessor.getProtocolVersion(), ProtocolVersion.v0_8))
                     {
                         methodProcessor.receiveConnectionCloseOk();
                     }

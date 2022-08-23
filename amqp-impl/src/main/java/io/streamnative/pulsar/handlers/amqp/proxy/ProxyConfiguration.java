@@ -78,4 +78,11 @@ public class ProxyConfiguration {
             doc = "The timeout for broker lookups (in seconds)"
     )
     private int brokerLookupTimeoutSeconds = 30;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_PROXY,
+            required = false
+    )
+    private int amqpExplicitFlushAfterFlushes = 1000;
+
 }

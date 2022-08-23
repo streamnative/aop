@@ -105,4 +105,11 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpAdminPort = 15673;
 
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false
+    )
+    private int amqpExplicitFlushAfterFlushes = 1000;
+
 }

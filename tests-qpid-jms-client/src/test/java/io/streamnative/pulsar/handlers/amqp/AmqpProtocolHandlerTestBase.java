@@ -261,6 +261,7 @@ public abstract class AmqpProtocolHandlerTestBase {
             ((AmqpServiceConfiguration) conf).setAmqpProxyEnable(true);
             conf.setWebServicePort(Optional.of(brokerWebServicePort));
             conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
+            conf.setBrokerShutdownTimeoutMs(0L);
 
             log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, aopProxyPort: {}",
                     i, brokerPort, amqpBrokerPort, aopProxyPort);

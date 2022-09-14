@@ -119,6 +119,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setBrokerDeleteInactiveTopicsEnabled(false);
         amqpConfig.setBrokerEntryMetadataInterceptors(
                 Sets.newHashSet("org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor"));
+        amqpConfig.setBrokerShutdownTimeoutMs(0L);
 
         // set protocol related config
         URL testHandlerUrl = this.getClass().getClassLoader().getResource("test-protocol-handler.nar");
@@ -256,6 +257,7 @@ public abstract class AmqpProtocolHandlerTestBase {
             ((AmqpServiceConfiguration) conf).setAmqpProxyEnable(true);
             conf.setWebServicePort(Optional.of(brokerWebServicePort));
             conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
+            conf.setBrokerShutdownTimeoutMs(0L);
 
             log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, aopProxyPort: {}",
                     i, brokerPort, amqpBrokerPort, aopProxyPort);

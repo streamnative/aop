@@ -393,6 +393,10 @@
       <id>ossrh</id>
       <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-1626/content</url>
     </repository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-1626/content</url>
+    </repository>
   </repositories>
   <distributionManagement>
     <snapshotRepository>

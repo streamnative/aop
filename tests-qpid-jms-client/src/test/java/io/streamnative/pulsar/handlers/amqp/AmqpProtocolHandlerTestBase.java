@@ -212,7 +212,6 @@ public abstract class AmqpProtocolHandlerTestBase {
 
     protected void stopBroker() throws Exception {
         for (PulsarService pulsarService : pulsarServiceList) {
-            pulsarService.getLoadManagerExecutor().shutdownNow();
             pulsarService.close();
         }
         brokerPortList.clear();

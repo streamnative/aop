@@ -43,6 +43,7 @@ import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -435,7 +436,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                         ? CommandSubscribe.SubType.Exclusive :
                         CommandSubscribe.SubType.Shared, topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
                         consumerTag, true, connection.getServerCnx(), "", null,
-                        false, CommandSubscribe.InitialPosition.Latest,
+                        false, MessageId.latest,
                         null, this, consumerTag, queueName, ack);
             } catch (BrokerServiceException e) {
                 exceptionFuture.completeExceptionally(e);
@@ -554,7 +555,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                     CommandSubscribe.SubType.Shared,
                                     topic.getName(), 0, 0, "", true,
                                     connection.getServerCnx(), "", null, false,
-                                    CommandSubscribe.InitialPosition.Latest, null, this,
+                                    MessageId.latest, null, this,
                                     "", queueName, noAck);
                             subscription.addConsumer(consumer);
                             consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);

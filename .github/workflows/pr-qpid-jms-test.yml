@@ -43,8 +43,8 @@ jobs:
     - name: Style check
       run: mvn checkstyle:check
 
-    - name: Spotbugs check
-      run: mvn spotbugs:check
+#    - name: Spotbugs check
+#      run: mvn spotbugs:check
 
     - name: test jms_1_1
       run: mvn test -DfailIfNoTests=false -pl tests-qpid-jms-client

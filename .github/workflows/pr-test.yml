@@ -43,8 +43,8 @@ jobs:
     - name: Style check
       run: mvn checkstyle:check
 
-    - name: Spotbugs check
-      run: mvn spotbugs:check
+#    - name: Spotbugs check
+#      run: mvn spotbugs:check
 
     - name: amqp-impl tests
       run: mvn test -DfailIfNoTests=false -pl amqp-impl

@@ -136,9 +136,11 @@ If you want to make contributions to AMQP on Pulsar, follow the following steps.
 
 1. Install system dependency.
 
+From version 2.11.0, the AoP need JDK 17.
+
 Dependency | Installation guide 
 |---|---
-Java 8 | https://openjdk.java.net/install/
+Java 17 | https://openjdk.java.net/install/
 Maven | https://maven.apache.org/
 
 2. Clone code to your machine. 

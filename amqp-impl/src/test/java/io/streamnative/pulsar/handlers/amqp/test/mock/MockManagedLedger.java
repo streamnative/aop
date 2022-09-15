@@ -365,4 +365,9 @@ public class MockManagedLedger implements ManagedLedger {
         // nothing to do
     }
 
+    @Override
+    public void checkCursorsToCacheEntries() {
+        // nothing to do
+    }
+
 }

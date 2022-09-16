@@ -65,7 +65,7 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                         "Unable to resolve the broker for the topic: " + topicName));
                 return;
             }
-            String hostAndPort = result.getLeft().toString();
+            String hostAndPort = result.getLeft().getHostName() + ":" + result.getLeft().getPort();
 
             // fetch the protocol handler data
             List<LoadManagerReport> brokers = metadataStoreCacheLoader.getAvailableBrokers();
@@ -90,13 +90,15 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                 amqpBrokerAddress = AmqpProtocolHandler.PLAINTEXT_PREFIX + amqpBrokerAddress;
             }
             URI amqpBrokerUri;
+            URI webServiceUri;
             try {
                 amqpBrokerUri = new URI(amqpBrokerAddress);
+                webServiceUri = new URI(serviceLookupData.get().getWebServiceUrl());
             } catch (URISyntaxException e) {
                 lookupResult.completeExceptionally(e);
                 return;
             }
-            lookupResult.complete(Pair.of(amqpBrokerUri.getHost(), amqpBrokerUri.getPort()));
+            lookupResult.complete(Pair.of(webServiceUri.getHost(), amqpBrokerUri.getPort()));
         });
 
         return lookupResult;

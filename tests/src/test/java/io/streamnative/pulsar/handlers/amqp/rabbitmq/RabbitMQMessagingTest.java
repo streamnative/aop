@@ -107,10 +107,10 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
                     Envelope envelope,
                     AMQP.BasicProperties properties,
                     byte[] body) throws IOException {
-                    waitForAtLeastOneDelivery.release();
                     long deliveryTag = envelope.getDeliveryTag();
-                    atomicInteger.incrementAndGet();
                     channel.basicNack(deliveryTag, false, true);
+                    waitForAtLeastOneDelivery.release();
+                    atomicInteger.incrementAndGet();
                 }
 
                 @Override

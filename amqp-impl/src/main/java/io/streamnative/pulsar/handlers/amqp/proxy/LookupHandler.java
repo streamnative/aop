@@ -31,6 +31,6 @@ public interface LookupHandler extends Closeable {
      * @return Pair consist of brokerHost and brokerPort
      */
     CompletableFuture<Pair<String, Integer>> findBroker(TopicName topicName,
-                                                        String protocolHandlerName) throws Exception;
+                                                        String protocolHandlerName);
 
 }

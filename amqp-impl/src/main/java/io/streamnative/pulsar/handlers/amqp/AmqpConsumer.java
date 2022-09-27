@@ -31,7 +31,6 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
-import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.EntryBatchIndexesAcks;
 import org.apache.pulsar.broker.service.EntryBatchSizes;
@@ -81,7 +80,7 @@ public class AmqpConsumer extends Consumer {
         int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
         String appId, Map<String, String> metadata, boolean readCompacted, MessageId messageId,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) throws BrokerServiceException {
+        boolean autoAck) {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
             cnx, appId, metadata, readCompacted, keySharedMeta, messageId, Commands.DEFAULT_CONSUMER_EPOCH);
         this.channel = channel;

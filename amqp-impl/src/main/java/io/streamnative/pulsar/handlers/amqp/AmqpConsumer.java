@@ -31,7 +31,6 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
-import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.EntryBatchIndexesAcks;
 import org.apache.pulsar.broker.service.EntryBatchSizes;
@@ -39,6 +38,7 @@ import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
@@ -78,13 +78,11 @@ public class AmqpConsumer extends Consumer {
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
-        String appId, Map<String, String> metadata, boolean readCompacted,
-        CommandSubscribe.InitialPosition subscriptionInitialPosition,
+        String appId, Map<String, String> metadata, boolean readCompacted, MessageId messageId,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) throws BrokerServiceException {
+        boolean autoAck) {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
-            cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, null,
-                Commands.DEFAULT_CONSUMER_EPOCH);
+            cnx, appId, metadata, readCompacted, keySharedMeta, messageId, Commands.DEFAULT_CONSUMER_EPOCH);
         this.channel = channel;
         this.queueContainer = queueContainer;
         this.autoAck = autoAck;
@@ -94,7 +92,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     @Override
-    public Future<Void> sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
+    public Future<Void> sendMessages(final List<? extends Entry> entries, EntryBatchSizes batchSizes,
                                      EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes,
                                      long totalChunkedMessages, RedeliveryTracker redeliveryTracker) {
         return sendMessages(entries, batchSizes, batchIndexesAcks, totalMessages, totalBytes,
@@ -102,7 +100,7 @@ public class AmqpConsumer extends Consumer {
     }
 
     @Override
-    public Future<Void> sendMessages(List<Entry> entries, EntryBatchSizes batchSizes,
+    public Future<Void> sendMessages(final List<? extends Entry> entries, EntryBatchSizes batchSizes,
            EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
            RedeliveryTracker redeliveryTracker, long epoch) {
         ChannelPromise writePromise = this.channel.getConnection().getCtx().newPromise();

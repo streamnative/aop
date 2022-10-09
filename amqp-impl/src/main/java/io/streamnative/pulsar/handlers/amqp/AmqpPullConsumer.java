@@ -15,9 +15,9 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
 
@@ -30,12 +30,11 @@ public class AmqpPullConsumer extends AmqpConsumer {
     public AmqpPullConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
         String consumerName, boolean isDurable, ServerCnx cnx, String appId,
-        Map<String, String> metadata, boolean readCompacted,
-        CommandSubscribe.InitialPosition subscriptionInitialPosition,
+        Map<String, String> metadata, boolean readCompacted, MessageId messageId,
         KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) throws BrokerServiceException {
+        boolean autoAck) {
         super(queueContainer, subscription, subType, topicName, consumerId, priorityLevel, consumerName,
-                isDurable, cnx, appId, metadata, readCompacted, subscriptionInitialPosition, keySharedMeta, channel,
+                isDurable, cnx, appId, metadata, readCompacted, messageId, keySharedMeta, channel,
             consumerTag, queueName, autoAck);
     }
 

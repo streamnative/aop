@@ -91,7 +91,7 @@ public class AoPBrokerAdmin extends AmqpProtocolHandlerTestBase implements Broke
             setup();
         } catch (Exception e) {
             log.error("[beforeTestClass] setup error", e);
-            throw new RuntimeException(e);
+            throw new QpidJMSTestException(e);
         }
     }
 
@@ -112,7 +112,7 @@ public class AoPBrokerAdmin extends AmqpProtocolHandlerTestBase implements Broke
             this.cleanup();
         } catch (Exception e) {
             log.error("[afterTestClass] cleanup error.", e);
-            throw new RuntimeException(e);
+            throw new QpidJMSTestException(e);
         }
     }
 

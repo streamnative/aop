@@ -57,7 +57,7 @@ jobs:
       run: |
         rm -rf artifacts
         mkdir artifacts
-        find . -type d -name "*surefire*" -exec cp --parents -R {} artifacts/ \;
+        find . -type d -name "*surefire-reports*" -exec cp --parents -R {} artifacts/ \;
         zip -r artifacts.zip artifacts
 
     - uses: actions/upload-artifact@master

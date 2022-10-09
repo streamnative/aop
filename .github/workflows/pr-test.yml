@@ -54,15 +54,22 @@ jobs:
 
     - name: package surefire artifacts
       if: failure()
-      run: |
-        rm -rf artifacts
-        mkdir artifacts
-        find . -type d -name "*surefire-reports*" -exec cp --parents -R {} artifacts/ \;
-        zip -r artifacts.zip artifacts
-
-    - uses: actions/upload-artifact@master
-      name: upload surefire-artifacts
-      if: failure()
+      uses: actions/upload-artifact@v3
       with:
-        name: surefire-artifacts
-        path: artifacts.zip
+        name: my-artifact
+        path: tests/target/surefire-reports/ # or path/to/artifact
+
+#    - name: package surefire artifacts
+#      if: failure()
+#      run: |
+#        rm -rf artifacts
+#        mkdir artifacts
+#        find . -type d -name "*surefire-reports*" -exec cp --parents -R {} artifacts/ \;
+#        zip -r artifacts.zip artifacts
+#
+#    - uses: actions/upload-artifact@master
+#      name: upload surefire-artifacts
+#      if: failure()
+#      with:
+#        name: surefire-artifacts
+#        path: artifacts.zip

@@ -37,23 +37,18 @@ import org.apache.pulsar.common.util.netty.EventLoopUtil;
 public class ProxyService implements Closeable {
 
     @Getter
-    private ProxyConfiguration proxyConfig;
+    private final ProxyConfiguration proxyConfig;
     @Getter
-    private PulsarService pulsarService;
+    private final PulsarService pulsarService;
     @Getter
     private LookupHandler lookupHandler;
 
     private Channel listenChannel;
-    private EventLoopGroup acceptorGroup;
+    private final EventLoopGroup acceptorGroup;
     @Getter
-    private EventLoopGroup workerGroup;
+    private final EventLoopGroup workerGroup;
 
-    private DefaultThreadFactory acceptorThreadFactory = new DefaultThreadFactory("amqp-redirect-acceptor");
-    private DefaultThreadFactory workerThreadFactory = new DefaultThreadFactory("amqp-redirect-io");
-    private static final int numThreads = Runtime.getRuntime().availableProcessors();
-
-    @Getter
-    private static final Map<String, Set<ProxyConnection>> vhostConnectionMap = Maps.newConcurrentMap();
+    private static final int NUM_THREADS = Runtime.getRuntime().availableProcessors();
 
     private String tenant;
 
@@ -63,8 +58,10 @@ public class ProxyService implements Closeable {
         this.proxyConfig = proxyConfig;
         this.pulsarService = pulsarService;
         this.tenant = this.proxyConfig.getAmqpTenant();
-        acceptorGroup = EventLoopUtil.newEventLoopGroup(1, false, acceptorThreadFactory);
-        workerGroup = EventLoopUtil.newEventLoopGroup(numThreads, false, workerThreadFactory);
+        this.acceptorGroup = EventLoopUtil.newEventLoopGroup(1, false,
+                new DefaultThreadFactory("amqp-redirect-acceptor"));
+        this.workerGroup = EventLoopUtil.newEventLoopGroup(NUM_THREADS, false,
+                new DefaultThreadFactory("amqp-redirect-io"));
     }
 
     private void configValid(ProxyConfiguration proxyConfig) {
@@ -87,16 +84,6 @@ public class ProxyService implements Closeable {
         }
 
         this.lookupHandler = new PulsarServiceLookupHandler(proxyConfig, pulsarService);
-    }
-
-    private void releaseConnection(String namespaceName) {
-        log.info("release connection");
-        if (vhostConnectionMap.containsKey(namespaceName)) {
-            Set<ProxyConnection> proxyConnectionSet = vhostConnectionMap.get(namespaceName);
-            for (ProxyConnection proxyConnection : proxyConnectionSet) {
-                proxyConnection.close();
-            }
-        }
     }
 
     @Override

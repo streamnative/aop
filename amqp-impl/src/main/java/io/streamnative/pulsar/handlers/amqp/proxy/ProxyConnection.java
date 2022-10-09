@@ -232,17 +232,6 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             }
         }
         vhost = virtualHostStr;
-
-        proxyService.getVhostConnectionMap().compute(vhost, (v, set) -> {
-            if (set == null) {
-                Set<ProxyConnection> proxyConnectionSet =  Sets.newConcurrentHashSet();
-                proxyConnectionSet.add(this);
-                return proxyConnectionSet;
-            } else {
-                set.add(this);
-                return set;
-            }
-        });
         handleConnect(new AtomicInteger(5));
     }
 

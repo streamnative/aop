@@ -61,6 +61,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String QUEUE = "QUEUE";
     public static final String ROUTERS = "ROUTERS";
     public static final String TOPIC_PREFIX = "__amqp_queue__";
+    public static final String DEFAULT_SUBSCRIPTION = "defaultSubscription";
 
     @Getter
     private PersistentTopic indexTopic;
@@ -69,19 +70,21 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private AmqpEntryWriter amqpEntryWriter;
 
-    private PositionImpl lastLac;
-    private final Map<String, Position> exchangeLastMarkDeletePos = new ConcurrentHashMap<>();
+    private final long exchangeClearTaskInterval;
+    private PositionImpl checkpointLac;
+    private final Map<String, Position> checkpointExchangeRoutePos = new ConcurrentHashMap<>();
 
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
-                           boolean exclusive, boolean autoDelete) {
+                           boolean exclusive, boolean autoDelete,
+                           long exchangeClearTaskInterval) {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.indexTopic = indexTopic;
         topicNameValidate();
         this.jsonMapper = new ObjectMapper();
         this.amqpEntryWriter = new AmqpEntryWriter(indexTopic);
-        this.indexTopic.getBrokerService().getPulsar().getExecutor()
-                .schedule(this::exchangeClear, 5, TimeUnit.SECONDS);
+        this.exchangeClearTaskInterval = exchangeClearTaskInterval;
+        scheduleExchangeClearTask();
     }
 
     @Override
@@ -198,8 +201,13 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 TOPIC_PREFIX, "exchangeName");
     }
 
-    private synchronized void exchangeClear() {
-        this.lastLac = null;
+    private void scheduleExchangeClearTask() {
+        this.indexTopic.getBrokerService().getPulsar().getExecutor()
+                .schedule(this::exchangeClearCheckpointTask, exchangeClearTaskInterval, TimeUnit.MILLISECONDS);
+    }
+
+    private synchronized void exchangeClearCheckpointTask() {
+        this.checkpointLac = null;
         Collection<CompletableFuture<Void>> futures = new ArrayList<>();
         for (AmqpMessageRouter router : routers.values()) {
             CompletableFuture<Void> future = new CompletableFuture<>();
@@ -208,40 +216,44 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 @Override
                 public void openCursorComplete(ManagedCursor cursor, Object ctx) {
                     PositionImpl pos = (PositionImpl) cursor.getMarkDeletedPosition();
-                    exchangeLastMarkDeletePos.put(router.getExchange().getName(), pos);
+                    checkpointExchangeRoutePos.put(router.getExchange().getName(), pos);
                     future.complete(null);
                 }
 
                 @Override
                 public void openCursorFailed(ManagedLedgerException exception, Object ctx) {
+                    log.warn("Failed to get exchange route position for queue {}.", queueName, exception);
                     future.completeExceptionally(exception);
                 }
             }, null);
             futures.add(future);
         }
-        FutureUtil.waitForAll(futures).thenAccept(__ -> {
-            this.lastLac = (PositionImpl) indexTopic.getLastPosition();
-            exchangeDelete();
+        FutureUtil.waitForAll(futures).whenComplete((__, t) -> {
+            if (t != null) {
+                scheduleExchangeClearTask();
+                return;
+            }
+            this.checkpointLac = (PositionImpl) indexTopic.getLastPosition();
+            exchangeCleanup();
         });
     }
 
-    private void exchangeDelete() {
-        PositionImpl indexMarkDeletePos = (PositionImpl) indexTopic.getManagedLedger()
-                .getSlowestConsumer().getMarkDeletedPosition();
+    private void exchangeCleanup() {
+        PositionImpl indexMarkDeletePos = (PositionImpl) indexTopic.getSubscription(DEFAULT_SUBSCRIPTION)
+                .getCursor().getMarkDeletedPosition();
         Collection<CompletableFuture<Void>> futures = new ArrayList<>();
-        if (indexMarkDeletePos.compareTo(this.lastLac) >= 0) {
+        if (indexMarkDeletePos.compareTo(this.checkpointLac) >= 0) {
             for (AmqpMessageRouter router : routers.values()) {
-                Position position = exchangeLastMarkDeletePos.get(router.getExchange().getName());
+                Position position = checkpointExchangeRoutePos.get(router.getExchange().getName());
                 if (position != null) {
                     futures.add(router.getExchange().markDeleteAsync(
                             queueName, position.getLedgerId(), position.getEntryId()));
                 }
             }
-            FutureUtil.waitForAll(futures).thenRun(() -> {
-                this.indexTopic.getBrokerService().getPulsar().getExecutor().schedule(this::exchangeClear, 5, TimeUnit.SECONDS);
-            });
+            FutureUtil.waitForAll(futures).thenRun(this::scheduleExchangeClearTask);
         } else {
-            this.indexTopic.getBrokerService().getPulsar().getExecutor().schedule(this::exchangeDelete, 5, TimeUnit.SECONDS);
+            this.indexTopic.getBrokerService().getPulsar().getExecutor().schedule(
+                    this::exchangeCleanup, exchangeClearTaskInterval, TimeUnit.MILLISECONDS);
         }
     }
 

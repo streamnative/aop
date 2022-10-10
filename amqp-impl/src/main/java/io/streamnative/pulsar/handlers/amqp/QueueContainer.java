@@ -36,12 +36,15 @@ public class QueueContainer {
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
     private ExchangeContainer exchangeContainer;
+    @Getter
+    private final AmqpServiceConfiguration serviceConfig;
 
     protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                             ExchangeContainer exchangeContainer) {
+                             ExchangeContainer exchangeContainer, AmqpServiceConfiguration serviceConfig) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.exchangeContainer = exchangeContainer;
+        this.serviceConfig = serviceConfig;
     }
 
     @Getter
@@ -96,7 +99,8 @@ public class QueueContainer {
 
                         // TODO: reset connectionId, exclusive and autoDelete
                         PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
-                                0, false, false);
+                                0, false, false,
+                                serviceConfig.getAmqpExchangeClearTaskInterval());
                         try {
                             amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
                                     namespaceName);

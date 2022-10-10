@@ -25,7 +25,6 @@
     <version>2.11.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>io.streamnative.pulsar.handlers</groupId>
   <artifactId>pulsar-protocol-handler-amqp-tests</artifactId>
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Tests</name>
   <description>Tests for AMQP on Pulsar</description>
@@ -105,6 +104,11 @@
       <artifactId>amqp-client-auth</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
     </dependency>
 
   </dependencies>

@@ -21,9 +21,12 @@ import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
+import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.mockito.Mockito;
@@ -69,15 +72,22 @@ public class TopicNameTest {
 
     @Test
     public void queueTopicNameValidate() {
+        BrokerService brokerService = Mockito.mock(BrokerService.class);
+        PulsarService pulsarService = Mockito.mock(PulsarService.class);
+        ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+        Mockito.when(pulsarService.getExecutor()).thenReturn(executorService);
+        Mockito.when(brokerService.getPulsar()).thenReturn(pulsarService);
+
         String queueName = "ex-test";
         ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
 
         PersistentTopic queueTopic1 = Mockito.mock(PersistentTopic.class);
         Mockito.when(queueTopic1.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + queueName);
         Mockito.when(queueTopic1.getManagedLedger()).thenReturn(managedLedger);
+        Mockito.when(queueTopic1.getBrokerService()).thenReturn(brokerService);
         try {
             new PersistentQueue(
-                    queueName, queueTopic1, 0, false, false);
+                    queueName, queueTopic1, 0, false, false, 5000);
         } catch (IllegalArgumentException e) {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
@@ -85,9 +95,10 @@ public class TopicNameTest {
         PersistentTopic queueTopic2 = Mockito.mock(PersistentTopic.class);
         Mockito.when(queueTopic2.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + "_" + queueName);
         Mockito.when(queueTopic2.getManagedLedger()).thenReturn(managedLedger);
+        Mockito.when(queueTopic2.getBrokerService()).thenReturn(brokerService);
         try {
             new PersistentQueue(
-                    queueName, queueTopic2, 0, false, false);
+                    queueName, queueTopic2, 0, false, false, 5000);
         } catch (IllegalArgumentException e) {
             assertNotNull(e);
             log.info("This is expected behavior.");

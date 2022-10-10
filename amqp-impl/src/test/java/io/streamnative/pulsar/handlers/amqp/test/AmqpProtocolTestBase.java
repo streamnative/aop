@@ -34,6 +34,7 @@ import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
@@ -99,7 +100,7 @@ public abstract class AmqpProtocolTestBase {
         mockPulsarService();
         mockBrokerService();
         ConnectionContainer connectionContainer = mock(ConnectionContainer.class);
-        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer, new AmqpServiceConfiguration());
         amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.
@@ -150,6 +151,7 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(pulsarService.getConfiguration()).thenReturn(serviceConfiguration);
         Mockito.when(pulsarService.getOrderedExecutor()).thenReturn(
                 OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
+        Mockito.when(pulsarService.getExecutor()).thenReturn(Executors.newScheduledThreadPool(1));
         Mockito.when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());
 
         NamespaceResources namespaceResources = mock(NamespaceResources.class);

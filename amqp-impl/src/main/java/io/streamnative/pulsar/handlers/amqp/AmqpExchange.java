@@ -131,7 +131,7 @@ public interface AmqpExchange {
      * Add a queue {@link AmqpQueue} to the exchange.
      * @param queue AMQP queue.
      */
-    void addQueue(AmqpQueue queue);
+    CompletableFuture<Void> addQueue(AmqpQueue queue);
 
     /**
      * Remove a queue {@link AmqpQueue} from the exchange.

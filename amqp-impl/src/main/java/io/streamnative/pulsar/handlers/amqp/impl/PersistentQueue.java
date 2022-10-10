@@ -212,7 +212,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
         for (AmqpMessageRouter router : routers.values()) {
             CompletableFuture<Void> future = new CompletableFuture<>();
             ((PersistentTopic) router.getExchange().getTopic()).getManagedLedger()
-                    .asyncOpenCursor("__amqp_replicator__" + router.getExchange().getName(), new AsyncCallbacks.OpenCursorCallback() {
+                    .asyncOpenCursor("__amqp_replicator__" + router.getExchange().getName(),
+                            new AsyncCallbacks.OpenCursorCallback() {
                 @Override
                 public void openCursorComplete(ManagedCursor cursor, Object ctx) {
                     PositionImpl pos = (PositionImpl) cursor.getMarkDeletedPosition();

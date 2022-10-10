@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
@@ -29,7 +30,6 @@ import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
-import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 /**
@@ -42,15 +42,15 @@ public class TopicNameTest {
     public void exchangeTopicNameValidate() {
         String exchangeName = "ex-test";
         AbstractAmqpExchange.Type exchangeType = AbstractAmqpExchange.Type.Direct;
-        ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
+        ManagedLedgerImpl managedLedger = mock(ManagedLedgerImpl.class);
 
-        BrokerService brokerService = Mockito.mock(BrokerService.class);
-        Mockito.when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
-        PersistentTopic exchangeTopic1 = Mockito.mock(PersistentTopic.class);
-        Mockito.when(exchangeTopic1.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + exchangeName);
-        Mockito.when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);
-        Mockito.when(exchangeTopic1.getBrokerService()).thenReturn(brokerService);
-        Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
+        BrokerService brokerService = mock(BrokerService.class);
+        when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
+        PersistentTopic exchangeTopic1 = mock(PersistentTopic.class);
+        when(exchangeTopic1.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + exchangeName);
+        when(exchangeTopic1.getManagedLedger()).thenReturn(managedLedger);
+        when(exchangeTopic1.getBrokerService()).thenReturn(brokerService);
+        when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic1, false);
@@ -58,9 +58,9 @@ public class TopicNameTest {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
 
-        PersistentTopic exchangeTopic2 = Mockito.mock(PersistentTopic.class);
-        Mockito.when(exchangeTopic2.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + "_" + exchangeName);
-        Mockito.when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
+        PersistentTopic exchangeTopic2 = mock(PersistentTopic.class);
+        when(exchangeTopic2.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + "_" + exchangeName);
+        when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic2, false);
@@ -72,19 +72,19 @@ public class TopicNameTest {
 
     @Test
     public void queueTopicNameValidate() {
-        BrokerService brokerService = Mockito.mock(BrokerService.class);
-        PulsarService pulsarService = Mockito.mock(PulsarService.class);
+        BrokerService brokerService = mock(BrokerService.class);
+        PulsarService pulsarService = mock(PulsarService.class);
         ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
-        Mockito.when(pulsarService.getExecutor()).thenReturn(executorService);
-        Mockito.when(brokerService.getPulsar()).thenReturn(pulsarService);
+        when(pulsarService.getExecutor()).thenReturn(executorService);
+        when(brokerService.getPulsar()).thenReturn(pulsarService);
 
         String queueName = "ex-test";
-        ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
+        ManagedLedgerImpl managedLedger = mock(ManagedLedgerImpl.class);
 
-        PersistentTopic queueTopic1 = Mockito.mock(PersistentTopic.class);
-        Mockito.when(queueTopic1.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + queueName);
-        Mockito.when(queueTopic1.getManagedLedger()).thenReturn(managedLedger);
-        Mockito.when(queueTopic1.getBrokerService()).thenReturn(brokerService);
+        PersistentTopic queueTopic1 = mock(PersistentTopic.class);
+        when(queueTopic1.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + queueName);
+        when(queueTopic1.getManagedLedger()).thenReturn(managedLedger);
+        when(queueTopic1.getBrokerService()).thenReturn(brokerService);
         try {
             new PersistentQueue(
                     queueName, queueTopic1, 0, false, false, 5000);
@@ -92,10 +92,10 @@ public class TopicNameTest {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
 
-        PersistentTopic queueTopic2 = Mockito.mock(PersistentTopic.class);
-        Mockito.when(queueTopic2.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + "_" + queueName);
-        Mockito.when(queueTopic2.getManagedLedger()).thenReturn(managedLedger);
-        Mockito.when(queueTopic2.getBrokerService()).thenReturn(brokerService);
+        PersistentTopic queueTopic2 = mock(PersistentTopic.class);
+        when(queueTopic2.getName()).thenReturn(PersistentQueue.TOPIC_PREFIX + "_" + queueName);
+        when(queueTopic2.getManagedLedger()).thenReturn(managedLedger);
+        when(queueTopic2.getBrokerService()).thenReturn(brokerService);
         try {
             new PersistentQueue(
                     queueName, queueTopic2, 0, false, false, 5000);

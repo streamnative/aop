@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -333,29 +332,50 @@ public class AdminTest extends AmqpTestBase{
     }
 
     @Test
-    public void exchangePropertiesTest() throws IOException, TimeoutException {
+    public void exchangePropertiesTest() throws Exception {
         Connection connection = getConnection("vhost1", false);
         Channel channel = connection.createChannel();
 
+        String ex1 = "ex1";
         Map<String, Object> properties = new HashMap<>();
         properties.put("testNum", 10);
         properties.put("testDecimal", 10.1);
         properties.put("testString", "hello");
-        channel.exchangeDeclare("exchange", "direct", false, false, properties);
+        properties.put("testBoolean", true);
+        channel.exchangeDeclare(ex1, "direct", true, true, properties);
 
-        ExchangeBean bean = exchangeByName("vhost1", "exchange");
+        ExchangeBean bean = exchangeByName("vhost1", ex1);
         Map<String, Object> arguments = bean.getArguments();
         assertNotNull(arguments);
         properties.forEach((k, v) -> {
             assertEquals(arguments.get(k), v);
         });
 
-        exchangeDeclare("vhost1", "exchage2", "direct", properties);
-        ExchangeBean bean2 = exchangeByName("vhost1", "exchange");
-        Map<String, Object> arguments2 = bean2.getArguments();
+        restartBroker();
+
+        Map<String, Object> properties2 = new HashMap<>();
+        properties2.put("testNum2", 20);
+        properties2.put("testString2", "string2");
+        // The new properties should be ignored, the properties only created when first declare the exchange.
+        exchangeDeclare("vhost1", ex1, "direct", properties2);
+        bean = exchangeByName("vhost1", ex1);
+        Map<String, Object> arguments2 = bean.getArguments();
         assertNotNull(arguments2);
         properties.forEach((k, v) -> {
             assertEquals(arguments2.get(k), v);
+        });
+
+        String ex3 = "ex3";
+        Map<String, Object> properties3 = new HashMap<>();
+        properties3.put("testNum3", 30);
+        properties3.put("testString3", "string3");
+        // The new properties should be ignored, the properties only created when first declare the exchange.
+        exchangeDeclare("vhost1", ex3, "direct", properties3);
+        bean = exchangeByName("vhost1", ex3);
+        Map<String, Object> arguments3 = bean.getArguments();
+        assertNotNull(arguments3);
+        properties3.forEach((k, v) -> {
+            assertEquals(arguments3.get(k), v);
         });
     }
 }

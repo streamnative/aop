@@ -13,11 +13,25 @@
  */
 package io.streamnative.pulsar.handlers.amqp.utils;
 
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.ARGUMENTS;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.AUTO_DELETE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURABLE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.EXCHANGE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.QUEUES;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.streamnative.pulsar.handlers.amqp.common.exception.ExchangeParameterException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
@@ -71,6 +85,9 @@ public class ExchangeUtil {
     }
 
     public static Map<String, Object> covertStringValueAsObjectMap(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
         try {
             return JSON_MAPPER.readValue(value, new TypeReference<Map<String, Object>>() {
             });
@@ -79,4 +96,33 @@ public class ExchangeUtil {
             throw new RuntimeException(e);
         }
     }
+
+    public static Map<String, String> generateTopicProperties(String exchangeName,
+                                                              String exchangeType,
+                                                              boolean durable,
+                                                              boolean autoDelete,
+                                                              boolean internal,
+                                                              Map<String, Object> arguments,
+                                                              List<String> queues) throws JsonProcessingException {
+        if (StringUtils.isEmpty(exchangeName)) {
+            throw new ExchangeParameterException("Miss parameter exchange name.");
+        }
+        if (StringUtils.isEmpty(exchangeType)) {
+            throw new ExchangeParameterException("Miss parameter exchange type.");
+        }
+        Map<String, String> props = new HashMap<>();
+        props.put(EXCHANGE, exchangeName);
+        props.put(TYPE, exchangeType);
+        props.put(DURABLE, "" + durable);
+        props.put(AUTO_DELETE, "" + autoDelete);
+        props.put(INTERNAL, "" + internal);
+        if (arguments != null && !arguments.isEmpty()) {
+            props.put(ARGUMENTS, covertObjectValueAsString(arguments));
+        }
+        if (!CollectionUtils.isEmpty(queues)) {
+            props.put(QUEUES, JSON_MAPPER.writeValueAsString(queues));
+        }
+        return props;
+    }
+
 }

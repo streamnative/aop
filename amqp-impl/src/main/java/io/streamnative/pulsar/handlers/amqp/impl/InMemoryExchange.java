@@ -47,13 +47,13 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     private Map<String, Object> properties;
 
     public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType, boolean autoDelete) {
-        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete);
+        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete, false, null);
         this.currentLedgerId = 1L;
     }
 
     public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType, boolean autoDelete,
                             Map<String, Object> properties) {
-        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete);
+        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete, false, null);
         this.currentLedgerId = 1L;
         this.properties = properties;
     }
@@ -157,8 +157,4 @@ public class InMemoryExchange extends AbstractAmqpExchange {
         return null;
     }
 
-    @Override
-    public Map<String, Object> getCustomProperties() {
-        return this.properties;
-    }
 }

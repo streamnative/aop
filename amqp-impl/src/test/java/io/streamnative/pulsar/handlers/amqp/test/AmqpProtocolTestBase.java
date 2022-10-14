@@ -218,6 +218,8 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(brokerService);
         Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean())).
                 thenReturn(topicCompletableFuture);
+        Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean(), Mockito.anyMap())).
+                thenReturn(topicCompletableFuture);
 
         ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);
         Mockito.when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);

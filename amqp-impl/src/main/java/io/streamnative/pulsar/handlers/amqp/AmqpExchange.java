@@ -69,9 +69,11 @@ public interface AmqpExchange {
 
     boolean getAutoDelete();
 
-    Topic getTopic();
+    boolean getInternal();
 
-    Map<String, Object> getCustomProperties();
+    Map<String, Object> getArguments();
+
+    Topic getTopic();
 
     /**
      * Get the type {@link Type} of the exchange.

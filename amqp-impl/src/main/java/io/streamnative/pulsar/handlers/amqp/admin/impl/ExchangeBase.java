@@ -72,8 +72,9 @@ public class ExchangeBase extends BaseResources {
             exchangeBean.setType(ex.getType().toString().toLowerCase());
             exchangeBean.setVhost(vhost);
             exchangeBean.setAutoDelete(ex.getAutoDelete());
-            exchangeBean.setInternal(false);
-            exchangeBean.setArguments(ex.getCustomProperties());
+            exchangeBean.setDurable(ex.getDurable());
+            exchangeBean.setInternal(ex.getInternal());
+            exchangeBean.setArguments(ex.getArguments());
             return exchangeBean;
         });
     }

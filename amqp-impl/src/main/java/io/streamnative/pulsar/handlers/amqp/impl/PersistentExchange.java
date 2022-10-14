@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
-import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.covertStringValueAsObjectMap;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -26,7 +25,6 @@ import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +38,6 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
@@ -61,8 +58,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
-
-    public static final String CUSTOM_PROPERTIES = "__custom_properties__";
+    public static final String DURABLE = "DURABLE";
+    public static final String AUTO_DELETE = "AUTO_DELETE";
+    public static final String INTERNAL = "INTERNAL";
+    public static final String ARGUMENTS = "ARGUMENTS";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
 
     private PersistentTopic persistentTopic;
@@ -70,11 +69,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic, boolean autoDelete) {
-        super(exchangeName, type, new HashSet<>(), true, autoDelete);
+    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
+                              boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments) {
+        super(exchangeName, type, new HashSet<>(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
-        updateExchangeProperties();
         cursors = new ConcurrentOpenHashMap<>(16, 1);
         for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {
             cursors.put(cursor.getName(), CompletableFuture.completedFuture(cursor));
@@ -217,24 +216,19 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return persistentTopic;
     }
 
-    @Override
-    public Map<String, Object> getCustomProperties() {
-        Map<String, String> properties = this.persistentTopic.getManagedLedger().getProperties();
-        if (properties == null) {
-            return null;
-        }
-        String customProperties = properties.get(CUSTOM_PROPERTIES);
-        if (StringUtils.isEmpty(customProperties)) {
-            return null;
-        }
-        return covertStringValueAsObjectMap(properties.get(CUSTOM_PROPERTIES));
-    }
-
     private void updateExchangeProperties() {
-        Map<String, String> properties = new HashMap<>();
+        Map<String, String> properties = this.persistentTopic.getManagedLedger().getProperties();
         try {
-            properties.put(EXCHANGE, exchangeName);
-            properties.put(TYPE, exchangeType.toString());
+            // compatibility with old logic
+            if (!properties.containsKey(DURABLE)) {
+                properties.put(DURABLE, "" + durable);
+            }
+            if (!properties.containsKey(AUTO_DELETE)) {
+                properties.put(AUTO_DELETE, "" + autoDelete);
+            }
+            if (!properties.containsKey(INTERNAL)) {
+                properties.put(INTERNAL, "" + internal);
+            }
             List<String> queueNames = getQueueNames();
             if (queueNames.size() != 0) {
                 properties.put(QUEUES, JSON_MAPPER.writeValueAsString(getQueueNames()));

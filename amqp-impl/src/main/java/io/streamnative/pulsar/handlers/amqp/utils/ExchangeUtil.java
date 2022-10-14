@@ -75,13 +75,8 @@ public class ExchangeUtil {
         return exchangeName == null || AMQShortString.EMPTY_STRING.toString().equals(exchangeName);
     }
 
-    public static String covertObjectValueAsString(Object obj) {
-        try {
-            return JSON_MAPPER.writeValueAsString(obj);
-        } catch (Exception e) {
-            log.error("Failed to covert object: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
+    public static String covertObjectValueAsString(Object obj) throws JsonProcessingException {
+        return JSON_MAPPER.writeValueAsString(obj);
     }
 
     public static Map<String, Object> covertStringValueAsObjectMap(String value) {

@@ -13,11 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp.common.exception;
 
-import org.apache.pulsar.common.naming.TopicName;
 
 public class EmptyLookupResultException extends Exception {
 
-    public EmptyLookupResultException(TopicName topicName) {
+    public EmptyLookupResultException(String topicName) {
         super("Lookup result is empty for " + topicName);
     }
 

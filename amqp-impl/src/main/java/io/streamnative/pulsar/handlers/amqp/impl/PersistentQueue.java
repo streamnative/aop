@@ -251,7 +251,10 @@ public class PersistentQueue extends AbstractAmqpQueue {
                             queueName, position.getLedgerId(), position.getEntryId()));
                 }
             }
-            FutureUtil.waitForAll(futures).thenRun(this::scheduleExchangeClearTask);
+            FutureUtil.waitForAll(futures).whenComplete((__, t) -> {
+                // no matter previous task is success or failed, schedule a new clear task.
+                scheduleExchangeClearTask();
+            });
         } else {
             this.indexTopic.getBrokerService().getPulsar().getExecutor().schedule(
                     this::exchangeCleanup, exchangeClearTaskInterval, TimeUnit.MILLISECONDS);

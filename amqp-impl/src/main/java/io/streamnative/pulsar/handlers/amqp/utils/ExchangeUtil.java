@@ -79,17 +79,11 @@ public class ExchangeUtil {
         return JSON_MAPPER.writeValueAsString(obj);
     }
 
-    public static Map<String, Object> covertStringValueAsObjectMap(String value) {
+    public static Map<String, Object> covertStringValueAsObjectMap(String value) throws JsonProcessingException {
         if (value == null || value.trim().isEmpty()) {
             return null;
         }
-        try {
-            return JSON_MAPPER.readValue(value, new TypeReference<Map<String, Object>>() {
-            });
-        } catch (Exception e) {
-            log.error("Failed to covert string: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
+        return JSON_MAPPER.readValue(value, new TypeReference<>() {});
     }
 
     public static Map<String, String> generateTopicProperties(String exchangeName,

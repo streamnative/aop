@@ -21,14 +21,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Consumer;
@@ -37,7 +33,6 @@ import org.apache.pulsar.broker.service.EntryBatchSizes;
 import org.apache.pulsar.broker.service.RedeliveryTracker;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.broker.service.Subscription;
-import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
@@ -61,10 +56,7 @@ public class AmqpConsumer extends Consumer {
     private final String consumerTag;
 
     private final String queueName;
-    /**
-     * map(exchangeName,treeMap(indexPosition,msgPosition)) .
-     */
-    private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
+
     private static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "availablePermits");
     private volatile int availablePermits;
@@ -88,7 +80,6 @@ public class AmqpConsumer extends Consumer {
         this.autoAck = autoAck;
         this.consumerTag = consumerTag;
         this.queueName = queueName;
-        this.unAckMessages = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -158,8 +149,6 @@ public class AmqpConsumer extends Consumer {
                     try {
                         long deliveryTag = channel.getNextDeliveryTag();
 
-                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                                (PositionImpl) msg.getPosition());
                         if (!autoAck) {
                             channel.getUnacknowledgedMessageMap().add(deliveryTag,
                                     index.getPosition(), this, msg.getLength());
@@ -199,28 +188,7 @@ public class AmqpConsumer extends Consumer {
 
     public void messagesAck(List<Position> position) {
         incrementPermits(position.size());
-        ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
-        Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
         getSubscription().acknowledgeMessage(position, CommandAck.AckType.Individual, Collections.EMPTY_MAP);
-        if (!cursor.getMarkDeletedPosition().equals(previousMarkDeletePosition)) {
-            asyncGetQueue().whenComplete((amqpQueue, throwable) -> {
-                if (throwable != null) {
-                    log.error("Failed to get queue from queue container", throwable);
-                } else {
-                    synchronized (this) {
-                        PositionImpl newDeletePosition = (PositionImpl) cursor.getMarkDeletedPosition();
-                        unAckMessages.forEach((key, value) -> {
-                            SortedMap<PositionImpl, PositionImpl> ackMap = value.headMap(newDeletePosition, true);
-                            if (ackMap.size() > 0) {
-                                PositionImpl lastValue = ackMap.get(ackMap.lastKey());
-                                amqpQueue.acknowledgeAsync(key, lastValue.getLedgerId(), lastValue.getEntryId());
-                            }
-                            ackMap.clear();
-                        });
-                    }
-                }
-            });
-        }
     }
 
     public void messagesAck(Position position) {
@@ -261,12 +229,6 @@ public class AmqpConsumer extends Consumer {
     @Override
     public boolean isWritable() {
         return channel.getConnection().ctx.channel().isWritable();
-    }
-
-    void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
-        ConcurrentSkipListMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName,
-                treeMap -> new ConcurrentSkipListMap<>());
-        map.put(index, message);
     }
 
     public String getConsumerTag() {

@@ -37,21 +37,22 @@ public class AmqpBrokerService {
     @Getter
     private PulsarService pulsarService;
 
-    public AmqpBrokerService(PulsarService pulsarService) {
+    public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration serviceConfig) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, serviceConfig);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
     }
 
-    public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
+    public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer,
+                             AmqpServiceConfiguration serviceConfig) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, serviceConfig);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = connectionContainer;

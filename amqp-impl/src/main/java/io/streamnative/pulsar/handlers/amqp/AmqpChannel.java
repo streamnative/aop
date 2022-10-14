@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.DEFAULT_SUBSCRIPTION;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
@@ -108,7 +109,6 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
      */
     private IncomingMessage currentMessage;
 
-    private final String defaultSubscription = "defaultSubscription";
     public static final AMQShortString EMPTY_STRING = AMQShortString.createAMQShortString((String) null);
     /**
      * ConsumerTag prefix, the tag is unique per subscription to a queue.
@@ -428,7 +428,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
-                defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
+                DEFAULT_SUBSCRIPTION, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
                 AmqpConsumer consumer = new AmqpConsumer(queueContainer, subscription,
                         exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
@@ -544,12 +544,11 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 } else {
                     Topic topic = amqpQueue.getTopic();
                     AmqpConsumer amqpConsumer = fetchConsumerMap.computeIfAbsent(queueName, value -> {
-
-                        Subscription subscription = topic.getSubscription(defaultSubscription);
+                        Subscription subscription = topic.getSubscription(DEFAULT_SUBSCRIPTION);
                         AmqpConsumer consumer;
                         try {
                             if (subscription == null) {
-                                subscription = topic.createSubscription(defaultSubscription,
+                                subscription = topic.createSubscription(DEFAULT_SUBSCRIPTION,
                                         CommandSubscribe.InitialPosition.Earliest, false, null).get();
                             }
                             consumer = new AmqpPullConsumer(queueContainer, subscription,

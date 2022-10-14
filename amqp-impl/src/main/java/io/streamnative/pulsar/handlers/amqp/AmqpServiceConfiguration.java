@@ -112,4 +112,11 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpExplicitFlushAfterFlushes = 1000;
 
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false,
+            doc = "Exchange clear task interval in milliseconds."
+    )
+    private int amqpExchangeClearTaskInterval = 5000;
+
 }

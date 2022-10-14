@@ -24,14 +24,18 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
+import org.apache.pulsar.common.policies.data.ManagedLedgerInternalStats;
+import org.apache.pulsar.common.policies.data.PersistentTopicInternalStats;
 import org.apache.pulsar.common.policies.data.TenantInfo;
 import org.awaitility.Awaitility;
 import org.testng.annotations.AfterClass;
@@ -155,8 +159,39 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .atMost(5, TimeUnit.SECONDS)
                 .until(messageSet::isEmpty);
+        verifyBacklog(vhost, exchangeName);
         channel.close();
         conn.close();
+    }
+
+    private void verifyBacklog(String vhost, String exchangeName) {
+        Awaitility.await()
+                .pollInterval(1, TimeUnit.SECONDS)
+                .atMost(5, TimeUnit.SECONDS)
+                .until(() -> checkBacklog(vhost, exchangeName));
+    }
+
+    private boolean checkBacklog(String vhost, String exchangeName) throws PulsarAdminException {
+        String topic = "public/" + vhost + "/__amqp_exchange__" + exchangeName;
+        PersistentTopicInternalStats stats = admin.topics().getInternalStats(topic);
+        Map<String, ManagedLedgerInternalStats.CursorStats> map = stats.cursors;
+        if (map.isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<String, ManagedLedgerInternalStats.CursorStats> entry : map.entrySet()) {
+            if (entry.getKey().startsWith("__amqp_replicator") || entry.getKey().equals("pulsar.dedup")) {
+                continue;
+            }
+            log.debug("Stats exchange: {}, cursor: {}, lac: {}, markDelete: {}",
+                    exchangeName,
+                    entry.getKey(),
+                    stats.lastConfirmedEntry,
+                    entry.getValue().markDeletePosition);
+            if (!stats.lastConfirmedEntry.equals(entry.getValue().markDeletePosition)) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }

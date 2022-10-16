@@ -86,7 +86,7 @@ public class ExchangeServiceImpl implements ExchangeService {
 
                     String replyTextFormat = "PRECONDITION_FAILED - inequivalent arg '%s' for exchange '" + exchange
                             + "' in vhost '" + namespaceName.getLocalName() + "': received '%s' but current is '%s'";
-                    if (!StringUtils.equalsIgnoreCase(exchangeType, ex.getType().toString())) {
+                    if (ex.getType() == null || !StringUtils.equalsIgnoreCase(exchangeType, ex.getType().toString())) {
                         String replyText = String.format(
                                 replyTextFormat, "type", exchangeType, ex.getType().toString());
                         future.completeExceptionally(new AoPException(ErrorCodes.IN_USE, replyText, true, false));

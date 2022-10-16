@@ -17,6 +17,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.ARGUMENTS;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.AUTO_DELETE;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURABLE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
@@ -147,9 +148,16 @@ public class ExchangeContainer {
                         try {
                             Map<String, Object> currentArguments =
                                     ExchangeUtil.covertStringValueAsObjectMap(properties.get(ARGUMENTS));
+                            String currentType = properties.get(TYPE);
+                            boolean currentDurable = Boolean.parseBoolean(
+                                    properties.getOrDefault(DURABLE, "true"));
+                            boolean currentAutoDelete = Boolean.parseBoolean(
+                                    properties.getOrDefault(AUTO_DELETE, "false"));
+                            boolean currentInternal = Boolean.parseBoolean(
+                                    properties.getOrDefault(INTERNAL, "false"));
                             amqpExchange = new PersistentExchange(exchangeName,
-                                    AmqpExchange.Type.value(exchangeType),
-                                    persistentTopic, durable, autoDelete, internal,
+                                    AmqpExchange.Type.value(currentType),
+                                    persistentTopic, currentDurable, currentAutoDelete, currentInternal,
                                     currentArguments);
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
@@ -175,8 +183,8 @@ public class ExchangeContainer {
 
         String replyTextFormat = "PRECONDITION_FAILED - inequivalent arg '%s' for exchange '" + exchangeName + "' in "
                 + "vhost '" + vhost + "': received '%s' but current is '%s'";
-        String currentType = properties.getOrDefault(TYPE, null);
-        if (currentType != null && !StringUtils.equals(currentType, exchangeType)) {
+        String currentType = properties.get(TYPE);
+        if (!StringUtils.equals(properties.get(TYPE), exchangeType)) {
             exchangeFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
                     String.format(replyTextFormat, "type", exchangeType, currentType), true, false));
             return false;

@@ -219,31 +219,15 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private void updateExchangeProperties() {
         Map<String, String> properties = this.persistentTopic.getManagedLedger().getProperties();
         try {
-            // compatibility with old logic
-            if (!properties.containsKey(DURABLE)) {
-                properties.put(DURABLE, "" + durable);
-            }
-            if (!properties.containsKey(AUTO_DELETE)) {
-                properties.put(AUTO_DELETE, "" + autoDelete);
-            }
-            if (!properties.containsKey(INTERNAL)) {
-                properties.put(INTERNAL, "" + internal);
-            }
             List<String> queueNames = getQueueNames();
             if (queueNames.size() != 0) {
                 properties.put(QUEUES, JSON_MAPPER.writeValueAsString(getQueueNames()));
             }
         } catch (JsonProcessingException e) {
-            log.error("[{}] covert map of routers to String error: {}", exchangeName, e.getMessage());
+            log.error("[{}] covert queue list to String error: {}", exchangeName, e.getMessage());
             return;
         }
-        synchronized (this) {
-            Map<String, String> oldProperties = this.persistentTopic.getManagedLedger().getProperties();
-            if (oldProperties != null) {
-                oldProperties.forEach(properties::putIfAbsent);
-            }
-            PulsarTopicMetadataUtils.updateMetaData(this.persistentTopic, properties, exchangeName);
-        }
+        PulsarTopicMetadataUtils.updateMetaData(this.persistentTopic, properties, exchangeName);
     }
 
     private List<String> getQueueNames() {

@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,8 +31,8 @@ import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
-import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -188,9 +189,11 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(subscription.getDispatcher()).thenReturn(mock(MockDispatcher.class));
         Mockito.when(subscription.addConsumer(Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
-        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
+        ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);
+        Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
+        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
         Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
-        CompletableFuture deleteCpm = new CompletableFuture<>();
+        CompletableFuture<Void> deleteCpm = new CompletableFuture<>();
         Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);
         deleteCpm.complete(null);
         Mockito.when(persistentTopic.getHierarchyTopicPolicies()).thenReturn(spy(new HierarchyTopicPolicies()));
@@ -219,11 +222,20 @@ public abstract class AmqpProtocolTestBase {
         Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean())).
                 thenReturn(topicCompletableFuture);
         Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean(), Mockito.anyMap())).
-                thenReturn(topicCompletableFuture);
-
-        ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);
-        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
-        Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
+                thenAnswer(new Answer<Object>() {
+                    @Override
+                    public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                        Object[] objects = invocationOnMock.getArguments();
+                        Map<String, String> map = null;
+                        for (Object obj : objects) {
+                            if (obj instanceof Map) {
+                                map = (Map<String, String>) obj;
+                            }
+                        }
+                        when(managedLedger.getProperties()).thenReturn(map);
+                        return topicCompletableFuture;
+                    }
+                });
     }
 
     /**

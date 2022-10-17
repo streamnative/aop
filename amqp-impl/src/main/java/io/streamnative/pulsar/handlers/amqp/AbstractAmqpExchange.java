@@ -51,6 +51,17 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     }
 
     @Override
+    public AmqpQueue getQueue(String queueName) {
+        AmqpQueue queue = null;
+        for (AmqpQueue q : queues) {
+            if (q.getName().equals(queueName)) {
+                queue = q;
+            }
+        }
+        return queue;
+    }
+
+    @Override
     public void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
     }

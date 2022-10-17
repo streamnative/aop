@@ -14,6 +14,9 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.netty.util.concurrent.DefaultThreadFactory;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
@@ -37,24 +40,20 @@ public class AmqpBrokerService {
     @Getter
     private PulsarService pulsarService;
 
-    public AmqpBrokerService(PulsarService pulsarService) {
+    public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, initRouteExecutor(config),
+                config.getAmqpExchangeRouteQueueSize());
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
     }
 
-    public AmqpBrokerService(PulsarService pulsarService, ConnectionContainer connectionContainer) {
-        this.pulsarService = pulsarService;
-        this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService);
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
-        this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
-        this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
-        this.connectionContainer = connectionContainer;
+    private Executor initRouteExecutor(AmqpServiceConfiguration config) {
+        return Executors.newFixedThreadPool(config.getAmqpExchangeRouteExecutorThreads(),
+                new DefaultThreadFactory("exchange-route"));
     }
 
     public boolean isAuthenticationEnabled() {

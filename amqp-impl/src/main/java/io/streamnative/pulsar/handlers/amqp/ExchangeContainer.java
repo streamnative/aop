@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -46,10 +47,15 @@ public class ExchangeContainer {
 
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
+    private final Executor routeExecutor;
+    private final int routeQueueSize;
 
-    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService) {
+    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
+                                Executor routeExecutor, int routeQueueSize) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
+        this.routeExecutor = routeExecutor;
+        this.routeQueueSize = routeQueueSize;
     }
 
     @Getter
@@ -158,7 +164,7 @@ public class ExchangeContainer {
                             amqpExchange = new PersistentExchange(exchangeName,
                                     AmqpExchange.Type.value(currentType),
                                     persistentTopic, currentDurable, currentAutoDelete, currentInternal,
-                                    currentArguments);
+                                    currentArguments, routeExecutor, routeQueueSize);
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
                                     exchangeName, namespaceName.getLocalName(), e);

@@ -14,10 +14,9 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import java.util.concurrent.ArrayBlockingQueue;
+import io.netty.util.concurrent.DefaultThreadFactory;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
@@ -53,9 +52,8 @@ public class AmqpBrokerService {
     }
 
     private Executor initRouteExecutor(AmqpServiceConfiguration config) {
-        return new ThreadPoolExecutor(config.getAmqpExchangeRouteExecutorThreads(),
-                config.getAmqpExchangeRouteExecutorThreads(), 30, TimeUnit.SECONDS,
-                new ArrayBlockingQueue<>(1000));
+        return Executors.newFixedThreadPool(config.getAmqpExchangeRouteExecutorThreads(),
+                new DefaultThreadFactory("exchange-route"));
     }
 
     public boolean isAuthenticationEnabled() {

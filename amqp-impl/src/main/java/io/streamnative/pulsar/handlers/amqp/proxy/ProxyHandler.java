@@ -82,7 +82,7 @@ public class ProxyHandler {
         channelFuture.addListener(future -> {
             if (!future.isSuccess()) {
                 // Close the connection if the connection attempt has failed.
-                clientChannel.close();
+                proxyConnection.close();
             }
         });
         state = State.Init;
@@ -94,8 +94,8 @@ public class ProxyHandler {
             ClientMethodProcessor<ClientChannelMethodProcessor>, FutureListener<Void> {
 
         private ChannelHandlerContext cnx;
-        private AMQMethodBody connectResponseBody;
-        private AmqpClientDecoder clientDecoder;
+        private final AMQMethodBody connectResponseBody;
+        private final AmqpClientDecoder clientDecoder;
 
         ProxyBackendHandler(AMQMethodBody responseBody) {
             this.connectResponseBody = responseBody;
@@ -107,11 +107,11 @@ public class ProxyHandler {
             // This is invoked when the write operation on the paired connection
             // is completed
             if (future.isSuccess()) {
-                brokerChannel.read();
+                cnx.channel().read();
             } else {
                 log.warn("[{}] [{}] Failed to write on proxy connection. Closing both connections.", clientChannel,
-                        brokerChannel, future.cause());
-                clientChannel.close();
+                        cnx.channel(), future.cause());
+                proxyConnection.close();
             }
 
         }
@@ -123,8 +123,8 @@ public class ProxyHandler {
             super.channelActive(ctx);
             for (Object msg : connectMsgList) {
                 ((ByteBuf) msg).retain();
-                brokerChannel.writeAndFlush(msg).addListener(future -> {
-                    brokerChannel.read();
+                ctx.channel().writeAndFlush(msg).addListener(future -> {
+                    ctx.channel().read();
                 });
             }
         }
@@ -166,6 +166,7 @@ public class ProxyHandler {
             cause.printStackTrace();
             log.error("[" + vhost + "] ProxyBackendHandler [exceptionCaught] - msg: " + cause.getMessage(), cause);
             state = State.Failed;
+            proxyConnection.close();
         }
 
         @Override

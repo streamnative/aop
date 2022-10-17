@@ -29,7 +29,6 @@ import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
-import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
 import java.net.SocketAddress;
 import java.util.Map;

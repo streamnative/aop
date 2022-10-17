@@ -45,22 +45,24 @@ import org.apache.qpid.server.protocol.ErrorCodes;
 @Slf4j
 public class ExchangeContainer {
 
-    private AmqpTopicManager amqpTopicManager;
-    private PulsarService pulsarService;
+    private final AmqpBrokerService amqpBrokerService;
+    private final AmqpTopicManager amqpTopicManager;
+    private final PulsarService pulsarService;
     private final Executor routeExecutor;
     private final int routeQueueSize;
 
-    protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                                Executor routeExecutor, int routeQueueSize) {
+    @Getter
+    private final Map<NamespaceName, Map<String, CompletableFuture<AmqpExchange>>> exchangeMap =
+            new ConcurrentHashMap<>();
+
+    protected ExchangeContainer(AmqpBrokerService amqpBrokerService, AmqpTopicManager amqpTopicManager,
+                                PulsarService pulsarService, Executor routeExecutor, int routeQueueSize) {
+        this.amqpBrokerService = amqpBrokerService;
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.routeExecutor = routeExecutor;
         this.routeQueueSize = routeQueueSize;
     }
-
-    @Getter
-    private Map<NamespaceName, Map<String, CompletableFuture<AmqpExchange>>> exchangeMap = new ConcurrentHashMap<>();
-
 
     public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
                                                             String exchangeName,
@@ -161,7 +163,7 @@ public class ExchangeContainer {
                                     properties.getOrDefault(AUTO_DELETE, "false"));
                             boolean currentInternal = Boolean.parseBoolean(
                                     properties.getOrDefault(INTERNAL, "false"));
-                            amqpExchange = new PersistentExchange(exchangeName,
+                            amqpExchange = new PersistentExchange(amqpBrokerService, exchangeName,
                                     AmqpExchange.Type.value(currentType),
                                     persistentTopic, currentDurable, currentAutoDelete, currentInternal,
                                     currentArguments, routeExecutor, routeQueueSize);

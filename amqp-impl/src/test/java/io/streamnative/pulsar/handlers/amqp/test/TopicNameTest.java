@@ -50,7 +50,7 @@ public class TopicNameTest {
         Mockito.when(exchangeTopic1.getBrokerService()).thenReturn(brokerService);
         Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
         try {
-            new PersistentExchange(
+            new PersistentExchange(null,
                     exchangeName, exchangeType, exchangeTopic1, true, false, false, null,
                     Executors.newSingleThreadExecutor(), 200);
         } catch (IllegalArgumentException e) {
@@ -61,7 +61,7 @@ public class TopicNameTest {
         Mockito.when(exchangeTopic2.getName()).thenReturn(PersistentExchange.TOPIC_PREFIX + "_" + exchangeName);
         Mockito.when(exchangeTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
-            new PersistentExchange(
+            new PersistentExchange(null,
                     exchangeName, exchangeType, exchangeTopic2, true, false, false, null,
                     Executors.newSingleThreadExecutor(), 200);
         } catch (IllegalArgumentException e) {

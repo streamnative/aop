@@ -98,16 +98,21 @@ public class QueueContainer {
                         PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
                                 0, false, false);
                         try {
-                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
-                                    namespaceName);
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer, namespaceName)
+                                    .thenAccept(__ -> {
+                                        queueCompletableFuture.complete(amqpQueue);
+                                    })
+                                    .exceptionally(t -> {
+                                        queueCompletableFuture.completeExceptionally(t);
+                                        removeQueueFuture(namespaceName, queueName);
+                                        return null;
+                                    });
                         } catch (Exception e) {
                             log.error("[{}][{}] Failed to recover routers for queue from properties.",
                                     namespaceName, queueName, e);
                             queueCompletableFuture.completeExceptionally(e);
                             removeQueueFuture(namespaceName, queueName);
-                            return;
                         }
-                        queueCompletableFuture.complete(amqpQueue);
                     }
                 }
             });

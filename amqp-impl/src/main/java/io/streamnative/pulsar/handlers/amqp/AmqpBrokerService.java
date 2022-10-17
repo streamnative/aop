@@ -43,7 +43,7 @@ public class AmqpBrokerService {
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, initRouteExecutor(config),
+        this.exchangeContainer = new ExchangeContainer(this, amqpTopicManager, pulsarService, initRouteExecutor(config),
                 config.getAmqpExchangeRouteQueueSize());
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);

@@ -52,18 +52,6 @@ public class AmqpBrokerService {
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
     }
 
-    public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config,
-                             ConnectionContainer connectionContainer) {
-        this.pulsarService = pulsarService;
-        this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, initRouteExecutor(config),
-                config.getAmqpExchangeRouteQueueSize());
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
-        this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
-        this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
-        this.connectionContainer = connectionContainer;
-    }
-
     private Executor initRouteExecutor(AmqpServiceConfiguration config) {
         return new ThreadPoolExecutor(config.getAmqpExchangeRouteExecutorThreads(),
                 config.getAmqpExchangeRouteExecutorThreads(), 30, TimeUnit.SECONDS,

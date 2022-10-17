@@ -65,8 +65,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
     }
 
     private static final int defaultReadMaxSizeBytes = 5 * 1024 * 1024;
-    private int routeQueueSize =
-            Integer.parseInt(System.getProperty("aop.replicatorQueueSize", "250"));
+    private int routeQueueSize = 200;
     private volatile int pendingQueueSize = 0;
     private static final AtomicIntegerFieldUpdater<AmqpExchangeReplicator> PENDING_SIZE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AmqpExchangeReplicator.class, "pendingQueueSize");

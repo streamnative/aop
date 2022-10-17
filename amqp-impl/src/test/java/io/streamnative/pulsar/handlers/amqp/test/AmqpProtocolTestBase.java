@@ -99,8 +99,7 @@ public abstract class AmqpProtocolTestBase {
     public void setup() throws Exception {
         mockPulsarService();
         mockBrokerService();
-        ConnectionContainer connectionContainer = mock(ConnectionContainer.class);
-        amqpBrokerService = new AmqpBrokerService(pulsarService, new AmqpServiceConfiguration(), connectionContainer);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, new AmqpServiceConfiguration());
         amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.
@@ -159,6 +158,7 @@ public abstract class AmqpProtocolTestBase {
         PulsarResources pulsarResources = mock(PulsarResources.class);
         when(pulsarResources.getNamespaceResources()).thenReturn(namespaceResources);
         when(pulsarService.getPulsarResources()).thenReturn(pulsarResources);
+        when(pulsarService.getNamespaceService()).thenReturn(mock(NamespaceService.class));
     }
 
     private void mockBrokerService() {

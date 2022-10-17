@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerService;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
@@ -28,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +55,7 @@ import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
  */
 @Slf4j
 public class PersistentExchange extends AbstractAmqpExchange {
+
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
@@ -72,6 +73,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     private final Backoff startReplicateBackoff = new Backoff(100, TimeUnit.MILLISECONDS,
             30, TimeUnit.SECONDS, 30, TimeUnit.SECONDS);
+
+    private enum QueueUpdateOperation {
+        ADD,
+        REMOVE
+    }
 
     public PersistentExchange(AmqpBrokerService amqpBrokerService, String exchangeName, Type type,
                               PersistentTopic persistentTopic, boolean durable, boolean autoDelete, boolean internal,
@@ -184,14 +190,14 @@ public class PersistentExchange extends AbstractAmqpExchange {
     @Override
     public CompletableFuture<Void> addQueue(AmqpQueue queue) {
         queues.add(queue);
-        updateExchangeProperties();
+        updateExchangeProperties(queue.getName(), QueueUpdateOperation.ADD);
         return createCursorIfNotExists(queue.getName()).thenApply(__ -> null);
     }
 
     @Override
     public void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
-        updateExchangeProperties();
+        updateExchangeProperties(queue.getName(), QueueUpdateOperation.REMOVE);
         deleteCursor(queue.getName());
     }
 
@@ -200,26 +206,27 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return persistentTopic;
     }
 
-    private void updateExchangeProperties() {
+    private synchronized void updateExchangeProperties(String queue, QueueUpdateOperation updateOperation) {
         Map<String, String> properties = this.persistentTopic.getManagedLedger().getProperties();
         try {
-            List<String> queueNames = getQueueNames();
-            if (queueNames.size() != 0) {
-                properties.put(QUEUES, JSON_MAPPER.writeValueAsString(getQueueNames()));
+            Set<String> queues = MapperUtil.parseSet(properties.get(QUEUES));
+            if (queues == null) {
+                queues = new HashSet<>();
             }
-        } catch (JsonProcessingException e) {
-            log.error("[{}] covert queue list to String error: {}", exchangeName, e.getMessage());
+            switch (updateOperation) {
+                case ADD -> {
+                    queues.add(queue);
+                }
+                case REMOVE -> {
+                    queues.remove(queue);
+                }
+            }
+            properties.put(QUEUES, JSON_MAPPER.writeValueAsString(queues));
+        } catch (Exception e) {
+            log.error("[{}] covert queue set to String error: {}", exchangeName, e.getMessage());
             return;
         }
         PulsarTopicMetadataUtils.updateMetaData(this.persistentTopic, properties, exchangeName);
-    }
-
-    private List<String> getQueueNames() {
-        List<String> queueNames = new ArrayList<>();
-        for (AmqpQueue queue : queues) {
-            queueNames.add(queue.getName());
-        }
-        return queueNames;
     }
 
     private CompletableFuture<ManagedCursor> createCursorIfNotExists(String name) {
@@ -316,7 +323,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         List<CompletableFuture<AmqpQueue>> amqpQueueFutureList = new ArrayList<>();
         if (queueJsonStr != null) {
             try {
-                List<String> list = MapperUtil.readListValue(queueJsonStr);
+                Set<String> list = MapperUtil.parseSet(queueJsonStr);
                 for (String queue : list) {
                     amqpQueueFutureList.add(
                             this.amqpBrokerService.getQueueContainer()

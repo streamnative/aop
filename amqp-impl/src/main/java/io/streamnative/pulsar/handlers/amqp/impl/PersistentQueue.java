@@ -128,15 +128,14 @@ public class PersistentQueue extends AbstractAmqpQueue {
         }
         List<CompletableFuture<Void>> futureList = new ArrayList<>();
         amqpQueueProperties.forEach((amqpQueueProperty) -> {
-            futureList.add(recoverExchangeBind(exchangeContainer, namespaceName, amqpQueueProperty));
+            futureList.add(recoverQueueBind(exchangeContainer, namespaceName, amqpQueueProperty));
         });
         return FutureUtil.waitForAll(futureList);
     }
 
-    private CompletableFuture<Void> recoverExchangeBind(ExchangeContainer exchangeContainer,
-                                                        NamespaceName namespaceName,
-                                                        AmqpQueueProperties props) {
-        // recover exchange
+    private CompletableFuture<Void> recoverQueueBind(ExchangeContainer exchangeContainer,
+                                                     NamespaceName namespaceName,
+                                                     AmqpQueueProperties props) {
         String exchangeName = props.getExchangeName();
         Set<String> bindingKeys = props.getBindingKeys();
         Map<String, Object> arguments = props.getArguments();
@@ -148,7 +147,10 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     messageRouter.setExchange(amqpExchange);
                     messageRouter.setArguments(arguments);
                     messageRouter.setBindingKeys(bindingKeys);
-                    return amqpExchange.addQueue(this).thenAccept(__ -> routers.put(exchangeName, messageRouter));
+                    return amqpExchange.addQueue(this).thenApply(__ -> {
+                        routers.put(exchangeName, messageRouter);
+                        return null;
+                    });
                 });
     }
 

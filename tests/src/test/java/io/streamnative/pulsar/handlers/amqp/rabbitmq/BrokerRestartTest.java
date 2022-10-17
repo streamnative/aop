@@ -78,7 +78,6 @@ public class BrokerRestartTest extends AmqpTestBase {
             public void handleDelivery(String consumerTag, Envelope envelope,
                                        AMQP.BasicProperties properties, byte[] body) throws IOException {
                 String msg = new String(body);
-                System.out.println("1 receive msg " + msg);
                 messageSet1.remove(msg);
             }
         });
@@ -88,20 +87,13 @@ public class BrokerRestartTest extends AmqpTestBase {
             public void handleDelivery(String consumerTag, Envelope envelope,
                                        AMQP.BasicProperties properties, byte[] body) throws IOException {
                 String msg = new String(body);
-                System.out.println("2 receive msg " + msg);
                 messageSet2.remove(msg);
             }
         });
 
         await().atMost(15, TimeUnit.SECONDS)
                 .pollInterval(1, TimeUnit.SECONDS)
-                .until(() -> {
-                    log.info("check queue1 {} set1: {}, queue2 {} set2: {}",
-                            queue, messageSet1.size(), queue2, messageSet2.size());
-                    log.info("queue1 set: {}", messageSet1);
-                    log.info("queue2 set: {}", messageSet2);
-                    return messageSet1.size() == 0 && messageSet2.size() == 0;
-                });
+                .until(() -> messageSet1.size() == 0 && messageSet2.size() == 0);
 
         channel.close();
         connection.close();

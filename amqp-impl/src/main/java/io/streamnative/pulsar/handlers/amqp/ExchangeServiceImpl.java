@@ -21,14 +21,15 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultE
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.exchange.ExchangeDefaults;
 import org.apache.qpid.server.protocol.ErrorCodes;
-import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.ExchangeBoundOkBody;
 
 /**
@@ -45,8 +46,8 @@ public class ExchangeServiceImpl implements ExchangeService {
 
     @Override
     public CompletableFuture<AmqpExchange> exchangeDeclare(NamespaceName namespaceName, String exchange, String type,
-                        boolean passive, boolean durable, boolean autoDelete, boolean internal, FieldTable arguments) {
-
+                                                           boolean passive, boolean durable, boolean autoDelete,
+                                                           boolean internal, Map<String, Object> arguments) {
         if (isDefaultExchange(exchange)) {
             String sb = "Attempt to redeclare default exchange: of type " + ExchangeDefaults.DIRECT_EXCHANGE_CLASS;
             return FutureUtil.failedFuture(new AoPException(ErrorCodes.ACCESS_REFUSED, sb, true, false));
@@ -61,9 +62,14 @@ public class ExchangeServiceImpl implements ExchangeService {
             exchangeType = type;
         }
         CompletableFuture<AmqpExchange> future = new CompletableFuture<>();
-        exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType)
+        exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType,
+                        durable, autoDelete, internal, arguments)
                 .whenComplete((ex, throwable) -> {
                     if (throwable != null) {
+                        if (throwable instanceof AoPException) {
+                            future.completeExceptionally(throwable);
+                            return;
+                        }
                         future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
                                 "Failed to get " + exchange + " in vhost " + namespaceName, false, true));
                         return;
@@ -73,12 +79,34 @@ public class ExchangeServiceImpl implements ExchangeService {
                                 "Get empty exchange " + exchange + " in vhost " + namespaceName, true, false));
                         return;
                     }
-                    if (!ex.getType().toString().equalsIgnoreCase(exchangeType)) {
-                        future.completeExceptionally(new AoPException(ErrorCodes.NOT_ALLOWED,
-                                "Attempt to redeclare exchange: '" + exchange + "' of type " + ex.getType()
-                                        + " to " + exchangeType + ".", false, true));
+                    if (passive) {
+                        future.complete(ex);
                         return;
                     }
+
+                    String replyTextFormat = "PRECONDITION_FAILED - inequivalent arg '%s' for exchange '" + exchange
+                            + "' in vhost '" + namespaceName.getLocalName() + "': received '%s' but current is '%s'";
+                    if (ex.getType() == null || !StringUtils.equalsIgnoreCase(exchangeType, ex.getType().toString())) {
+                        String replyText = String.format(
+                                replyTextFormat, "type", exchangeType, ex.getType().toString());
+                        future.completeExceptionally(new AoPException(ErrorCodes.IN_USE, replyText, true, false));
+                        return;
+                    }
+
+                    if (durable != ex.getDurable()) {
+                        String replyText = String.format(
+                                replyTextFormat, "durable", durable, ex.getDurable());
+                        future.completeExceptionally(new AoPException(ErrorCodes.IN_USE, replyText, true, false));
+                        return;
+                    }
+
+                    if (autoDelete != ex.getAutoDelete()) {
+                        String replyText = String.format(
+                                replyTextFormat, "auto_delete", autoDelete, ex.getAutoDelete());
+                        future.completeExceptionally(new AoPException(ErrorCodes.IN_USE, replyText, true, false));
+                        return;
+                    }
+
                     future.complete(ex);
         });
         return future;

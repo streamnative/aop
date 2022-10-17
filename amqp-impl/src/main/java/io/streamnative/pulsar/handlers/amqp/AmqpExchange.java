@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
@@ -67,6 +68,10 @@ public interface AmqpExchange {
     boolean getDurable();
 
     boolean getAutoDelete();
+
+    boolean getInternal();
+
+    Map<String, Object> getArguments();
 
     Topic getTopic();
 

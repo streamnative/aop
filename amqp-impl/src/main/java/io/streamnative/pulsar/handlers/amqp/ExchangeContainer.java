@@ -14,7 +14,17 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.ARGUMENTS;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.AUTO_DELETE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURABLE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
+
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +36,7 @@ import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.qpid.server.protocol.ErrorCodes;
 
 /**
  * Container for all exchanges in the broker.
@@ -44,6 +55,14 @@ public class ExchangeContainer {
     @Getter
     private Map<NamespaceName, Map<String, CompletableFuture<AmqpExchange>>> exchangeMap = new ConcurrentHashMap<>();
 
+
+    public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
+                                                            String exchangeName,
+                                                            boolean createIfMissing,
+                                                            String exchangeType) {
+        return asyncGetExchange(namespaceName, exchangeName, createIfMissing, exchangeType, true, false, false, null);
+    }
+
     /**
      * Get or create exchange.
      *
@@ -52,12 +71,17 @@ public class ExchangeContainer {
      * @param createIfMissing true to create the exchange if not existed, and exchangeType should be not null
      *                        false to get the exchange and return null if not existed
      * @param exchangeType type of exchange: direct,fanout,topic and headers
+     * @param arguments other properties (construction arguments) for the exchange
      * @return the completableFuture of get result
      */
     public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
                                                             String exchangeName,
                                                             boolean createIfMissing,
-                                                            String exchangeType) {
+                                                            String exchangeType,
+                                                            boolean durable,
+                                                            boolean autoDelete,
+                                                            boolean internal,
+                                                            Map<String, Object> arguments) {
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = new CompletableFuture<>();
         if (StringUtils.isEmpty(exchangeType) && createIfMissing) {
             log.error("[{}][{}] ExchangeType should be set when createIfMissing is true.", namespaceName, exchangeName);
@@ -83,7 +107,23 @@ public class ExchangeContainer {
             return existingAmqpExchangeFuture;
         } else {
             String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
-            CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(topicName, createIfMissing);
+            Map<String, String> initProperties = new HashMap<>();
+            if (createIfMissing) {
+                // if first create the exchange, try to set properties for exchange
+                try {
+                    initProperties = ExchangeUtil.generateTopicProperties(exchangeName, exchangeType, durable,
+                            autoDelete, internal, arguments, Collections.EMPTY_LIST);
+                } catch (Exception e) {
+                    log.error("Failed to generate topic properties for exchange {} in vhost {}.",
+                            exchangeName, namespaceName, e);
+                    amqpExchangeCompletableFuture.completeExceptionally(e);
+                    removeExchangeFuture(namespaceName, exchangeName);
+                    return amqpExchangeCompletableFuture;
+                }
+            }
+
+            CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(
+                    topicName, createIfMissing, initProperties);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     log.error("[{}][{}] Failed to get exchange topic.", namespaceName, exchangeName, throwable);
@@ -98,23 +138,77 @@ public class ExchangeContainer {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;
                         Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
-                        AmqpExchange.Type amqpExchangeType;
-                        // if properties has type, ignore the exchangeType
-                        if (null != properties && properties.size() > 0
-                                && null != properties.get(PersistentExchange.TYPE)) {
-                            String type = properties.get(PersistentExchange.TYPE);
-                            amqpExchangeType = AmqpExchange.Type.value(type);
-                        } else {
-                            amqpExchangeType = AmqpExchange.Type.value(exchangeType);
+                        if (createIfMissing && !exchangeDeclareCheck(
+                                amqpExchangeCompletableFuture, namespaceName.getLocalName(),
+                                exchangeName, exchangeType, durable, autoDelete, properties)) {
+                            return;
                         }
-                        PersistentExchange amqpExchange = new PersistentExchange(exchangeName,
-                                amqpExchangeType, persistentTopic, false);
+
+                        PersistentExchange amqpExchange;
+                        try {
+                            Map<String, Object> currentArguments =
+                                    ExchangeUtil.covertStringValueAsObjectMap(properties.get(ARGUMENTS));
+                            String currentType = properties.get(TYPE);
+                            boolean currentDurable = Boolean.parseBoolean(
+                                    properties.getOrDefault(DURABLE, "true"));
+                            boolean currentAutoDelete = Boolean.parseBoolean(
+                                    properties.getOrDefault(AUTO_DELETE, "false"));
+                            boolean currentInternal = Boolean.parseBoolean(
+                                    properties.getOrDefault(INTERNAL, "false"));
+                            amqpExchange = new PersistentExchange(exchangeName,
+                                    AmqpExchange.Type.value(currentType),
+                                    persistentTopic, currentDurable, currentAutoDelete, currentInternal,
+                                    currentArguments);
+                        } catch (Exception e) {
+                            log.error("Failed to init exchange {} in vhost {}.",
+                                    exchangeName, namespaceName.getLocalName(), e);
+                            amqpExchangeCompletableFuture.completeExceptionally(e);
+                            removeExchangeFuture(namespaceName, exchangeName);
+                            return;
+                        }
                         amqpExchangeCompletableFuture.complete(amqpExchange);
                     }
                 }
             });
         }
         return amqpExchangeCompletableFuture;
+    }
+
+    private boolean exchangeDeclareCheck(CompletableFuture<AmqpExchange> exchangeFuture, String vhost,
+                                         String exchangeName, String exchangeType, boolean durable, boolean autoDelete,
+                                         Map<String, String> properties) {
+        if (properties == null || properties.isEmpty()) {
+            return true;
+        }
+
+        String replyTextFormat = "PRECONDITION_FAILED - inequivalent arg '%s' for exchange '" + exchangeName + "' in "
+                + "vhost '" + vhost + "': received '%s' but current is '%s'";
+        String currentType = properties.get(TYPE);
+        if (!StringUtils.equals(properties.get(TYPE), exchangeType)) {
+            exchangeFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
+                    String.format(replyTextFormat, "type", exchangeType, currentType), true, false));
+            return false;
+        }
+
+        if (properties.containsKey(DURABLE)) {
+            boolean currentDurable = Boolean.parseBoolean(properties.get(DURABLE));
+            if (durable != currentDurable) {
+                exchangeFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
+                        String.format(replyTextFormat, "durable", durable, currentDurable), true, false));
+                return false;
+            }
+        }
+
+        if (properties.containsKey(AUTO_DELETE)) {
+            boolean currentAutoDelete = Boolean.parseBoolean(properties.get(AUTO_DELETE));
+            if (autoDelete != currentAutoDelete) {
+                exchangeFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
+                        String.format(replyTextFormat, "auto_delete", autoDelete, currentAutoDelete), true, false));
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

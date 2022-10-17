@@ -172,16 +172,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     type, passive, durable, autoDelete, internal, nowait, arguments);
         }
 
-        this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(), type.toString(),
-                passive, durable, autoDelete, internal, arguments).thenAccept(__ -> {
+        this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(),
+                type != null ? type.toString() : null,
+                passive, durable, autoDelete, internal, FieldTable.convertToMap(arguments)).thenAccept(__ -> {
             if (!nowait) {
                 connection.writeFrame(
                         connection.getMethodRegistry().createExchangeDeclareOkBody().generateFrame(channelId));
             }
         }).exceptionally(t -> {
             log.error("Failed to declare exchange {} in vhost {}. type: {}, passive: {}, durable: {}, "
-                            + "autoDelete: {}, nowait: {}", type, passive, durable, autoDelete, nowait,
-                    exchange, connection.getNamespaceName(), t);
+                            + "autoDelete: {}, nowait: {}", exchange, connection.getNamespaceName(), type, passive,
+                    durable, autoDelete, nowait, t);
             handleAoPException(t);
             return null;
         });

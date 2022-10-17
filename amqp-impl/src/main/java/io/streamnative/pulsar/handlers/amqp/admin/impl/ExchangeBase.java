@@ -72,7 +72,9 @@ public class ExchangeBase extends BaseResources {
             exchangeBean.setType(ex.getType().toString().toLowerCase());
             exchangeBean.setVhost(vhost);
             exchangeBean.setAutoDelete(ex.getAutoDelete());
-            exchangeBean.setInternal(false);
+            exchangeBean.setDurable(ex.getDurable());
+            exchangeBean.setInternal(ex.getInternal());
+            exchangeBean.setArguments(ex.getArguments());
             return exchangeBean;
         });
     }
@@ -81,7 +83,7 @@ public class ExchangeBase extends BaseResources {
                                                               ExchangeDeclareParams declareParams) {
         return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName,
                 declareParams.getType(), false, declareParams.isDurable(), declareParams.isAutoDelete(),
-                declareParams.isInternal(), null);
+                declareParams.isInternal(), declareParams.getArguments());
     }
 
     protected CompletableFuture<Void> deleteExchange(String vhost, String exchangeName, boolean ifUnused) {

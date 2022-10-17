@@ -214,12 +214,12 @@ public class PersistentExchange extends AbstractAmqpExchange {
                 queues = new HashSet<>();
             }
             switch (updateOperation) {
-                case ADD -> {
+                case ADD:
                     queues.add(queue);
-                }
-                case REMOVE -> {
+                    break;
+                case REMOVE:
                     queues.remove(queue);
-                }
+                    break;
             }
             properties.put(QUEUES, JSON_MAPPER.writeValueAsString(queues));
         } catch (Exception e) {

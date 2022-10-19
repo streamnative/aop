@@ -17,6 +17,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.collect.ImmutableList;
+import io.jsonwebtoken.lang.Collections;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.common.util.JsonUtil;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.CompressionType;
@@ -86,13 +88,15 @@ public final class MessageConvertUtils {
     private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
     public static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
 
+    public static final String PROP_CUSTOM_JSON = BASIC_PROP_HEADER_PRE + "custom_json";
+    public static final String PROP_X_DELAY = BASIC_PROP_HEADER_PRE + "x-delay";
+
     private static final Clock clock = Clock.systemDefaultZone();
 
     // convert qpid IncomingMessage to Pulsar MessageImpl
     public static MessageImpl<byte[]> toPulsarMessage(IncomingMessage incomingMessage)
-            throws UnsupportedEncodingException {
-        @SuppressWarnings("unchecked")
-        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
+            throws UnsupportedEncodingException, JsonUtil.ParseJsonException {
+        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl<>(null, Schema.BYTES);
 
         // value
         if (incomingMessage.getBodyCount() > 0) {
@@ -132,9 +136,9 @@ public final class MessageConvertUtils {
             setProp(builder, PROP_CLUSTER_ID, props.getClusterIdAsString());
             setProp(builder, PROP_PROPERTY_FLAGS, props.getPropertyFlags());
 
-            Map<String, Object> headers = props.getHeadersAsMap();
-            for (Map.Entry<String, Object> entry : headers.entrySet()) {
-                setProp(builder, BASIC_PROP_HEADER_PRE + entry.getKey(), entry.getValue());
+            setProp(builder, PROP_CUSTOM_JSON, JsonUtil.toJson(props.getHeadersAsMap()));
+            if (props.getHeader("x-delay") != null) {
+                setProp(builder, PROP_X_DELAY, props.getHeader("x-delay"));
             }
         }
 
@@ -146,7 +150,7 @@ public final class MessageConvertUtils {
         return (MessageImpl<byte[]>) builder.getMessage();
     }
 
-    private void setProp(TypedMessageBuilder builder, String propName, Object value)
+    private void setProp(TypedMessageBuilder<byte[]> builder, String propName, Object value)
             throws UnsupportedEncodingException {
         if (value != null) {
             if (value instanceof Byte) {
@@ -157,10 +161,13 @@ public final class MessageConvertUtils {
         }
     }
 
-    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, List<KeyValue> keyValues) {
-        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl(null, Schema.BYTES);
+    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, List<KeyValue> keyValues, boolean setDeliveryTime) {
+        TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl<>(null, Schema.BYTES);
         for (KeyValue kv : keyValues) {
             builder.property(kv.getKey(), kv.getValue());
+            if (kv.getKey().equals(PROP_X_DELAY) && setDeliveryTime) {
+                builder.deliverAfter(Long.parseLong(kv.getValue()), TimeUnit.MILLISECONDS);
+            }
         }
         byte[] array = new byte[payload.readableBytes()];
         payload.getBytes(payload.readerIndex(), array);
@@ -199,7 +206,7 @@ public final class MessageConvertUtils {
     }
 
     public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
-                                List<KeyValue> propertiesList) throws UnsupportedEncodingException {
+                                List<KeyValue> propertiesList) throws UnsupportedEncodingException, JsonUtil.ParseJsonException {
         BasicContentHeaderProperties props = new BasicContentHeaderProperties();
         Map<String, Object> headers = new HashMap<>();
         MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
@@ -260,8 +267,14 @@ public final class MessageConvertUtils {
                 case PROP_ROUTING_KEY:
                     messagePublishInfo.setRoutingKey(AMQShortString.createAMQShortString(keyValue.getValue()));
                     break;
+                case PROP_CUSTOM_JSON:
+                    Map<String, Object> map = JsonUtil.fromJson(keyValue.getValue(), Map.class);
+                    if (!Collections.isEmpty(map)) {
+                        headers.putAll(map);
+                    }
                 default:
-                    headers.put(keyValue.getKey().substring(BASIC_PROP_HEADER_PRE.length()), keyValue.getValue());
+                    // do nothing
+//                    headers.put(keyValue.getKey().substring(BASIC_PROP_HEADER_PRE.length()), keyValue.getValue());
             }
         }
         props.setHeaders(FieldTableFactory.createFieldTable(headers));
@@ -269,7 +282,7 @@ public final class MessageConvertUtils {
     }
 
     public static List<AmqpMessageData> entriesToAmqpBodyList(List<Entry> entries)
-                                                                throws UnsupportedEncodingException {
+            throws UnsupportedEncodingException, JsonUtil.ParseJsonException {
         ImmutableList.Builder<AmqpMessageData> builder = ImmutableList.builder();
         // TODO convert bk entries to amqpbody,
         //  then assemble deliver body with ContentHeaderBody and ContentBody
@@ -310,7 +323,7 @@ public final class MessageConvertUtils {
     }
 
     public static AmqpMessageData entryToAmqpBody(Entry entry)
-        throws UnsupportedEncodingException {
+            throws UnsupportedEncodingException, JsonUtil.ParseJsonException {
         AmqpMessageData amqpMessage = null;
         // TODO convert bk entries to amqpbody,
         //  then assemble deliver body with ContentHeaderBody and ContentBody

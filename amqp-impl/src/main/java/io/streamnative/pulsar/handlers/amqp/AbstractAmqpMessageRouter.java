@@ -164,7 +164,9 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     public CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, List<KeyValue> messageKeyValues, Map<String, Object> properties) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         if (isMatch(properties)) {
-            return destinationEx.writeMessageAsync(MessageConvertUtils.entryToMessage(payload, messageKeyValues), routingKey)
+            System.out.println("route message to exchange from " + exchange.getName() + " to " + destinationEx.getName());
+            return destinationEx.writeMessageAsync(
+                    MessageConvertUtils.entryToMessage(payload, messageKeyValues, false), routingKey)
                     .thenApply(__ -> null);
         } else {
             future.complete(null);

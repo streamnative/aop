@@ -108,7 +108,7 @@ public final class MessageFetchContext {
                                 try {
                                     message.complete(Pair.of(index.getPosition(),
                                             MessageConvertUtils.entryToAmqpBody(msg)));
-                                } catch (UnsupportedEncodingException e) {
+                                } catch (Exception e) {
                                     log.error("Failed to convert entry to AMQP body", e);
                                 }
                                 consumer.addUnAckMessages(indexMessage.getExchangeName(),

@@ -697,7 +697,7 @@ public class AmqpChannel implements ExtensionServerChannelMethodProcessor {
             Message<byte[]> message;
             try {
                 message = MessageConvertUtils.toPulsarMessage(currentMessage);
-            } catch (UnsupportedEncodingException e) {
+            } catch (Exception e) {
                 connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
                 return;
             }

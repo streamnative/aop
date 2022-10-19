@@ -61,7 +61,7 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testWriteAndRead() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
+    public void testWriteAndRead() throws Exception {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
@@ -88,7 +88,7 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testMarkDelete() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
+    public void testMarkDelete() throws Exception {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
@@ -116,7 +116,7 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testQueueAcknowledge() throws ExecutionException, InterruptedException, UnsupportedEncodingException {
+    public void testQueueAcknowledge() throws Exception {
         String exchangeName = "test-exchange";
         String queueName = "test-queue";
         AmqpExchange exchange = new InMemoryExchange(exchangeName, ExchangeType.DIRECT, false);
@@ -189,8 +189,7 @@ public class InMemoryExchangeAndQueueTest {
     }
 
     @Test
-    public void testMultipleBindWriteReadAndAcknowledge() throws
-            ExecutionException, InterruptedException, UnsupportedEncodingException {
+    public void testMultipleBindWriteReadAndAcknowledge() throws Exception {
         String exchangeName1 = "test-exchange-1";
         String exchangeName2 = "test-exchange-2";
         String queueName1 = "test-queue-1";
@@ -237,7 +236,7 @@ public class InMemoryExchangeAndQueueTest {
         Assert.assertEquals(((InMemoryExchange) exchange1).getMessages(), 9);
     }
 
-    private Message<byte[]> generateMessage(String exchangeName, byte[] payload) throws UnsupportedEncodingException {
+    private Message<byte[]> generateMessage(String exchangeName, byte[] payload) throws Exception {
 
         boolean immediate = true;
         boolean mandatory = false;

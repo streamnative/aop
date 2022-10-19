@@ -225,7 +225,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public CompletableFuture<Void> addQueue(AmqpQueue queue) {
+    public synchronized CompletableFuture<Void> addQueue(AmqpQueue queue) {
         queues.add(queue);
         if (exchangeType == Type.Direct) {
             for (String bindingKey : queue.getRouter(exchangeName).getBindingKey()) {
@@ -246,11 +246,14 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public void removeQueue(AmqpQueue queue) {
+    public synchronized void removeQueue(AmqpQueue queue) {
         queues.remove(queue);
-        if (bindingKeyQueueMap != null) {
-            for (Set<AmqpQueue> queueSet : bindingKeyQueueMap.values()) {
-                queueSet.remove(queue);
+        if (exchangeType == Type.Direct) {
+            for (Map.Entry<String, Set<AmqpQueue>> entry : bindingKeyQueueMap.entrySet()) {
+                entry.getValue().remove(queue);
+                if (entry.getValue().isEmpty()) {
+                    bindingKeyQueueMap.remove(entry.getKey());
+                }
             }
         }
         updateExchangeProperties();

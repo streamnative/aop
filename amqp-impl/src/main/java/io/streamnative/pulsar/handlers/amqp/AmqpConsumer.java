@@ -278,12 +278,13 @@ public class AmqpConsumer extends Consumer {
         getSubscription().getDispatcher().consumerFlow(this, permits);
     }
 
-    public void incrementPermits(int permits) {
+    public synchronized void incrementPermits(int permits) {
         int var = ADD_PERMITS_UPDATER.addAndGet(this, permits);
         if (var > maxPermits / 2) {
             MESSAGE_PERMITS_UPDATER.addAndGet(this, var);
-            this.getSubscription().consumerFlow(this, availablePermits);
+            this.getSubscription().consumerFlow(this, var);
             ADD_PERMITS_UPDATER.set(this, 0);
         }
     }
+
 }

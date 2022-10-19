@@ -154,16 +154,8 @@ public class AmqpConsumer extends Consumer {
         asyncGetQueue()
                 .thenCompose(amqpQueue -> amqpQueue.readEntryAsync(
                         indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
-                .whenCompleteAsync((msg, ex) -> {
+                .thenAccept(msg -> {
                     try {
-                        if (ex != null) {
-                            log.error("Failed to read entries data.", ex);
-                            channel.getCreditManager().restoreCredit(1, 0);
-                            incrementPermits(1);
-                            sendFuture.completeExceptionally(ex);
-                            msg.release();
-                            return;
-                        }
                         long deliveryTag = channel.getNextDeliveryTag();
 
                         addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),

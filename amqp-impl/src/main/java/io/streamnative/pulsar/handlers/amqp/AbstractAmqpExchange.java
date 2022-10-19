@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Base class of AMQP exchange.
@@ -30,6 +31,8 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     protected boolean autoDelete;
     protected boolean internal;
     protected Map<String, Object> arguments;
+    protected Map<String, Set<AmqpQueue>> bindingKeyQueueMap;
+
     public static final String DEFAULT_EXCHANGE_DURABLE = "aop.direct.durable";
 
     protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType,
@@ -42,6 +45,9 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
         this.autoDelete = autoDelete;
         this.internal = internal;
         this.arguments = arguments;
+        if (this.exchangeType == Type.Direct) {
+            bindingKeyQueueMap = new ConcurrentHashMap<>();
+        }
     }
 
     @Override

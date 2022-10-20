@@ -33,18 +33,37 @@ import org.testng.annotations.Test;
 /**
  * Exchange bind exchange test.
  */
-public class ExchangeBindExchangeTest extends AmqpTestBase{
+public class ExchangeBindExchangeTest extends AmqpTestBase {
+
+    @Test
+    public void bindAndUnbindTest() throws Exception {
+        @Cleanup
+        Connection connection = getConnection("vhost1", true);
+        @Cleanup
+        Channel channel = connection.createChannel();
+
+        String sourceEx = randExName();
+        String desEx = randExName();
+        channel.exchangeDeclare(sourceEx, BuiltinExchangeType.DIRECT, true);
+        channel.exchangeDeclare(desEx, BuiltinExchangeType.DIRECT, true);
+        String routingKey = "ex-routing";
+        Map<String, Object> params = new HashMap<>();
+        params.put("int", 100);
+        params.put("string", "string value");
+        params.put("boolean", true);
+        channel.exchangeBind(desEx, sourceEx, routingKey, params);
+        channel.exchangeUnbind(desEx, sourceEx, routingKey, params);
+    }
 
     /**
+     * A demo case test, data pipeline as below.
      *
-     * TOPIC_EX --> HEADER_EX --> TOPIC_EX --> QUEUE1
+     * TOPIC_EX --> HEADER_EX  --> TOPIC_EX --> QUEUE1
      *                        |--> DIRECT_EX --> QUEUE1
      *                        |--> FANOUT_EX --> QUEUE2
-     *
-     * @throws Exception
      */
-    @Test()
-    public void test() throws Exception {
+    @Test(timeOut = 1000 * 5)
+    public void produceAndConsumeTest() throws Exception {
         @Cleanup
         Connection connection = getConnection("vhost1", true);
         @Cleanup
@@ -85,7 +104,8 @@ public class ExchangeBindExchangeTest extends AmqpTestBase{
         channel.queueBind(queue1, secondLevelEx2, keyLevel2Ex2ToQueue2);
         channel.basicConsume(queue1, true, new DefaultConsumer(channel) {
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                                       byte[] body) throws IOException {
                 System.out.println("[" + queue1 + "] receive msg: " + new String(body));
                 messageSet.remove(new String(body));
             }
@@ -96,7 +116,8 @@ public class ExchangeBindExchangeTest extends AmqpTestBase{
         channel.queueBind(queue2, secondLevelEx3, "");
         channel.basicConsume(queue2, true, new DefaultConsumer(channel) {
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                                       byte[] body) throws IOException {
                 System.out.println("[" + queue2 + "] receive msg: " + new String(body));
                 messageSet.remove(new String(body));
             }

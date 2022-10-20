@@ -124,7 +124,7 @@ public interface AmqpExchange {
     int getQueueSize();
 
     /**
-     * This method is used by destination exchange;
+     * This method is used by destination exchange.
      * @param sourceEx
      * @param routingKey
      * @param params
@@ -133,7 +133,7 @@ public interface AmqpExchange {
     CompletableFuture<Void> bindExchange(AmqpExchange sourceEx, String routingKey, Map<String, Object> params);
 
     /**
-     * This method is used by destination exchange;
+     * This method is used by destination exchange.
      * @param sourceEx
      * @param routingKey
      * @param params
@@ -141,7 +141,7 @@ public interface AmqpExchange {
     CompletableFuture<Void> unbindExchange(AmqpExchange sourceEx, String routingKey, Map<String, Object> params);
 
     /**
-     * This method is used by source exchange;
+     * This method is used by source exchange.
      * @param destinationEx
      * @param routingKey
      * @param params
@@ -150,7 +150,7 @@ public interface AmqpExchange {
                                         Map<String, Object> params);
 
     /**
-     * This method is used by source exchange;
+     * This method is used by source exchange.
      * @param destinationEx
      * @param routingKey
      * @param params

@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils.PROP_EXCHANGE;
+
 import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.impl.DirectMessageRouter;
@@ -39,19 +41,19 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     protected AmqpExchange exchange;
     protected AmqpExchange destinationEx;
     protected AmqpQueue queue;
-    protected final AmqpMessageRouter.Type routerType;
+    protected final ExchangeType routerType;
     protected Set<String> bindingKeys;
     protected ConcurrentHashMap<String, AmqpBinding> bindings;
     protected Map<String, Object> arguments;
 
-    protected AbstractAmqpMessageRouter(Type routerType) {
+    protected AbstractAmqpMessageRouter(ExchangeType routerType) {
         this.routerType = routerType;
         this.bindingKeys = Sets.newConcurrentHashSet();
         this.bindings = new ConcurrentHashMap<>();
     }
 
     @Override
-    public Type getType() {
+    public ExchangeType getType() {
         return routerType;
     }
 
@@ -102,7 +104,7 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
 
     @Override
     public void addBinding(AmqpBinding binding) {
-        this.bindings.put(binding.getPropsKey(), binding);
+        this.bindings.put(binding.propsKey(), binding);
     }
 
     @Override
@@ -161,17 +163,18 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     }
 
     @Override
-    public CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, List<KeyValue> messageKeyValues, Map<String, Object> properties) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        if (isMatch(properties)) {
-            System.out.println("route message to exchange from " + exchange.getName() + " to " + destinationEx.getName());
+    public CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey,
+                                                      List<KeyValue> messageKeyValues, Map<String, Object> props) {
+        if (!props.getOrDefault(PROP_EXCHANGE, "").equals(destinationEx.getName())) {
+            // indicate this message is from the destination exchange, don't need to route, avoid dead loop
+            return CompletableFuture.completedFuture(null);
+        }
+        if (isMatch(props)) {
             return destinationEx.writeMessageAsync(
                     MessageConvertUtils.entryToMessage(payload, messageKeyValues, false), routingKey)
                     .thenApply(__ -> null);
-        } else {
-            future.complete(null);
         }
-        return future;
+        return CompletableFuture.completedFuture(null);
     }
 
     public abstract boolean isMatch(Map<String, Object> properties);

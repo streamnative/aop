@@ -39,6 +39,7 @@ import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -120,24 +121,53 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         Collection<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
                         String bindingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
                         if (exchangeType == ExchangeType.DIRECT) {
-                            Set<AmqpQueue> queueSet = bindingKeyQueueMap.get(bindingKey);
-                            if (queueSet != null) {
-                                for (AmqpQueue queue : queueSet) {
-                                    routeFutureList.add(
-                                            queue.writeIndexMessageAsync(exchangeName, position.getLedgerId(),
-                                                    position.getEntryId(), props));
+                            // route to queue
+                            Set<AmqpQueue> queueSet = bindingKeyQueueMap.getOrDefault(
+                                    bindingKey, Collections.EMPTY_SET);
+                            for (AmqpQueue queue : queueSet) {
+                                routeFutureList.add(
+                                        queue.writeIndexMessageAsync(exchangeName, position.getLedgerId(),
+                                                position.getEntryId(), props));
+                            }
+                            // route to exchange
+                            Set<AmqpExchange> exchangeSet = bindingKeyExchangeMap.getOrDefault(
+                                    bindingKey, Collections.EMPTY_SET);
+                            for (AmqpExchange exchange : exchangeSet) {
+                                if (!props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
+                                    // indicate this message is from the destination exchange
+                                    // don't need to route, avoid dead loop
+                                    continue;
                                 }
+                                routeFutureList.add(exchange.writeMessageAsync(message, null)
+                                        .thenApply(__ -> null));
+                            }
+                        } else if (exchangeType == ExchangeType.FANOUT) {
+                            for (AmqpQueue queue : queues) {
+                                routeFutureList.add(
+                                        queue.writeIndexMessageAsync(
+                                                exchangeName, position.getLedgerId(), position.getEntryId(), props));
+                            }
+                            for (AmqpExchange exchange : exchanges) {
+                                if (!props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
+                                    // indicate this message is from the destination exchange
+                                    // don't need to route, avoid dead loop
+                                    continue;
+                                }
+                                routeFutureList.add(exchange.writeMessageAsync(message, null)
+                                        .thenApply(__ -> null));
                             }
                         } else {
-                            int queueIndex = 0;
-                            props.put("__queueCount", queues.size());
                             for (AmqpQueue queue : queues) {
-                                queueIndex ++;
-                                props.put("__queueIndex", queueIndex);
                                 CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
                                         position.getLedgerId(), position.getEntryId(),
-                                        props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                                        bindingKey,
                                         props);
+                                routeFutureList.add(routeFuture);
+                            }
+                            for (AmqpExchange exchange : exchanges) {
+                                CompletableFuture<Void> routeFuture = exchange.getRouter(exchangeName)
+                                        .routingMessageToEx(data, bindingKey,
+                                                message.getMessageBuilder().getPropertiesList(), props);
                                 routeFutureList.add(routeFuture);
                             }
                         }
@@ -151,7 +181,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                             props.put(PROP_EXCHANGE, exchange.getName());
                             CompletableFuture<Void> routeFuture = exchange.getRouter(exchangeName).routingMessageToEx(
                                     data,
-                                    props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                                    bindingKey,
                                     message.getMessageBuilder().getPropertiesList(),
                                     props
                             );
@@ -314,9 +344,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public CompletableFuture<Void> unbindExchange(AmqpExchange sourceEx, String routingKey, Map<String, Object> params) {
+    public CompletableFuture<Void> unbindExchange(AmqpExchange sourceEx, String routingKey,
+                                                  Map<String, Object> params) {
         routerMap.computeIfPresent(sourceEx.getName(), (k, router) -> {
-            router.getBindings().remove(new AmqpBinding(sourceEx.getName(), routingKey, params).getPropsKey());
+            router.getBindings().remove(new AmqpBinding(sourceEx.getName(), routingKey, params).propsKey());
             return router;
         });
         updateExchangeProperties();
@@ -325,7 +356,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public CompletableFuture<Void> addExchange(AmqpExchange destinationEx, String routingKey, Map<String, Object> params) {
+    public CompletableFuture<Void> addExchange(AmqpExchange destinationEx, String routingKey,
+                                               Map<String, Object> params) {
         exchanges.add(destinationEx);
         if (exchangeType == ExchangeType.DIRECT) {
             bindingKeyExchangeMap.compute(routingKey, (k, v) -> {
@@ -345,6 +377,9 @@ public class PersistentExchange extends AbstractAmqpExchange {
         if (exchangeType == ExchangeType.DIRECT) {
             bindingKeyExchangeMap.computeIfPresent(routingKey, (k, v) -> {
                 v.remove(destinationEx);
+                if (v.isEmpty()) {
+                    return null;
+                }
                 return v;
             });
         }

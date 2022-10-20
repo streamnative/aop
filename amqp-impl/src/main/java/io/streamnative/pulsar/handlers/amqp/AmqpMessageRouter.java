@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.buffer.ByteBuf;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,25 +27,11 @@ import org.apache.pulsar.common.api.proto.KeyValue;
 public interface AmqpMessageRouter {
 
     /**
-     * Message router type.
-     * Direct message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#DIRECT} exchange.
-     * Fanout message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#FANOUT} exchange.
-     * Topic message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#TOPIC} exchange.
-     * Headers message router is used to bind {@link io.streamnative.pulsar.handlers.amqp.utils.ExchangeType#HEADERS} exchange.
-     */
-    enum Type {
-        Direct,
-        Fanout,
-        Topic,
-        Headers;
-    }
-
-    /**
      * Get the type of this message router.
      *
-     * @return {@link Type} type of this message router
+     * @return {@link ExchangeType} type of this message router
      */
-    Type getType();
+    ExchangeType getType();
 
     /**
      * Set AMQP exchange {@link AmqpExchange} for the message router.
@@ -143,6 +130,7 @@ public interface AmqpMessageRouter {
     CompletableFuture<Void> routingMessage(long ledgerId, long entryId, String routingKey,
                                            Map<String, Object> properties);
 
-    CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, List<KeyValue> messageKeyValues, Map<String, Object> properties);
+    CompletableFuture<Void> routingMessageToEx(ByteBuf payload, String routingKey, List<KeyValue> messageKeyValues,
+                                               Map<String, Object> properties);
 
 }

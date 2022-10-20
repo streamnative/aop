@@ -164,12 +164,14 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public CompletableFuture<Void> unbindExchange(AmqpExchange sourceEx, String routingKey, Map<String, Object> params) {
+    public CompletableFuture<Void> unbindExchange(AmqpExchange sourceEx, String routingKey,
+                                                  Map<String, Object> params) {
         return null;
     }
 
     @Override
-    public CompletableFuture<Void> addExchange(AmqpExchange destinationEx, String routingKey, Map<String, Object> params) {
+    public CompletableFuture<Void> addExchange(AmqpExchange destinationEx, String routingKey,
+                                               Map<String, Object> params) {
         return null;
     }
 

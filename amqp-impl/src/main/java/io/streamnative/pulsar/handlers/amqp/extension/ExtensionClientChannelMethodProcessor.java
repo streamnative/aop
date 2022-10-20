@@ -13,12 +13,12 @@
  */
 package io.streamnative.pulsar.handlers.amqp.extension;
 
-import org.apache.qpid.server.protocol.v0_8.transport.MethodDispatcher;
+import org.apache.qpid.server.protocol.v0_8.transport.ClientChannelMethodProcessor;
 
-public interface ExtensionMethodDispatcher extends MethodDispatcher {
+public interface ExtensionClientChannelMethodProcessor extends ClientChannelMethodProcessor {
 
-    boolean dispatchExchangeBind(ExchangeBindBody exchangeBindBody, int channelId);
+    void receiveExchangeBindOk();
 
-    boolean dispatchExchangeBindOk(ExchangeBindOkBody exchangeBindOkBody, int channelId);
+    void receiveExchangeUnbindOk();
 
 }

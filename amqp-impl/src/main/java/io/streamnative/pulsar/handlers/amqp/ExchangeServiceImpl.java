@@ -59,7 +59,11 @@ public class ExchangeServiceImpl implements ExchangeService {
             createIfMissing = true;
             exchangeType = getExchangeType(exchange);
         } else {
-            exchangeType = type;
+            if ("x-delayed-message".equalsIgnoreCase(type)) {
+                exchangeType = arguments.get("x-delayed-type").toString();
+            } else {
+                exchangeType = type;
+            }
         }
         CompletableFuture<AmqpExchange> future = new CompletableFuture<>();
         exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType,
@@ -191,11 +195,11 @@ public class ExchangeServiceImpl implements ExchangeService {
 
     @Override
     public CompletableFuture<Void> exchangeBind(NamespaceName namespaceName, String destination, String source,
-                                                String bindingKey, Map<String, Object> params) {
+                                                String routingKey, Map<String, Object> params) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         exchangeContainer.asyncGetExchange(namespaceName, source, false, null)
                 .thenCombine(exchangeContainer.asyncGetExchange(namespaceName, destination, false, null),
-                        (sourceEx, desEx) -> desEx.bindExchange(sourceEx, getFinalKey(bindingKey, destination), params))
+                        (sourceEx, desEx) -> desEx.bindExchange(sourceEx, getFinalKey(routingKey, destination), params))
                 .thenAccept(__ -> {
                     future.complete(null);
                 })
@@ -208,11 +212,12 @@ public class ExchangeServiceImpl implements ExchangeService {
 
     @Override
     public CompletableFuture<Void> exchangeUnbind(NamespaceName namespaceName, String destination, String source,
-                                                  String bindingKey, Map<String, Object> params) {
+                                                  String routingKey, Map<String, Object> params) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         exchangeContainer.asyncGetExchange(namespaceName, source, false, null)
                 .thenCombine(exchangeContainer.asyncGetExchange(namespaceName, destination, false, null),
-                        (sourceEx, desEx) -> desEx.unbindExchange(sourceEx, getFinalKey(bindingKey, destination), params))
+                        (sourceEx, desEx) ->
+                                desEx.unbindExchange(sourceEx, getFinalKey(routingKey, destination), params))
                 .thenAccept(__ -> {
                     future.complete(null);
                 })
@@ -223,12 +228,12 @@ public class ExchangeServiceImpl implements ExchangeService {
         return future;
     }
 
-    private String getFinalKey(String bindingKey, String destination) {
+    private String getFinalKey(String routingKey, String destination) {
         String finalKey;
-        if (bindingKey == null) {
+        if (routingKey == null) {
             finalKey = destination;
         } else {
-            finalKey = bindingKey;
+            finalKey = routingKey;
         }
         return finalKey;
     }

@@ -24,6 +24,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -33,8 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.naming.AuthenticationException;
-
-import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;

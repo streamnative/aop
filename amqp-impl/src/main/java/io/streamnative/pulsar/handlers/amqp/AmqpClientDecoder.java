@@ -15,6 +15,8 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
+
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionClientChannelMethodProcessor;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
@@ -51,7 +53,8 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueuePurgeOkBody;
  * Client decoder for client-server interaction tests.
  * Copied from Qpid tests lib.
  */
-public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extends ClientChannelMethodProcessor>>
+public class AmqpClientDecoder extends
+        AMQDecoder<ClientMethodProcessor<? extends ExtensionClientChannelMethodProcessor>>
 {
     private QpidByteBuffer _incompleteBuffer;
 
@@ -60,8 +63,8 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
      *
      * @param methodProcessor          method processor
      */
-    public AmqpClientDecoder(final ClientMethodProcessor<? extends ClientChannelMethodProcessor> methodProcessor)
-    {
+    public AmqpClientDecoder(
+            final ClientMethodProcessor<? extends ExtensionClientChannelMethodProcessor> methodProcessor) {
         super(false, methodProcessor);
     }
 
@@ -115,8 +118,9 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
                        QpidByteBuffer in)
             throws AMQFrameDecodingException
     {
-        ClientMethodProcessor<? extends ClientChannelMethodProcessor> methodProcessor = getMethodProcessor();
-        ClientChannelMethodProcessor channelMethodProcessor = methodProcessor.getChannelMethodProcessor(channelId);
+        ClientMethodProcessor<? extends ExtensionClientChannelMethodProcessor> methodProcessor = getMethodProcessor();
+        ExtensionClientChannelMethodProcessor channelMethodProcessor =
+                methodProcessor.getChannelMethodProcessor(channelId);
         final int classAndMethod = in.getInt();
         int classId = classAndMethod >> 16;
         int methodId = classAndMethod & 0xFFFF;
@@ -228,6 +232,16 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
                     break;
                 case 0x00280017:
                     ExchangeBoundOkBody.process(in, channelMethodProcessor);
+                    break;
+                case 0x0028001f:
+                    if(!channelMethodProcessor.ignoreAllButCloseOk()) {
+                        channelMethodProcessor.receiveExchangeBindOk();
+                    }
+                    break;
+                case 0x00280033:
+                    if(!channelMethodProcessor.ignoreAllButCloseOk()) {
+                        channelMethodProcessor.receiveExchangeUnbindOk();
+                    }
                     break;
 
 

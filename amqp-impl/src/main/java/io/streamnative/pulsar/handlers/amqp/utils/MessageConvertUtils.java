@@ -161,7 +161,8 @@ public final class MessageConvertUtils {
         }
     }
 
-    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, List<KeyValue> keyValues, boolean setDeliveryTime) {
+    public static MessageImpl<byte[]> entryToMessage(ByteBuf payload, List<KeyValue> keyValues,
+                                                     boolean setDeliveryTime) {
         TypedMessageBuilderImpl<byte[]> builder = new TypedMessageBuilderImpl<>(null, Schema.BYTES);
         for (KeyValue kv : keyValues) {
             builder.property(kv.getKey(), kv.getValue());
@@ -206,7 +207,8 @@ public final class MessageConvertUtils {
     }
 
     public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
-                                List<KeyValue> propertiesList) throws UnsupportedEncodingException, JsonUtil.ParseJsonException {
+                                List<KeyValue> propertiesList)
+            throws UnsupportedEncodingException, JsonUtil.ParseJsonException {
         BasicContentHeaderProperties props = new BasicContentHeaderProperties();
         Map<String, Object> headers = new HashMap<>();
         MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
@@ -272,6 +274,7 @@ public final class MessageConvertUtils {
                     if (!Collections.isEmpty(map)) {
                         headers.putAll(map);
                     }
+                    break;
                 default:
                     // do nothing
 //                    headers.put(keyValue.getKey().substring(BASIC_PROP_HEADER_PRE.length()), keyValue.getValue());

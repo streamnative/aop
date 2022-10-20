@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.BindingBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
-import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;

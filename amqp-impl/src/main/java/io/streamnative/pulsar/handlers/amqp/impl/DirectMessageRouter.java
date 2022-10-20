@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ import java.util.Map;
 public class DirectMessageRouter extends AbstractAmqpMessageRouter {
 
     public DirectMessageRouter() {
-        super(Type.Direct);
+        super(ExchangeType.DIRECT);
     }
 
     @Override

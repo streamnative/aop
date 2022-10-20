@@ -19,98 +19,55 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
-import lombok.extern.slf4j.Slf4j;
-import org.testng.annotations.Test;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.extern.slf4j.Slf4j;
+import org.awaitility.Awaitility;
+import org.testng.annotations.Test;
 
 /**
- * Admin API test.
+ * Properties test.
  */
 @Slf4j
 public class PropertiesTest extends AmqpTestBase{
 
-    @Test()
-    public void listExchangeTest() throws Exception {
+    @Test(timeOut = 5000)
+    public void propsTest() throws Exception {
         Connection connection = getConnection("vhost1", true);
         Channel channel = connection.createChannel();
 
         String ex = randExName();
         String qu = randQuName();
 
-
         channel.exchangeDeclare(ex, BuiltinExchangeType.FANOUT, true);
         channel.queueDeclare(qu, true, false, false, null);
         channel.queueBind(qu, ex, "");
 
+        Map<String, Object> headers = new HashMap<>();
+        headers.put("int", 10);
+        headers.put("double", 20.123);
+        headers.put("boolean", true);
 
+        AtomicBoolean flag = new AtomicBoolean(false);
         channel.basicConsume(qu, false, new DefaultConsumer(channel) {
             @Override
-            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
-                super.handleDelivery(consumerTag, envelope, properties, body);
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                                       byte[] body) throws IOException {
+                if (properties.getHeaders().equals(headers)) {
+                    flag.set(true);
+                }
             }
         });
 
         AMQP.BasicProperties.Builder props = new AMQP.BasicProperties.Builder();
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("a", "av");
-        headers.put("b", "bv");
         props.headers(headers);
-        channel.basicPublish(ex, "", props.build(), "test".getBytes());
+        channel.basicPublish(ex, qu, props.build(), "test".getBytes());
 
-        Thread.sleep(1000 * 60 * 60);
-    }
-
-    interface ReadCallback {
-        void readFailed(String s);
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        ExecutorService executors = Executors.newSingleThreadExecutor();
-
-        ReadCallback readCallback = new ReadCallback() {
-            @Override
-            public void readFailed(String s) {
-                log.info(s.toLowerCase());
-            }
-        };
-
-        PropertiesTest test = new PropertiesTest();
-        executors.submit(() -> {
-            test.read(executors, readCallback);
-        });
-        System.out.println("test finish");
-        Thread.sleep(1000 * 2);
-        System.out.println("test finish 2");
-        executors.shutdown();
-    }
-
-    public void read(ExecutorService executorService, ReadCallback readCallback) {
-        try {
-            log.info("read method");
-            read0(executorService, readCallback);
-        } catch (Throwable e) {
-            log.error("read 0 error ", e);
-        }
-    }
-
-    public void read0(ExecutorService executorService, ReadCallback readCallback) {
-        process().thenAcceptAsync(s -> {
-            log.info("process finish");
-            readCallback.readFailed(s);
-        }, executorService).exceptionally(s -> {
-            log.error("failed to process", s);
-            return null;
-        });
-    }
-
-    public CompletableFuture<String> process() {
-        return CompletableFuture.completedFuture(null);
+        Awaitility.await().atMost(5, TimeUnit.SECONDS)
+                .until(flag::get);
     }
 
 }

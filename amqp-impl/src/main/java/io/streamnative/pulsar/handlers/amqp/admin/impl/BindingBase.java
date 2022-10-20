@@ -17,10 +17,10 @@ import io.streamnative.pulsar.handlers.amqp.AmqpBinding;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
-import javax.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javax.ws.rs.core.Response;
 import org.apache.pulsar.broker.web.RestException;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -107,15 +107,15 @@ public class BindingBase extends BaseResources {
                         return;
                     }
                     for (AmqpBinding binding : router.getBindings().values()) {
-                        if (propsKey != null && !propsKey.equals(binding.getPropsKey())) {
+                        if (propsKey != null && !propsKey.equals(binding.propsKey())) {
                             continue;
                         }
                         BindingBean bean = new BindingBean();
                         bean.setVhost(vhost);
                         bean.setSource(source);
                         bean.setDestination(destination);
-                        bean.setRoutingKey(binding.getBindingKey());
-                        bean.setPropertiesKey(binding.getPropsKey());
+                        bean.setRoutingKey(binding.getRoutingKey());
+                        bean.setPropertiesKey(binding.propsKey());
                         bean.setDestinationType("exchange");
                         beans.add(bean);
                     }

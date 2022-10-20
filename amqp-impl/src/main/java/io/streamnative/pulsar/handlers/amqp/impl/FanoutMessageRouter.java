@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import java.util.Map;
 
 /**
@@ -22,7 +23,7 @@ import java.util.Map;
 public class FanoutMessageRouter extends AbstractAmqpMessageRouter {
 
     public FanoutMessageRouter() {
-        super(Type.Fanout);
+        super(ExchangeType.FANOUT);
     }
 
     @Override

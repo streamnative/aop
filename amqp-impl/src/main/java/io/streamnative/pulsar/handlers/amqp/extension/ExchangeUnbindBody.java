@@ -1,3 +1,16 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.streamnative.pulsar.handlers.amqp.extension;
 
 import org.apache.qpid.server.QpidException;
@@ -10,106 +23,108 @@ import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBodyImpl;
 import org.apache.qpid.server.protocol.v0_8.transport.EncodableAMQDataBlock;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodDispatcher;
 
-public class ExchangeUnbindBody extends AMQMethodBodyImpl implements EncodableAMQDataBlock, AMQMethodBody
-{
+public class ExchangeUnbindBody extends AMQMethodBodyImpl implements EncodableAMQDataBlock, AMQMethodBody {
 
     public static final int CLASS_ID =  40;
     public static final int METHOD_ID = 40;
 
     // Fields declared in specification
-    private final AMQShortString _exchange; // [exchange]
-    private final AMQShortString _routingKey; // [routingKey]
-    private final AMQShortString _queue; // [queue]
+    private final int ticket; // [ticket]
+    private final AMQShortString destination; // [exchange]
+    private final AMQShortString source; // [routingKey]
+    private final AMQShortString routingKey; // [queue]
+    private final FieldTable arguments; // [arguments]
 
     public ExchangeUnbindBody(
-            AMQShortString exchange,
+            int ticket,
+            AMQShortString destination,
+            AMQShortString source,
             AMQShortString routingKey,
-            AMQShortString queue
-                            )
-    {
-        _exchange = exchange;
-        _routingKey = routingKey;
-        _queue = queue;
+            FieldTable arguments) {
+        this.ticket = ticket;
+        this.destination = destination;
+        this.source = source;
+        this.routingKey = routingKey;
+        this.arguments = arguments;
     }
 
     @Override
-    public int getClazz()
-    {
+    public int getClazz() {
         return CLASS_ID;
     }
 
     @Override
-    public int getMethod()
-    {
+    public int getMethod() {
         return METHOD_ID;
     }
 
-    public final AMQShortString getExchange()
-    {
-        return _exchange;
+
+    public final int getTicket() {
+        return ticket;
     }
-    public final AMQShortString getRoutingKey()
-    {
-        return _routingKey;
+    public final AMQShortString getDestination() {
+        return destination;
     }
-    public final AMQShortString getQueue()
-    {
-        return _queue;
+    public final AMQShortString getSource() {
+        return source;
+    }
+    public final AMQShortString getRoutingKey() {
+        return routingKey;
+    }
+    public final FieldTable getArguments() {
+        return arguments;
     }
 
     @Override
-    protected int getBodySize()
-    {
-        int size = 0;
-        size += getSizeOf( _exchange );
-        size += getSizeOf( _routingKey );
-        size += getSizeOf( _queue );
+    protected int getBodySize() {
+        int size = 3;
+        size += getSizeOf(destination);
+        size += getSizeOf(source);
+        size += getSizeOf(routingKey);
+        size += getSizeOf(arguments);
         return size;
     }
 
     @Override
-    public void writeMethodPayload(QpidByteBuffer buffer)
-    {
-        writeAMQShortString( buffer, _exchange );
-        writeAMQShortString( buffer, _routingKey );
-        writeAMQShortString( buffer, _queue );
+    public void writeMethodPayload(QpidByteBuffer buffer) {
+        writeUnsignedShort(buffer, ticket);
+        writeAMQShortString(buffer, destination);
+        writeAMQShortString(buffer, source);
+        writeAMQShortString(buffer, routingKey);
+        writeBitfield(buffer, (byte) 0);
+        writeFieldTable(buffer, arguments);
     }
 
     @Override
-    public boolean execute(MethodDispatcher dispatcher, int channelId) throws QpidException
-	{
+    public boolean execute(MethodDispatcher dispatcher, int channelId) throws QpidException {
         return false;
-	}
+    }
 
     @Override
-    public String toString()
-    {
-        StringBuilder buf = new StringBuilder("[ExchangeUnbindBodyImpl: ");
-        buf.append( "exchange=" );
-        buf.append(  getExchange() );
-        buf.append( ", " );
-        buf.append( "routingKey=" );
-        buf.append(  getRoutingKey() );
-        buf.append( ", " );
-        buf.append( "queue=" );
-        buf.append(  getQueue() );
-        buf.append("]");
-        return buf.toString();
+    public String toString() {
+        return "[ExchangeUnbindBodyImpl: " + "exchange="
+                + getDestination()
+                + ", "
+                + "routingKey="
+                + getSource()
+                + ", "
+                + "queue="
+                + getRoutingKey()
+                + "]";
     }
 
     public static void process(final QpidByteBuffer buffer,
-                               final ExtensionServerChannelMethodProcessor dispatcher)
-    {
+                               final ExtensionServerChannelMethodProcessor dispatcher) {
 
         int ticket = buffer.getUnsignedShort();
         AMQShortString destination = AMQShortString.readAMQShortString(buffer);
         AMQShortString source = AMQShortString.readAMQShortString(buffer);
-        AMQShortString bindingKey = AMQShortString.readAMQShortString(buffer);
+        AMQShortString routingKey = AMQShortString.readAMQShortString(buffer);
         boolean nowait = (buffer.get() & 0x01) == 0x01;
         FieldTable arguments = EncodingUtils.readFieldTable(buffer);
-        if(!dispatcher.ignoreAllButCloseOk())
-        {
-            dispatcher.receiveExchangeUnbind(destination, source, bindingKey, nowait, FieldTable.convertToDecodedFieldTable(arguments));
+        if (!dispatcher.ignoreAllButCloseOk()) {
+            dispatcher.receiveExchangeUnbind(destination, source, routingKey, nowait,
+                    FieldTable.convertToDecodedFieldTable(arguments));
         }
     }
 }

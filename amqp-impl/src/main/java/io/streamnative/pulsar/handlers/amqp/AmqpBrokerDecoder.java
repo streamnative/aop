@@ -13,11 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import java.io.IOException;
-
 import io.streamnative.pulsar.handlers.amqp.extension.ExchangeBindBody;
 import io.streamnative.pulsar.handlers.amqp.extension.ExchangeUnbindBody;
 import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
+import java.io.IOException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQFrameDecodingException;
@@ -136,10 +135,8 @@ public class AmqpBrokerDecoder extends ServerDecoder {
         int classId = classAndMethod >> 16;
         int methodId = classAndMethod & 0xFFFF;
         methodProcessor.setCurrentMethod(classId, methodId);
-        try
-        {
-            switch (classAndMethod)
-            {
+        try {
+            switch (classAndMethod) {
                 //CONNECTION_CLASS:
                 case 0x000a000b:
                     ConnectionStartOkBody.process(in, methodProcessor);
@@ -154,47 +151,31 @@ public class AmqpBrokerDecoder extends ServerDecoder {
                     ConnectionOpenBody.process(in, methodProcessor);
                     break;
                 case 0x000a0032:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
-                    {
-                        throw newUnknownMethodException(classId, methodId,
-                                methodProcessor.getProtocolVersion());
-                    }
-                    else
-                    {
+                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8)) {
+                        throw newUnknownMethodException(classId, methodId, methodProcessor.getProtocolVersion());
+                    } else {
                         ConnectionCloseBody.process(in, methodProcessor);
                     }
                     break;
                 case 0x000a0033:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
-                    {
-                        throw newUnknownMethodException(classId, methodId,
-                                methodProcessor.getProtocolVersion());
-                    }
-                    else
-                    {
+                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8)) {
+                        throw newUnknownMethodException(classId, methodId, methodProcessor.getProtocolVersion());
+                    } else {
                         methodProcessor.receiveConnectionCloseOk();
                     }
                     break;
                 case 0x000a003c:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
-                    {
+                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8)) {
                         ConnectionCloseBody.process(in, methodProcessor);
-                    }
-                    else
-                    {
-                        throw newUnknownMethodException(classId, methodId,
-                                methodProcessor.getProtocolVersion());
+                    } else {
+                        throw newUnknownMethodException(classId, methodId, methodProcessor.getProtocolVersion());
                     }
                     break;
                 case 0x000a003d:
-                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8))
-                    {
+                    if (methodProcessor.getProtocolVersion().equals(ProtocolVersion.v0_8)) {
                         methodProcessor.receiveConnectionCloseOk();
-                    }
-                    else
-                    {
-                        throw newUnknownMethodException(classId, methodId,
-                                methodProcessor.getProtocolVersion());
+                    } else {
+                        throw newUnknownMethodException(classId, methodId, methodProcessor.getProtocolVersion());
                     }
                     break;
 
@@ -307,32 +288,26 @@ public class AmqpBrokerDecoder extends ServerDecoder {
                 // TX_CLASS:
 
                 case 0x005a000a:
-                    if(!methodProcessor.getChannelMethodProcessor(channelId).ignoreAllButCloseOk())
-                    {
+                    if (!methodProcessor.getChannelMethodProcessor(channelId).ignoreAllButCloseOk()) {
                         methodProcessor.getChannelMethodProcessor(channelId).receiveTxSelect();
                     }
                     break;
                 case 0x005a0014:
-                    if(!methodProcessor.getChannelMethodProcessor(channelId).ignoreAllButCloseOk())
-                    {
+                    if (!methodProcessor.getChannelMethodProcessor(channelId).ignoreAllButCloseOk()) {
                         methodProcessor.getChannelMethodProcessor(channelId).receiveTxCommit();
                     }
                     break;
                 case 0x005a001e:
-                    if(!methodProcessor.getChannelMethodProcessor(channelId).ignoreAllButCloseOk())
-                    {
+                    if (!methodProcessor.getChannelMethodProcessor(channelId).ignoreAllButCloseOk()) {
                         methodProcessor.getChannelMethodProcessor(channelId).receiveTxRollback();
                     }
                     break;
 
                 default:
-                    throw newUnknownMethodException(classId, methodId,
-                            methodProcessor.getProtocolVersion());
+                    throw newUnknownMethodException(classId, methodId, methodProcessor.getProtocolVersion());
 
             }
-        }
-        finally
-        {
+        } finally {
             methodProcessor.setCurrentMethod(0, 0);
         }
     }

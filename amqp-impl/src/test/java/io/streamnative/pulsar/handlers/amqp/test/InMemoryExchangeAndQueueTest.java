@@ -15,19 +15,16 @@ package io.streamnative.pulsar.handlers.amqp.test;
 
 import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchange;
-import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.impl.FanoutMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.InMemoryQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
@@ -56,7 +53,7 @@ public class InMemoryExchangeAndQueueTest {
         queue.bindExchange(exchange, new FanoutMessageRouter(), "", null);
         Assert.assertNotNull(queue.getRouter(exchangeName));
         Assert.assertEquals(queue.getRouter(exchangeName).getExchange(), exchange);
-        Assert.assertEquals(queue.getRouter(exchangeName).getType(), AmqpMessageRouter.Type.Fanout);
+        Assert.assertEquals(queue.getRouter(exchangeName).getType(), ExchangeType.FANOUT);
         Assert.assertEquals(queue.getRouter(exchangeName).getQueue(), queue);
     }
 
@@ -178,10 +175,10 @@ public class InMemoryExchangeAndQueueTest {
         Assert.assertEquals(queue1.getRouter(exchangeName2).getExchange(), exchange2);
         Assert.assertEquals(queue2.getRouter(exchangeName1).getExchange(), exchange1);
         Assert.assertEquals(queue2.getRouter(exchangeName2).getExchange(), exchange2);
-        Assert.assertEquals(queue1.getRouter(exchangeName1).getType(), AmqpMessageRouter.Type.Fanout);
-        Assert.assertEquals(queue1.getRouter(exchangeName2).getType(), AmqpMessageRouter.Type.Fanout);
-        Assert.assertEquals(queue2.getRouter(exchangeName1).getType(), AmqpMessageRouter.Type.Fanout);
-        Assert.assertEquals(queue2.getRouter(exchangeName2).getType(), AmqpMessageRouter.Type.Fanout);
+        Assert.assertEquals(queue1.getRouter(exchangeName1).getType(), ExchangeType.FANOUT);
+        Assert.assertEquals(queue1.getRouter(exchangeName2).getType(), ExchangeType.FANOUT);
+        Assert.assertEquals(queue2.getRouter(exchangeName1).getType(), ExchangeType.FANOUT);
+        Assert.assertEquals(queue2.getRouter(exchangeName2).getType(), ExchangeType.FANOUT);
         Assert.assertEquals(queue1.getRouter(exchangeName1).getQueue(), queue1);
         Assert.assertEquals(queue1.getRouter(exchangeName2).getQueue(), queue1);
         Assert.assertEquals(queue2.getRouter(exchangeName1).getQueue(), queue2);

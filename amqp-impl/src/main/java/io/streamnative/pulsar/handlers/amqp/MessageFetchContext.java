@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;

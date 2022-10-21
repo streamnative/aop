@@ -19,14 +19,15 @@ import static org.junit.Assert.fail;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.test.BrokerTestCase;
 import java.io.IOException;
+import org.testng.annotations.Test;
 
 /**
  * Test that unbinding from an auto-delete exchange causes the exchange to go away.
  *
  */
 public class UnbindAutoDeleteExchange extends BrokerTestCase {
-    ////@Test
-    public void unbind() throws IOException, InterruptedException {
+    @Test
+    public void unbind() throws IOException{
         String exchange = "myexchange";
         channel.exchangeDeclare(exchange, "fanout", false, true, null);
         String queue = channel.queueDeclare().getQueue();

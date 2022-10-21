@@ -252,7 +252,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }
-        queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
+        queueService.queueDeclare(connection.getNamespaceName(), AMQShortString.toString(queue),
+                passive, durable, exclusive,
                 autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
             setDefaultQueue(amqpQueue);
             MethodRegistry methodRegistry = connection.getMethodRegistry();
@@ -345,7 +346,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     exchange, bindingKey, arguments);
         }
         queueService.queueUnbind(connection.getNamespaceName(), queue.toString(), exchange.toString(),
-                bindingKey.toString(), arguments, connection.getConnectionId()).thenAccept(__ -> {
+                AMQShortString.toString(bindingKey), arguments, connection.getConnectionId()).thenAccept(__ -> {
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
         }).exceptionally(t -> {

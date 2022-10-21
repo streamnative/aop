@@ -21,7 +21,7 @@ public enum ExchangeType {
     HEADERS("headers"),
     X_CONSISTENT_HASH("x-consistent-hash");
 
-    private String value;
+    private final String value;
 
     ExchangeType(String value) {
         this.value = value;
@@ -31,8 +31,8 @@ public enum ExchangeType {
         if (type == null || type.length() == 0) {
             return null;
         }
-        type = type.toLowerCase();
-        switch (type) {
+        String finalType = type.toLowerCase();
+        switch (finalType) {
             case "direct":
                 return DIRECT;
             case "fanout":

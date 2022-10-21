@@ -170,6 +170,7 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
             return CompletableFuture.completedFuture(null);
         }
         if (isMatch(props)) {
+            props.put(PROP_EXCHANGE, exchange.getName());
             return destinationEx.writeMessageAsync(
                     MessageConvertUtils.entryToMessage(payload, messageKeyValues, false), routingKey)
                     .thenApply(__ -> null);

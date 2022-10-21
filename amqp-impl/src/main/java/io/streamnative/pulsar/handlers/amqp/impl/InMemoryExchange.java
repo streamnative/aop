@@ -177,7 +177,7 @@ public class InMemoryExchange extends AbstractAmqpExchange {
 
     @Override
     public void removeExchange(AmqpExchange destinationEx, String routingKey, Map<String, Object> params) {
-
+        // nothing to do
     }
 
     @Override

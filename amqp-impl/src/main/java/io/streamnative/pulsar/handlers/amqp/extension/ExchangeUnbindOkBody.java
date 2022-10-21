@@ -27,9 +27,6 @@ public class ExchangeUnbindOkBody extends AMQMethodBodyImpl implements Encodable
 
     // Fields declared in specification
 
-    public ExchangeUnbindOkBody() {
-    }
-
     @Override
     public int getClazz() {
         return CLASS_ID;
@@ -43,12 +40,12 @@ public class ExchangeUnbindOkBody extends AMQMethodBodyImpl implements Encodable
 
     @Override
     protected int getBodySize() {
-        int size = 0;
-        return size;
+        return 0;
     }
 
     @Override
     public void writeMethodPayload(QpidByteBuffer buffer) {
+        // nothing to do
     }
 
     @Override

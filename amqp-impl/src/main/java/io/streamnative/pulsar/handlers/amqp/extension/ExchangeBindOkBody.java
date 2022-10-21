@@ -25,11 +25,6 @@ public class ExchangeBindOkBody extends AMQMethodBodyImpl implements EncodableAM
     public static final int CLASS_ID =  40;
     public static final int METHOD_ID = 31;
 
-    // Fields declared in specification
-
-    public ExchangeBindOkBody() {
-    }
-
     @Override
     public int getClazz() {
         return CLASS_ID;
@@ -43,12 +38,12 @@ public class ExchangeBindOkBody extends AMQMethodBodyImpl implements EncodableAM
 
     @Override
     protected int getBodySize() {
-        int size = 0;
-        return size;
+        return 0;
     }
 
     @Override
     public void writeMethodPayload(QpidByteBuffer buffer) {
+        // nothing to do
     }
 
     @Override

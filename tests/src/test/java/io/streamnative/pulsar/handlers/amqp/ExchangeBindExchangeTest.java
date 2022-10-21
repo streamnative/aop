@@ -68,12 +68,13 @@ public class ExchangeBindExchangeTest extends AmqpTestBase {
         Connection connection = getConnection("vhost1", true);
         @Cleanup
         Channel channel = connection.createChannel();
-        String rootEx, firstLevelEx, secondLevelEx1, secondLevelEx2, secondLevelEx3;
-        rootEx = "root-ex-" + RandomStringUtils.randomAlphabetic(5);
-        firstLevelEx = "level1-ex-header-" + RandomStringUtils.randomAlphabetic(5);
-        secondLevelEx1 = "level2-ex-topic-" + RandomStringUtils.randomAlphabetic(5);
-        secondLevelEx2 = "level2-ex-fanout-" + RandomStringUtils.randomAlphabetic(5);
-        secondLevelEx3 = "level2-ex-direct-" + RandomStringUtils.randomAlphabetic(5);
+
+        String rootEx = "root-ex-" + RandomStringUtils.randomAlphabetic(5);
+        String firstLevelEx = "level1-ex-header-" + RandomStringUtils.randomAlphabetic(5);
+        String secondLevelEx1 = "level2-ex-topic-" + RandomStringUtils.randomAlphabetic(5);
+        String secondLevelEx2 = "level2-ex-fanout-" + RandomStringUtils.randomAlphabetic(5);
+        String secondLevelEx3 = "level2-ex-direct-" + RandomStringUtils.randomAlphabetic(5);
+
         channel.exchangeDeclare(rootEx, BuiltinExchangeType.TOPIC, true);
         channel.exchangeDeclare(firstLevelEx, BuiltinExchangeType.HEADERS, true);
         channel.exchangeDeclare(secondLevelEx1, BuiltinExchangeType.TOPIC, true);

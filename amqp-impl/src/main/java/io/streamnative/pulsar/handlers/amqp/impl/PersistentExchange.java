@@ -74,6 +74,7 @@ import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
  */
 @Slf4j
 public class PersistentExchange extends AbstractAmqpExchange {
+
     public static final String EXCHANGE = "EXCHANGE";
     public static final String QUEUES = "QUEUES";
     public static final String TYPE = "TYPE";
@@ -114,80 +115,32 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         MessageImpl<byte[]> message = MessageImpl.deserialize(data);
                         for (KeyValue keyValue : message.getMessageBuilder().getPropertiesList()) {
                             props.put(keyValue.getKey(), keyValue.getValue());
-                            if (keyValue.getKey().equals(PROP_CUSTOM_JSON)) {
+                            if (exchangeType.equals(ExchangeType.HEADERS)
+                                    && keyValue.getKey().equals(PROP_CUSTOM_JSON)) {
                                 props.putAll(JsonUtil.fromJson(keyValue.getValue(), Map.class));
                             }
                         }
                         Collection<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
-                        String bindingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
+                        String routingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
                         if (exchangeType == ExchangeType.DIRECT) {
-                            // route to queue
-                            Set<AmqpQueue> queueSet = bindingKeyQueueMap.getOrDefault(
-                                    bindingKey, Collections.EMPTY_SET);
-                            for (AmqpQueue queue : queueSet) {
-                                routeFutureList.add(
-                                        queue.writeIndexMessageAsync(exchangeName, position.getLedgerId(),
-                                                position.getEntryId(), props));
-                            }
-                            // route to exchange
-                            Set<AmqpExchange> exchangeSet = bindingKeyExchangeMap.getOrDefault(
-                                    bindingKey, Collections.EMPTY_SET);
-                            for (AmqpExchange exchange : exchangeSet) {
-                                if (!props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
-                                    // indicate this message is from the destination exchange
-                                    // don't need to route, avoid dead loop
-                                    continue;
-                                }
-                                routeFutureList.add(exchange.writeMessageAsync(message, null)
-                                        .thenApply(__ -> null));
-                            }
+                            directRouting(routingKey, position, message, props, routeFutureList);
                         } else if (exchangeType == ExchangeType.FANOUT) {
-                            for (AmqpQueue queue : queues) {
-                                routeFutureList.add(
-                                        queue.writeIndexMessageAsync(
-                                                exchangeName, position.getLedgerId(), position.getEntryId(), props));
-                            }
-                            for (AmqpExchange exchange : exchanges) {
-                                if (!props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
-                                    // indicate this message is from the destination exchange
-                                    // don't need to route, avoid dead loop
-                                    continue;
-                                }
-                                routeFutureList.add(exchange.writeMessageAsync(message, null)
-                                        .thenApply(__ -> null));
-                            }
+                            fanoutRouting(position, message, props, routeFutureList);
                         } else {
                             for (AmqpQueue queue : queues) {
                                 CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
                                         position.getLedgerId(), position.getEntryId(),
-                                        bindingKey,
+                                        routingKey,
                                         props);
                                 routeFutureList.add(routeFuture);
                             }
                             for (AmqpExchange exchange : exchanges) {
                                 CompletableFuture<Void> routeFuture = exchange.getRouter(exchangeName)
-                                        .routingMessageToEx(data, bindingKey,
+                                        .routingMessageToEx(data, routingKey,
                                                 message.getMessageBuilder().getPropertiesList(), props);
                                 routeFutureList.add(routeFuture);
                             }
                         }
-
-                        for (AmqpExchange exchange : exchanges) {
-                            if (props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
-                                // indicate this message is from the destination exchange
-                                // don't need to route, avoid dead loop
-                                continue;
-                            }
-                            props.put(PROP_EXCHANGE, exchange.getName());
-                            CompletableFuture<Void> routeFuture = exchange.getRouter(exchangeName).routingMessageToEx(
-                                    data,
-                                    bindingKey,
-                                    message.getMessageBuilder().getPropertiesList(),
-                                    props
-                            );
-                            routeFutureList.add(routeFuture);
-                        }
-
                         return FutureUtil.waitForAll(routeFutureList);
                     } catch (Exception e) {
                         log.error("Read process failed. exchangeName: {}", exchangeName, e);
@@ -198,6 +151,45 @@ public class PersistentExchange extends AbstractAmqpExchange {
             messageReplicator.startReplicate();
         }
         this.amqpEntryWriter = new AmqpEntryWriter(persistentTopic);
+    }
+
+    private void directRouting(String routingKey, Position position, Message<byte[]> message, Map<String, Object> props,
+                               Collection<CompletableFuture<Void>> futures) {
+        // route to queue
+        Set<AmqpQueue> queueSet = bindingKeyQueueMap.getOrDefault(routingKey, Collections.EMPTY_SET);
+        for (AmqpQueue queue : queueSet) {
+            futures.add(
+                    queue.writeIndexMessageAsync(exchangeName, position.getLedgerId(),
+                            position.getEntryId(), props));
+        }
+        // route to exchange
+        Set<AmqpExchange> exchangeSet = bindingKeyExchangeMap.getOrDefault(routingKey, Collections.EMPTY_SET);
+        for (AmqpExchange exchange : exchangeSet) {
+            if (!props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
+                // indicate this message is from the destination exchange
+                // don't need to route, avoid dead loop
+                continue;
+            }
+            futures.add(exchange.writeMessageAsync(message, null)
+                    .thenApply(__ -> null));
+        }
+    }
+
+    private void fanoutRouting(Position position, Message<byte[]> message, Map<String, Object> props,
+                               Collection<CompletableFuture<Void>> futures) {
+        for (AmqpQueue queue : queues) {
+            futures.add(queue.writeIndexMessageAsync(
+                    exchangeName, position.getLedgerId(), position.getEntryId(), props));
+        }
+        for (AmqpExchange exchange : exchanges) {
+            if (!props.getOrDefault(PROP_EXCHANGE, "").equals(exchange.getName())) {
+                // indicate this message is from the destination exchange
+                // don't need to route, avoid dead loop
+                continue;
+            }
+            futures.add(exchange.writeMessageAsync(message, null)
+                    .thenApply(__ -> null));
+        }
     }
 
     @Override

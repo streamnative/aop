@@ -115,8 +115,8 @@ public class ExchangeUnbindBody extends AMQMethodBodyImpl implements EncodableAM
 
     public static void process(final QpidByteBuffer buffer,
                                final ExtensionServerChannelMethodProcessor dispatcher) {
-
-        int ticket = buffer.getUnsignedShort();
+        // get ticket
+        buffer.getUnsignedShort();
         AMQShortString destination = AMQShortString.readAMQShortString(buffer);
         AMQShortString source = AMQShortString.readAMQShortString(buffer);
         AMQShortString routingKey = AMQShortString.readAMQShortString(buffer);

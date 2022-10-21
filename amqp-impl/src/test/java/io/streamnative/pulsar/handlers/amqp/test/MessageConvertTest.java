@@ -45,7 +45,7 @@ import org.testng.annotations.Test;
 public class MessageConvertTest {
 
     @Test
-    private void test() throws Exception {
+    private void messageConvertTest() throws Exception {
         String exchange = "testExchange";
         boolean immediate = true;
         boolean mandatory = false;
@@ -113,7 +113,7 @@ public class MessageConvertTest {
     }
 
     @Test
-    private void positionConvert() {
+    private void positionConvertTest() {
         MessageImpl<byte[]> message;
         IndexMessage indexMessage = IndexMessage.create("test-exchange", 1L, 1L, null);
         message = MessageConvertUtils.toPulsarMessage(indexMessage);

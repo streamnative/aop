@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Base class for AMQP message router.
@@ -113,16 +114,16 @@ public abstract class AbstractAmqpMessageRouter implements AmqpMessageRouter {
     @Override
     public CompletableFuture<Void> routingMessage(long ledgerId, long entryId,
                                                   String routingKey, Map<String, Object> properties) {
-        CompletableFuture<Void> completableFuture = CompletableFuture.completedFuture(null);
         if (isMatch(properties)) {
             try {
                 return queue.writeIndexMessageAsync(exchange.getName(), ledgerId, entryId, properties);
             } catch (Exception e) {
-                log.error("Failed to route message.", e);
-                completableFuture.completeExceptionally(e);
+                log.error("Failed to route message from exchange {} to queue {} for pos {}:{}.",
+                        exchange.getName(), queue.getName(), ledgerId, entryId, e);
+                return FutureUtil.failedFuture(e);
             }
         }
-        return completableFuture;
+        return CompletableFuture.completedFuture(null);
     }
 
     public abstract boolean isMatch(Map<String, Object> properties);

@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -28,10 +29,9 @@ import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
-import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
-import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -98,8 +98,7 @@ public abstract class AmqpProtocolTestBase {
     public void setup() throws Exception {
         mockPulsarService();
         mockBrokerService();
-        ConnectionContainer connectionContainer = mock(ConnectionContainer.class);
-        amqpBrokerService = new AmqpBrokerService(pulsarService, connectionContainer);
+        amqpBrokerService = new AmqpBrokerService(pulsarService, new AmqpServiceConfiguration());
         amqpTopicManager = amqpBrokerService.getAmqpTopicManager();
 
         // 1.Init AMQP connection for connection methods and channel methods tests.
@@ -107,9 +106,9 @@ public abstract class AmqpProtocolTestBase {
         ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
         Channel channel = mock(Channel.class);
         SocketAddress socketAddress = mock(SocketAddress.class);
-        Mockito.when(ctx.channel()).thenReturn(channel);
-        Mockito.when(channel.remoteAddress()).thenReturn(socketAddress);
-        Mockito.when(ctx.pipeline()).thenReturn(mock(ChannelPipeline.class));
+        when(ctx.channel()).thenReturn(channel);
+        when(channel.remoteAddress()).thenReturn(socketAddress);
+        when(ctx.pipeline()).thenReturn(mock(ChannelPipeline.class));
         connection.channelActive(ctx);
         // 2.Init ByteBuffer sender for the test to send requests to AMQP server.
         toServerSender = new ToServerByteBufferSender(connection);
@@ -128,7 +127,7 @@ public abstract class AmqpProtocolTestBase {
             (new AmqpClientMethodProcessor(clientChannel))));
         AmqpPulsarServerCnx serverCnx = new AmqpPulsarServerCnx(connection.getPulsarService(), ctx);
         connection.setPulsarServerCnx(serverCnx);
-        Mockito.when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
+        when(connection.getPulsarService().getState()).thenReturn(PulsarService.State.Started);
         initProtocol();
         initMockAmqpTopicManager();
         initDefaultExchange();
@@ -139,32 +138,33 @@ public abstract class AmqpProtocolTestBase {
         PulsarAdmin adminClient = mock(PulsarAdmin.class);
         Namespaces namespaces = mock(Namespaces.class);
         ServiceConfiguration serviceConfiguration = mock(ServiceConfiguration.class);
-        Mockito.when(pulsarService.getAdminClient()).thenReturn(adminClient);
-        Mockito.when(pulsarService.getAdminClient().namespaces()).thenReturn(namespaces);
-        Mockito.when(pulsarService.getBrokerService()).then(new Answer<Object>() {
+        when(pulsarService.getAdminClient()).thenReturn(adminClient);
+        when(pulsarService.getAdminClient().namespaces()).thenReturn(namespaces);
+        when(pulsarService.getBrokerService()).then(new Answer<Object>() {
             @Override
             public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
                 return brokerService;
             }
         });
-        Mockito.when(pulsarService.getConfiguration()).thenReturn(serviceConfiguration);
-        Mockito.when(pulsarService.getOrderedExecutor()).thenReturn(
+        when(pulsarService.getConfiguration()).thenReturn(serviceConfiguration);
+        when(pulsarService.getOrderedExecutor()).thenReturn(
                 OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
-        Mockito.when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());
+        when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());
 
         NamespaceResources namespaceResources = mock(NamespaceResources.class);
-        Mockito.when(namespaceResources.getPoliciesAsync(any()))
+        when(namespaceResources.getPoliciesAsync(any()))
                 .thenReturn(CompletableFuture.completedFuture(Optional.of(new Policies())));
         PulsarResources pulsarResources = mock(PulsarResources.class);
-        Mockito.when(pulsarResources.getNamespaceResources()).thenReturn(namespaceResources);
-        Mockito.when(pulsarService.getPulsarResources()).thenReturn(pulsarResources);
+        when(pulsarResources.getNamespaceResources()).thenReturn(namespaceResources);
+        when(pulsarService.getPulsarResources()).thenReturn(pulsarResources);
+        when(pulsarService.getNamespaceService()).thenReturn(mock(NamespaceService.class));
     }
 
     private void mockBrokerService() {
         brokerService = mock(BrokerService.class);
-        Mockito.when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
-        Mockito.when(brokerService.pulsar()).thenReturn(pulsarService);
-        Mockito.when(brokerService.getPulsar()).thenReturn(pulsarService);
+        when(brokerService.executor()).thenReturn(mock(EventLoopGroup.class));
+        when(brokerService.pulsar()).thenReturn(pulsarService);
+        when(brokerService.getPulsar()).thenReturn(pulsarService);
     }
 
     private void initDefaultExchange() {
@@ -181,19 +181,21 @@ public abstract class AmqpProtocolTestBase {
 
         CompletableFuture<Subscription> subFuture = new CompletableFuture<>();
         Subscription subscription = mock(Subscription.class);
-        Mockito.when(subscription.getTopic()).thenReturn(persistentTopic);
+        when(subscription.getTopic()).thenReturn(persistentTopic);
         subFuture.complete(subscription);
-        Mockito.when(persistentTopic.createSubscription(Mockito.anyString(),
+        when(persistentTopic.createSubscription(Mockito.anyString(),
                 Mockito.any(), Mockito.anyBoolean(), Mockito.any())).thenReturn(subFuture);
-        Mockito.when(subscription.getDispatcher()).thenReturn(mock(MockDispatcher.class));
-        Mockito.when(subscription.addConsumer(Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
-        Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
-        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
-        Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
-        CompletableFuture deleteCpm = new CompletableFuture<>();
-        Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);
+        when(subscription.getDispatcher()).thenReturn(mock(MockDispatcher.class));
+        when(subscription.addConsumer(Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
+        when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
+        ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);
+        when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
+        when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
+        when(persistentTopic.getBrokerService()).thenReturn(brokerService);
+        CompletableFuture<Void> deleteCpm = new CompletableFuture<>();
+        when(persistentTopic.delete()).thenReturn(deleteCpm);
         deleteCpm.complete(null);
-        Mockito.when(persistentTopic.getHierarchyTopicPolicies()).thenReturn(spy(new HierarchyTopicPolicies()));
+        when(persistentTopic.getHierarchyTopicPolicies()).thenReturn(spy(new HierarchyTopicPolicies()));
 
         completableFuture.complete(persistentTopic);
         NamespaceService namespaceService = mock(NamespaceService.class);
@@ -201,27 +203,38 @@ public abstract class AmqpProtocolTestBase {
         CompletableFuture<Optional<LookupResult>> lookupCompletableFuture = new CompletableFuture<>();
         LookupResult lookupResult = mock(LookupResult.class);
         lookupCompletableFuture.complete(Optional.of(lookupResult));
-        Mockito.when(connection.getPulsarService().getNamespaceService()).thenReturn(namespaceService);
-        Mockito.when(namespaceService.getBrokerServiceUrlAsync(Mockito.any(TopicName.class),
+        when(connection.getPulsarService().getNamespaceService()).thenReturn(namespaceService);
+        when(namespaceService.getBrokerServiceUrlAsync(Mockito.any(TopicName.class),
                 Mockito.any(LookupOptions.class))).then(invocationOnMock -> {
             Object[] args = invocationOnMock.getArguments();
-            Mockito.when(persistentTopic.getName()).thenReturn(args[0].toString());
+            when(persistentTopic.getName()).thenReturn(args[0].toString());
             return lookupCompletableFuture;
         });
 
         LookupData lookupData = mock(LookupData.class);
-        Mockito.when(lookupResult.getLookupData()).thenReturn(lookupData);
-        Mockito.when(lookupResult.getLookupData().getBrokerUrl()).thenReturn("127.0.0.1");
+        when(lookupResult.getLookupData()).thenReturn(lookupData);
+        when(lookupResult.getLookupData().getBrokerUrl()).thenReturn("127.0.0.1");
         CompletableFuture<Optional<Topic>> topicCompletableFuture = new CompletableFuture<>();
         topicCompletableFuture.complete(Optional.of(persistentTopic));
 
-        Mockito.when(connection.getPulsarService().getBrokerService()).thenReturn(brokerService);
-        Mockito.when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean())).
+        when(connection.getPulsarService().getBrokerService()).thenReturn(brokerService);
+        when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean())).
                 thenReturn(topicCompletableFuture);
-
-        ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);
-        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
-        Mockito.when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
+        when(brokerService.getTopic(Mockito.anyString(), Mockito.anyBoolean(), Mockito.anyMap())).
+                thenAnswer(new Answer<Object>() {
+                    @Override
+                    public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                        Object[] objects = invocationOnMock.getArguments();
+                        Map<String, String> map = null;
+                        for (Object obj : objects) {
+                            if (obj instanceof Map) {
+                                map = (Map<String, String>) obj;
+                            }
+                        }
+                        when(managedLedger.getProperties()).thenReturn(map);
+                        return topicCompletableFuture;
+                    }
+                });
     }
 
     /**

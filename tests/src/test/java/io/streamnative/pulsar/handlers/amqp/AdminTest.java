@@ -13,6 +13,10 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
+
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -58,7 +62,7 @@ public class AdminTest extends AmqpTestBase{
         }
 
         List<ExchangeBean> exchangeBeans = exchangeList();
-        Assert.assertTrue(exchangeBeans.size() > 0);
+        assertTrue(exchangeBeans.size() > 0);
         for (ExchangeBean bean : exchangeBeans) {
             if (vhost1Exs.remove(bean.getName())) {
                 Assert.assertEquals(bean.getType(), "direct");
@@ -71,7 +75,7 @@ public class AdminTest extends AmqpTestBase{
         Assert.assertEquals(vhost2Exs.size(), 0);
 
         List<ExchangeBean> exchangeBeans1 = exchangeListByVhost("vhost1");
-        Assert.assertTrue(exchangeBeans1.size() > 0);
+        assertTrue(exchangeBeans1.size() > 0);
         for (ExchangeBean bean : exchangeBeans1) {
             Assert.assertEquals(bean.getVhost(), "vhost1");
         }
@@ -138,7 +142,7 @@ public class AdminTest extends AmqpTestBase{
         }
 
         List<QueueBean> queueBeans = listQueues();
-        Assert.assertTrue(queueBeans.size() > 0);
+        assertTrue(queueBeans.size() > 0);
         for (QueueBean bean : queueBeans) {
             if (vhost1Queues.remove(bean.getName())) {
                 Assert.assertEquals(bean.getVhost(), "vhost1");
@@ -151,7 +155,7 @@ public class AdminTest extends AmqpTestBase{
         Assert.assertEquals(vhost2Queues.size(), 0);
 
         List<QueueBean> queueBeans1 = listQueuesByVhost("vhost1");
-        Assert.assertTrue(queueBeans1.size() > 0);
+        assertTrue(queueBeans1.size() > 0);
         for (QueueBean bean : queueBeans1) {
             Assert.assertEquals(bean.getVhost(), "vhost1");
         }
@@ -171,7 +175,7 @@ public class AdminTest extends AmqpTestBase{
         }
 
         List<QueueBean> beans = listQueuesByVhost(vhost);
-        Assert.assertTrue(beans.size() > 0);
+        assertTrue(beans.size() > 0);
         for (QueueBean bean : beans) {
             queueNameSet.remove(bean.getName());
         }
@@ -180,13 +184,13 @@ public class AdminTest extends AmqpTestBase{
         String qu = beans.get(0).getName();
         queueDelete(vhost, qu);
         beans = listQueuesByVhost(vhost);
-        Assert.assertTrue(beans.size() > 0);
+        assertTrue(beans.size() > 0);
         for (QueueBean bean : beans) {
             Assert.assertNotEquals(bean.getName(), qu);
             queueDelete(vhost, bean.getName());
         }
         beans = listQueuesByVhost(vhost);
-        Assert.assertTrue(CollectionUtils.isEmpty(beans));
+        assertTrue(CollectionUtils.isEmpty(beans));
     }
 
     @Test
@@ -240,13 +244,19 @@ public class AdminTest extends AmqpTestBase{
 //        queueDelete(vhost, qu);
     }
 
-    private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {
+    private void exchangeDeclare(String vhost, String exchange, String type, Map<String, Object> arguments)
+            throws IOException {
         Map<String, Object> declareParams = new HashMap<>();
         declareParams.put("type", type);
         declareParams.put("auto_delete", true);
         declareParams.put("durable", true);
         declareParams.put("internal", false);
+        declareParams.put("arguments", arguments);
         HttpUtil.put(api("exchanges/" + vhost + "/" + exchange), declareParams);
+    }
+
+    private void exchangeDeclare(String vhost, String exchange, String type) throws IOException {
+        exchangeDeclare(vhost, exchange, type, null);
     }
 
     private void exchangeDelete(String vhost, String exchange) throws IOException {
@@ -321,4 +331,51 @@ public class AdminTest extends AmqpTestBase{
         return "http://localhost:" + new AmqpServiceConfiguration().getAmqpAdminPort() + "/api/" + path;
     }
 
+    @Test
+    public void exchangePropertiesTest() throws Exception {
+        Connection connection = getConnection("vhost1", false);
+        Channel channel = connection.createChannel();
+
+        String ex1 = "ex1";
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("testNum", 10);
+        properties.put("testDecimal", 10.1);
+        properties.put("testString", "hello");
+        properties.put("testBoolean", true);
+        channel.exchangeDeclare(ex1, "direct", true, true, properties);
+
+        ExchangeBean bean = exchangeByName("vhost1", ex1);
+        Map<String, Object> arguments = bean.getArguments();
+        assertNotNull(arguments);
+        properties.forEach((k, v) -> {
+            assertEquals(arguments.get(k), v);
+        });
+
+        restartBroker();
+
+        Map<String, Object> properties2 = new HashMap<>();
+        properties2.put("testNum2", 20);
+        properties2.put("testString2", "string2");
+        // The new properties should be ignored, the properties only created when first declare the exchange.
+        exchangeDeclare("vhost1", ex1, "direct", properties2);
+        bean = exchangeByName("vhost1", ex1);
+        Map<String, Object> arguments2 = bean.getArguments();
+        assertNotNull(arguments2);
+        properties.forEach((k, v) -> {
+            assertEquals(arguments2.get(k), v);
+        });
+
+        String ex3 = "ex3";
+        Map<String, Object> properties3 = new HashMap<>();
+        properties3.put("testNum3", 30);
+        properties3.put("testString3", "string3");
+        // The new properties should be ignored, the properties only created when first declare the exchange.
+        exchangeDeclare("vhost1", ex3, "direct", properties3);
+        bean = exchangeByName("vhost1", ex3);
+        Map<String, Object> arguments3 = bean.getArguments();
+        assertNotNull(arguments3);
+        properties3.forEach((k, v) -> {
+            assertEquals(arguments3.get(k), v);
+        });
+    }
 }

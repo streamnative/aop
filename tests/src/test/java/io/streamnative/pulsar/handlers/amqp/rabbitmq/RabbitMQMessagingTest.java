@@ -175,7 +175,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
 
     }
 
-    @Test(timeOut = 1000 * 5)
+    @Test(timeOut = 1000 * 6)
     private void basicPublishTest() throws IOException, TimeoutException {
         final String queueName = randQuName();
         final String message = "Hello AOP!";
@@ -215,7 +215,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         }
     }
 
-    @Test(timeOut = 1000 * 5)
+    @Test(timeOut = 1000 * 6)
     private void persistentExchangeAndQueueWriteTest() throws IOException, TimeoutException {
         final String vhost = "vhost1";
         final String exchangeName = randExName();

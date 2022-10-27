@@ -61,7 +61,7 @@ public class AoPBrokerAdmin extends AmqpProtocolHandlerTestBase implements Broke
             admin.tenants().updateTenant("public", tenantInfo);
         }
 
-        List<String> vhostList = Arrays.asList("vhost1", "vhost2", "vhost3");
+        List<String> vhostList = List.of("vhost1");
         for (String vhost : vhostList) {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
@@ -91,6 +91,7 @@ public class AoPBrokerAdmin extends AmqpProtocolHandlerTestBase implements Broke
             setup();
         } catch (Exception e) {
             log.error("[beforeTestClass] setup error", e);
+            throw new QpidJMSTestException(e);
         }
     }
 
@@ -111,6 +112,7 @@ public class AoPBrokerAdmin extends AmqpProtocolHandlerTestBase implements Broke
             this.cleanup();
         } catch (Exception e) {
             log.error("[afterTestClass] cleanup error.", e);
+            throw new QpidJMSTestException(e);
         }
     }
 

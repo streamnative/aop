@@ -27,12 +27,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import org.junit.Test;
+import org.testng.annotations.Test;
 
 /**
  * Testcase.
  */
-public class ExchangeDeclare extends ExchangeEquivalenceBase {
+public class ExchangeDeclareTest extends ExchangeEquivalenceBase {
 
     static final String TYPE = "direct";
 
@@ -102,6 +102,7 @@ public class ExchangeDeclare extends ExchangeEquivalenceBase {
     public void exchangeDeclaredWithEnumerationEquivalentOnRecoverableConnection()
             throws IOException, TimeoutException, InterruptedException {
         ConnectionFactory connectionFactory = TestUtils.connectionFactory();
+        connectionFactory.setPort(getAmqpBrokerPortList().get(0));
         connectionFactory.setAutomaticRecoveryEnabled(true);
         connectionFactory.setTopologyRecoveryEnabled(false);
         Connection c = connectionFactory.newConnection();

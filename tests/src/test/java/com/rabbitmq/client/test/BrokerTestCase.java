@@ -43,14 +43,12 @@ import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ClusterData;
 import org.apache.pulsar.common.policies.data.RetentionPolicies;
 import org.apache.pulsar.common.policies.data.TenantInfo;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.TestWatcher;
-import org.junit.runner.Description;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 
 /**
  * BrokerTestCase.
@@ -60,21 +58,21 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BrokerTestCase.class);
 
-    @Rule
-    public TestRule watcher = new TestWatcher() {
-        protected void starting(Description description) {
-            LOGGER.info(
-                "Starting test: {}.{} (nio? {})",
-                description.getTestClass().getSimpleName(), description.getMethodName(), TestUtils.USE_NIO
-            );
-        }
-
-        @Override
-        protected void finished(Description description) {
-            LOGGER.info("Test finished: {}.{}", description.getTestClass().getSimpleName(),
-                    description.getMethodName());
-        }
-    };
+//    @Rule
+//    public TestRule watcher = new TestWatcher() {
+//        protected void starting(Description description) {
+//            LOGGER.info(
+//                "Starting test: {}.{} (nio? {})",
+//                description.getTestClass().getSimpleName(), description.getMethodName(), TestUtils.USE_NIO
+//            );
+//        }
+//
+//        @Override
+//        protected void finished(Description description) {
+//            LOGGER.info("Test finished: {}.{}", description.getTestClass().getSimpleName(),
+//                    description.getMethodName());
+//        }
+//    };
 
     protected ConnectionFactory connectionFactory;
 
@@ -96,7 +94,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
     }
 
     @Override
-    @Before
+    @BeforeClass
     public void setup() throws Exception {
         super.internalSetup();
         log.info("success internal setup");
@@ -138,7 +136,7 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 
 
     @Override
-    @After
+    @AfterClass
     public void cleanup() throws Exception {
         super.internalCleanup();
 //        if(shouldRun()) {
@@ -153,6 +151,17 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
 //        }
     }
 
+    @BeforeMethod
+    public void openConnectionAndChannel() throws IOException, TimeoutException {
+        openConnection();
+        openChannel();
+    }
+
+    @AfterMethod
+    public void closeConnectionAndChannel() throws IOException {
+        closeChannel();
+        closeConnection();
+    }
 
     /**
      * Whether to run the test or not.

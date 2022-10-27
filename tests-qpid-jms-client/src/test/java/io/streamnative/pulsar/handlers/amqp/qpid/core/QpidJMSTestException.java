@@ -11,13 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.common.exception;
+package io.streamnative.pulsar.handlers.amqp.qpid.core;
 
+/**
+ * Qpid JMS test exception.
+ */
+public class QpidJMSTestException extends RuntimeException{
 
-public class EmptyLookupResultException extends Exception {
-
-    public EmptyLookupResultException(String topicName) {
-        super("Lookup result is empty for " + topicName);
+    public QpidJMSTestException(Exception e) {
+        super(e);
     }
 
 }

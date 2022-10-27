@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -87,8 +88,8 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     }
 
     @Override
-    public void bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
-                             Map<String, Object> arguments) {
+    public CompletableFuture<Void> bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
+                                                Map<String, Object> arguments) {
         // The same exchange and queue can have more than one binding,
         // if router had been created, get it and add a new bindingKey.
         if (isRouterExisted(exchange)) {
@@ -100,7 +101,7 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
             router.setArguments(arguments);
             this.routers.put(router.getExchange().getName(), router);
         }
-        exchange.addQueue(this);
+        return exchange.addQueue(this);
     }
 
     @Override

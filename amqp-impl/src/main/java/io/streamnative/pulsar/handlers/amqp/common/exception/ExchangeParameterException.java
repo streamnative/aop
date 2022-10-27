@@ -13,11 +13,13 @@
  */
 package io.streamnative.pulsar.handlers.amqp.common.exception;
 
+/**
+ * Exchange parameter exception.
+ */
+public class ExchangeParameterException extends RuntimeException{
 
-public class EmptyLookupResultException extends Exception {
-
-    public EmptyLookupResultException(String topicName) {
-        super("Lookup result is empty for " + topicName);
+    public ExchangeParameterException(String message) {
+        super(message);
     }
 
 }

@@ -105,11 +105,24 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpAdminPort = 15673;
 
-
     @FieldContext(
             category = CATEGORY_AMQP,
             required = false
     )
     private int amqpExplicitFlushAfterFlushes = 1000;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false,
+            doc = "Exchange route queue size."
+    )
+    private int amqpExchangeRouteQueueSize = 200;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false,
+            doc = "Threads count for route exchange messages."
+    )
+    private int amqpExchangeRouteExecutorThreads = Runtime.getRuntime().availableProcessors();
 
 }

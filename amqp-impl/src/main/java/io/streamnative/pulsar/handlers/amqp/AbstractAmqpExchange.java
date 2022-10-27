@@ -13,8 +13,11 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Base class of AMQP exchange.
@@ -26,20 +29,42 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     protected Set<AmqpQueue> queues;
     protected boolean durable;
     protected boolean autoDelete;
+    protected boolean internal;
+    protected Map<String, Object> arguments;
+    protected Map<String, Set<AmqpQueue>> bindingKeyQueueMap;
+
     public static final String DEFAULT_EXCHANGE_DURABLE = "aop.direct.durable";
 
     protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType,
-                                   Set<AmqpQueue> queues, boolean durable, boolean autoDelete) {
+                                   Set<AmqpQueue> queues, boolean durable, boolean autoDelete, boolean internal,
+                                   Map<String, Object> arguments) {
         this.exchangeName = exchangeName;
         this.exchangeType = exchangeType;
         this.queues = queues;
         this.durable = durable;
         this.autoDelete = autoDelete;
+        this.internal = internal;
+        this.arguments = arguments;
+        if (this.exchangeType == Type.Direct) {
+            bindingKeyQueueMap = new ConcurrentHashMap<>();
+        }
     }
 
     @Override
-    public void addQueue(AmqpQueue queue) {
+    public CompletableFuture<Void> addQueue(AmqpQueue queue) {
         queues.add(queue);
+        return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public AmqpQueue getQueue(String queueName) {
+        AmqpQueue queue = null;
+        for (AmqpQueue q : queues) {
+            if (q.getName().equals(queueName)) {
+                queue = q;
+            }
+        }
+        return queue;
     }
 
     @Override
@@ -65,6 +90,16 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
     @Override
     public boolean getAutoDelete() {
         return autoDelete;
+    }
+
+    @Override
+    public boolean getInternal() {
+        return internal;
+    }
+
+    @Override
+    public Map<String, Object> getArguments() {
+        return arguments;
     }
 
     @Override

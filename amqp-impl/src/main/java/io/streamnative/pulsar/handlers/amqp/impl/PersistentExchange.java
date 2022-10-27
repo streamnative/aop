@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
@@ -292,13 +291,13 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     private CompletableFuture<ManagedCursor> createCursorIfNotExists(String name) {
         CompletableFuture<ManagedCursor> cursorFuture = new CompletableFuture<>();
-        return cursors.computeIfAbsent(name, cusrsor -> {
-            ManagedLedgerImpl ledger = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
-            if (log.isDebugEnabled()) {
-                log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());
-            }
-            ledger.asyncOpenCursor(name, CommandSubscribe.InitialPosition.Earliest,
-                    new AsyncCallbacks.OpenCursorCallback() {
+        cursors.computeIfAbsent(name, cusrsor -> cursorFuture);
+        ManagedLedgerImpl ledger = (ManagedLedgerImpl) persistentTopic.getManagedLedger();
+        if (log.isDebugEnabled()) {
+            log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());
+        }
+        ledger.asyncOpenCursor(name, CommandSubscribe.InitialPosition.Earliest,
+                new AsyncCallbacks.OpenCursorCallback() {
                     @Override
                     public void openCursorComplete(ManagedCursor cursor, Object ctx) {
                         cursorFuture.complete(cursor);
@@ -314,8 +313,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         }
                     }
                 }, null);
-            return cursorFuture;
-        });
+        return cursorFuture;
     }
 
     public void deleteCursor(String name) {

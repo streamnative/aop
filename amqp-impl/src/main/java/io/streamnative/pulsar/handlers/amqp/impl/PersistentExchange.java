@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;

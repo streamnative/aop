@@ -148,7 +148,7 @@ public class AmqpOutputConverter {
                 writeFrame(new CompositeAMQBodyBlock(channelId,
                     deliverBody,
                     contentHeaderBody,
-                    new MessageContentSourceBody(chunk)));
+                    new MessageContentSourceBody(chunk), connection.getAmqpConfig().isAmqpProxyV2Enable()));
 
                 int writtenSize = contentChunkSize;
                 while (writtenSize < bodySize) {
@@ -346,27 +346,49 @@ public class AmqpOutputConverter {
         private final AMQBody headerBody;
         private final AMQBody contentBody;
         private final int channel;
+        private final boolean amqpProxyV2Enable;
 
-        public CompositeAMQBodyBlock(int channel, AMQBody methodBody, AMQBody headerBody, AMQBody contentBody) {
+        public CompositeAMQBodyBlock(int channel, AMQBody methodBody, AMQBody headerBody, AMQBody contentBody,
+                                     boolean amqpProxyV2Enable) {
             this.channel = channel;
             this.methodBody = methodBody;
             this.headerBody = headerBody;
             this.contentBody = contentBody;
+            this.amqpProxyV2Enable = amqpProxyV2Enable;
         }
 
         @Override
         public long getSize() {
-            return OVERHEAD + (long) methodBody.getSize() + (long) headerBody.getSize() + (long) contentBody.getSize();
+            return (amqpProxyV2Enable ? 8 : 0) + OVERHEAD + (long) methodBody.getSize() + (long) headerBody.getSize()
+                    + (long) contentBody.getSize();
         }
 
         @Override
         public long writePayload(final ByteBufferSender sender) {
+            if (amqpProxyV2Enable) {
+                // wrap the delivery message data with a special type 9 to skip data decode in proxy
+                QpidByteBuffer buffer = QpidByteBuffer.allocate(7);
+                buffer.put((byte) 9);
+                buffer.putUnsignedShort(0);
+                buffer.putUnsignedInt(getSize() - 8);
+                buffer.flip();
+                sender.send(buffer);
+            }
+
             long size = (new AMQFrame(channel, methodBody)).writePayload(sender);
 
             size += (new AMQFrame(channel, headerBody)).writePayload(sender);
 
             size += (new AMQFrame(channel, contentBody)).writePayload(sender);
 
+            if (amqpProxyV2Enable) {
+                // wrap the delivery message data to skip data decode in proxy
+                QpidByteBuffer endBuffer = QpidByteBuffer.allocate(1);
+                endBuffer.put((byte) 0xCE);
+                endBuffer.flip();
+                sender.send(endBuffer);
+                size += 8;
+            }
             return size;
         }
 

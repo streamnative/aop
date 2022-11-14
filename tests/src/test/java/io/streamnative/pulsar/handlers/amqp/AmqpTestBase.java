@@ -37,6 +37,7 @@ import org.awaitility.Awaitility;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
+
 /**
  * Base test class for RabbitMQ Client.
  */
@@ -114,7 +115,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         String routingKey = "test.key";
         String queueName = randQuName();
 
-        Connection conn = getConnection(vhost, false);
+        Connection conn = getConnection(vhost, true);
         Channel channel = conn.createChannel();
 
         channel.exchangeDeclare(exchangeName, "direct", true);

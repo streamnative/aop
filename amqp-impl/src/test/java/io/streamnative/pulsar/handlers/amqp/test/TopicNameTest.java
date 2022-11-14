@@ -19,7 +19,6 @@ import static org.testng.Assert.fail;
 
 import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
-import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.concurrent.Executors;

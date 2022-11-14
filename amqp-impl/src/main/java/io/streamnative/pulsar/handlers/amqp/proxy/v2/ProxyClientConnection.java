@@ -51,8 +51,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcess
 import org.apache.qpid.server.protocol.v0_8.transport.ServerMethodProcessor;
 
 /**
- * Proxy connection, it used to manage RabbitMQ client connection
- * One connection will maintain multi connection with broker
+ * Proxy connection, it used to manage RabbitMQ client connection.
  */
 @Slf4j
 public class ProxyClientConnection extends ChannelInboundHandlerAdapter
@@ -127,7 +126,8 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
     }
 
     @Override
-    public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response, AMQShortString locale) {
+    public void receiveConnectionStartOk(FieldTable clientProperties, AMQShortString mechanism, byte[] response,
+                                         AMQShortString locale) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyClientConnection receive connection start request, clientProperties: {}, mechanism: {}, "
                     + "response: {}, locale: {}.", clientProperties, mechanism, response, locale);

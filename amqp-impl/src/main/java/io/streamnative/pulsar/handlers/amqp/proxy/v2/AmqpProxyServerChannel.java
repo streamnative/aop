@@ -62,14 +62,16 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveAccessRequest(AMQShortString realm, boolean exclusive, boolean passive, boolean active, boolean write, boolean read) {
+    public void receiveAccessRequest(AMQShortString realm, boolean exclusive, boolean passive, boolean active,
+                                     boolean write, boolean read) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive access request.");
         }
     }
 
     @Override
-    public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable, boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
+    public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
+                                       boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive exchange declare request, exchange: {}, type: {}, passive: {},"
                             + "durable: {}, autoDelete: {}, internal: {}, nowait: {}, arguments: {}.",
@@ -100,7 +102,8 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive, boolean autoDelete, boolean nowait, FieldTable arguments) {
+    public void receiveQueueDeclare(AMQShortString queue, boolean passive, boolean durable, boolean exclusive,
+                                    boolean autoDelete, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive queue declare request, queue: {}, passive: {},"
                             + "durable: {}, exclusive: {}, autoDelete: {}, nowait: {}, arguments: {}.",
@@ -116,7 +119,8 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey, boolean nowait, FieldTable arguments) {
+    public void receiveQueueBind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+                                 boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive queue bind request, queue: {}, exchange: {}, bindingKey: {}, "
                             + "nowait: {}, arguments: {}.", queue, exchange, bindingKey, nowait, arguments);
@@ -144,7 +148,8 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey, FieldTable arguments) {
+    public void receiveQueueUnbind(AMQShortString queue, AMQShortString exchange, AMQShortString bindingKey,
+                                   FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive queue unbind request, queue: {}, exchange: {}, bindingKey: {}, "
                             + "arguments: {}.", queue, exchange, bindingKey, arguments);
@@ -172,7 +177,8 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveBasicConsume(AMQShortString queue, AMQShortString consumerTag, boolean noLocal, boolean noAck, boolean exclusive, boolean nowait, FieldTable arguments) {
+    public void receiveBasicConsume(AMQShortString queue, AMQShortString consumerTag, boolean noLocal, boolean noAck,
+                                    boolean exclusive, boolean nowait, FieldTable arguments) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive basic consume request, queue: {}, consumerTag: {}, noLocal: {}, "
                     + "noAck: {}, exclusive: {}, nowait: {}, arguments: {}.",
@@ -195,7 +201,8 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     @Override
-    public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory, boolean immediate) {
+    public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory,
+                                    boolean immediate) {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive basic publish request, exchange: {}, routingKey: {}, mandatory: {}, "
                             + "immediate: {}.", exchange, routingKey, mandatory, immediate);
@@ -367,8 +374,8 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                 proxyConnection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.");
                 return;
             }
-            boolean createIfMissing = false;
-            String exchangeType = null;
+//            boolean createIfMissing = false;
+//            String exchangeType = null;
 //            if (isDefaultExchange(AMQShortString.valueOf(exchangeName))
 //                    || isBuildInExchange(exchangeName)) {
 //                // Auto create default and buildIn exchanges if use.
@@ -380,10 +387,9 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                 exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
             }
 
-            String msg = new String(message.getData());
-            final String exName = exchangeName;
+            String topic = "persistent://public/" + proxyConnection.getVhost() + "/__amqp_exchange__" + exchangeName;
             proxyConnection.getProxyServer()
-                    .getProducer("persistent://public/" + proxyConnection.getVhost() + "/__amqp_exchange__" + exchangeName)
+                    .getProducer(topic)
                     .thenCompose(producer -> {
                         return producer.newMessage()
                                 .value(message.getData())

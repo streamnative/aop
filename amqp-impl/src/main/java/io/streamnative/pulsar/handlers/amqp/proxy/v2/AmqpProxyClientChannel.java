@@ -78,7 +78,8 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveQueueDeclareOk(AMQShortString queue, long messageCount, long consumerCount) {
-        conn.getClientChannel().writeAndFlush(new QueueDeclareOkBody(queue, messageCount, consumerCount).generateFrame(channelId));
+        conn.getClientChannel().writeAndFlush(
+                new QueueDeclareOkBody(queue, messageCount, consumerCount).generateFrame(channelId));
     }
 
     @Override
@@ -107,15 +108,18 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
     }
 
     @Override
-    public void receiveBasicReturn(int replyCode, AMQShortString replyText, AMQShortString exchange, AMQShortString routingKey) {
+    public void receiveBasicReturn(int replyCode, AMQShortString replyText, AMQShortString exchange,
+                                   AMQShortString routingKey) {
     }
 
     @Override
-    public void receiveBasicDeliver(AMQShortString consumerTag, long deliveryTag, boolean redelivered, AMQShortString exchange, AMQShortString routingKey) {
+    public void receiveBasicDeliver(AMQShortString consumerTag, long deliveryTag, boolean redelivered,
+                                    AMQShortString exchange, AMQShortString routingKey) {
     }
 
     @Override
-    public void receiveBasicGetOk(long deliveryTag, boolean redelivered, AMQShortString exchange, AMQShortString routingKey, long messageCount) {
+    public void receiveBasicGetOk(long deliveryTag, boolean redelivered, AMQShortString exchange,
+                                  AMQShortString routingKey, long messageCount) {
     }
 
     @Override
@@ -158,7 +162,8 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
         conn.getChannelState().put(channelId, ProxyBrokerConnection.ChannelState.CLOSE);
         AtomicBoolean allClose = new AtomicBoolean(true);
         conn.getProxyConnection().getConnectionMap().values().forEach(conn -> {
-            if (conn.getChannelState().getOrDefault(channelId, null) == ProxyBrokerConnection.ChannelState.OPEN) {
+            if (conn.getChannelState().getOrDefault(channelId, null)
+                    == ProxyBrokerConnection.ChannelState.OPEN) {
                 allClose.set(false);
             }
         });

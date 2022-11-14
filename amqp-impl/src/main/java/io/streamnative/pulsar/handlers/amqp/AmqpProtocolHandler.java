@@ -21,7 +21,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
-import io.streamnative.pulsar.handlers.amqp.proxy2.ProxyServer;
+import io.streamnative.pulsar.handlers.amqp.proxy.v2.ProxyServer;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
@@ -109,11 +109,14 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                     "plaintext must be configured on internal listener");
             proxyConfig.setBrokerServiceURL(internalListener.getBrokerServiceUrl().toString());
 
-//            ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
-            ProxyServer proxyServer = new ProxyServer(proxyConfig, service.getPulsar());
             try {
-//                proxyService.start();
-                proxyServer.start();
+                if (amqpConfig.isAmqpProxyV2Enable()) {
+                    ProxyServer proxyServer = new ProxyServer(proxyConfig, service.getPulsar());
+                    proxyServer.start();
+                } else {
+                    ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
+                    proxyService.start();
+                }
                 log.info("Start amqp proxy service at port: {}", proxyConfig.getAmqpProxyPort());
             } catch (Exception e) {
                 log.error("Failed to start amqp proxy service.");

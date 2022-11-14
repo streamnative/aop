@@ -125,4 +125,10 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpExchangeRouteExecutorThreads = Runtime.getRuntime().availableProcessors();
 
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false
+    )
+    private boolean amqpProxyV2Enable = false;
+
 }

@@ -49,13 +49,15 @@ public class ExchangeContainer {
     private PulsarService pulsarService;
     private final Executor routeExecutor;
     private final int routeQueueSize;
+    private final AmqpServiceConfiguration configuration;
 
     protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                                Executor routeExecutor, int routeQueueSize) {
+                                Executor routeExecutor, int routeQueueSize, AmqpServiceConfiguration configuration) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.routeExecutor = routeExecutor;
         this.routeQueueSize = routeQueueSize;
+        this.configuration = configuration;
     }
 
     @Getter
@@ -164,7 +166,7 @@ public class ExchangeContainer {
                             amqpExchange = new PersistentExchange(exchangeName,
                                     AmqpExchange.Type.value(currentType),
                                     persistentTopic, currentDurable, currentAutoDelete, currentInternal,
-                                    currentArguments, routeExecutor, routeQueueSize);
+                                    currentArguments, routeExecutor, routeQueueSize, configuration);
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
                                     exchangeName, namespaceName.getLocalName(), e);

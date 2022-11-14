@@ -19,6 +19,7 @@ import static org.testng.Assert.fail;
 
 import io.netty.channel.EventLoopGroup;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.concurrent.Executors;
@@ -52,8 +53,8 @@ public class TopicNameTest {
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic1, true, false, false, null,
-                    Executors.newSingleThreadExecutor(), 200);
-        } catch (IllegalArgumentException e) {
+                    Executors.newSingleThreadExecutor(), 200, new AmqpServiceConfiguration());
+        } catch (Exception e) {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
 
@@ -63,8 +64,8 @@ public class TopicNameTest {
         try {
             new PersistentExchange(
                     exchangeName, exchangeType, exchangeTopic2, true, false, false, null,
-                    Executors.newSingleThreadExecutor(), 200);
-        } catch (IllegalArgumentException e) {
+                    Executors.newSingleThreadExecutor(), 200, new AmqpServiceConfiguration());
+        } catch (Exception e) {
             assertNotNull(e);
             log.info("This is expected behavior.");
         }

@@ -18,15 +18,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.ProtocolVersion;
-import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
 import org.apache.qpid.server.protocol.v0_8.AMQFrameDecodingException;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQProtocolVersionException;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Slf4j
 public abstract class AmqpDecoder<T extends MethodProcessor> {

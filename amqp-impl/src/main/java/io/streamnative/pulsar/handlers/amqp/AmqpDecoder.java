@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 @Slf4j
 public abstract class AmqpDecoder<T extends MethodProcessor> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AMQDecoder.class);
     public static final int FRAME_HEADER_SIZE = 7;
     private final T methodProcessor;
 

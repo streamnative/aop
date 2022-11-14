@@ -71,9 +71,9 @@ public abstract class ExchangeMessageRouter {
     private static final AtomicIntegerFieldUpdater<ExchangeMessageRouter> PENDING_SIZE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(ExchangeMessageRouter.class, "pendingQueueSize");
 
+    private volatile int havePendingRead = FALSE;
     private static final AtomicIntegerFieldUpdater<ExchangeMessageRouter> HAVE_PENDING_READ_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(ExchangeMessageRouter.class, "havePendingRead");
-    private volatile int havePendingRead = FALSE;
 
     private enum State {
         INIT,

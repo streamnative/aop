@@ -132,22 +132,27 @@ public class ProxyBrokerConnection {
         @Override
         public void receiveConnectionStart(short versionMajor, short versionMinor, FieldTable serverProperties,
                                            byte[] mechanisms, byte[] locales) {
+            // nothing to do
         }
 
         @Override
         public void receiveConnectionSecure(byte[] challenge) {
+            // nothing to do
         }
 
         @Override
         public void receiveConnectionRedirect(AMQShortString host, AMQShortString knownHosts) {
+            // nothing to do
         }
 
         @Override
         public void receiveConnectionTune(int channelMax, long frameMax, int heartbeat) {
+            // nothing to do
         }
 
         @Override
         public void receiveConnectionOpenOk(AMQShortString knownHosts) {
+            // nothing to do
         }
 
         @Override
@@ -187,17 +192,17 @@ public class ProxyBrokerConnection {
 
         @Override
         public void receiveHeartbeat() {
-            log.info("receiveHeartbeat");
+            // nothing to do
         }
 
         @Override
         public void receiveProtocolHeader(ProtocolInitiation protocolInitiation) {
-            log.info("receiveProtocolHeader");
+            // nothing to do
         }
 
         @Override
         public void setCurrentMethod(int classId, int methodId) {
-            log.info("setCurrentMethod");
+            // nothing to do
         }
 
         @Override

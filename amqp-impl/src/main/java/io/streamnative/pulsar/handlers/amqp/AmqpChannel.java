@@ -463,7 +463,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         subscriptionFuture.thenAccept(subscription -> {
                 AmqpConsumer consumer;
                 if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
-                    consumer = new AmqpConsumer(queueContainer, subscription,
+                    consumer = new AmqpConsumerOriginal(queueContainer, subscription,
                             exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
                             topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
                             consumerTag, true, connection.getServerCnx(), "", null,

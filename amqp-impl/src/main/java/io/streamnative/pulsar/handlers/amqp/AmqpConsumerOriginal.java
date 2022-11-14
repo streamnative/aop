@@ -46,7 +46,7 @@ public class AmqpConsumerOriginal extends AmqpConsumer {
                                 String appId, Map<String, String> metadata, boolean readCompacted,
                                 MessageId messageId,
                                 KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-                                boolean autoAck) throws BrokerServiceException {
+                                boolean autoAck) {
         super(queueContainer, subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
                 cnx, appId, metadata, readCompacted, messageId, keySharedMeta, channel, consumerTag,
                 queueName, autoAck);

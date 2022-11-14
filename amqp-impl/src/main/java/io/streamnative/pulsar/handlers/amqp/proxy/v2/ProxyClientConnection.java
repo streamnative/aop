@@ -226,6 +226,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
 
     @Override
     public void receiveConnectionCloseOk() {
+        // nothing to do
     }
 
     @Override
@@ -257,7 +258,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
         } catch (QpidException e) {
             log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
             writeFrame(new ProtocolInitiation(ProtocolVersion.v0_91));
-            throw new RuntimeException(e);
+            throw new ProxyV2ServiceException(e);
         }
     }
 
@@ -276,7 +277,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
 
     public synchronized void writeFrame(AMQDataBlock frame) {
         if (log.isDebugEnabled()) {
-            log.info("ProxyClientConnection write frame: {}", frame);
+            log.debug("ProxyClientConnection write frame: {}", frame);
         }
         this.ctx.writeAndFlush(frame);
     }

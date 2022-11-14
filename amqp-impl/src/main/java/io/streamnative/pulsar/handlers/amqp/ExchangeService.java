@@ -57,4 +57,11 @@ public interface ExchangeService {
      */
     CompletableFuture<Integer> exchangeBound(NamespaceName namespaceName, String exchange, String routingKey,
                                           String queueName);
+
+    CompletableFuture<Void> queueBind(NamespaceName namespaceName, String exchange, String queue, String routingKey,
+                                      Map<String, Object> arguments);
+
+    CompletableFuture<Void> queueUnBind(NamespaceName namespaceName, String exchange, String queue, String routingKey,
+                                      Map<String, Object> arguments);
+
 }

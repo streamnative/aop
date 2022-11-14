@@ -13,24 +13,21 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import org.apache.pulsar.broker.PulsarService;
-import org.apache.pulsar.broker.service.Consumer;
-import org.apache.pulsar.broker.service.ServerCnx;
+import io.netty.handler.codec.MessageToByteEncoder;
+import lombok.extern.log4j.Log4j2;
+import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
 
 /**
- * AmqpPulsarServerCnx extend ServerCnx.
+ *  amqp data direct handler.
  */
-public class AmqpPulsarServerCnx extends ServerCnx {
-
-    public AmqpPulsarServerCnx(PulsarService pulsar, ChannelHandlerContext ctx) {
-        super(pulsar);
-        this.ctx = ctx;
-        this.remoteAddress = ctx.channel().remoteAddress();
-    }
+@Log4j2
+public class AmqpProxyDirectHandler extends MessageToByteEncoder<SingleQpidByteBuffer> {
 
     @Override
-    public void closeConsumer(Consumer consumer) {
-        // avoid close the connection when close the consumer
+    public void encode(ChannelHandlerContext ctx, SingleQpidByteBuffer buffer, ByteBuf out) {
+        out.writeBytes(buffer.getUnderlyingBuffer());
     }
+
 }

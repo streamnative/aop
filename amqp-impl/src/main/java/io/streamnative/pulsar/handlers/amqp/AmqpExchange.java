@@ -153,4 +153,12 @@ public interface AmqpExchange {
 
     int getQueueSize();
 
+    default CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
+        return null;
+    }
+
+    default CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
+        return null;
+    };
+
 }

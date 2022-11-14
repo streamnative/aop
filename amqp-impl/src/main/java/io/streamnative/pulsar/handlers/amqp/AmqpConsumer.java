@@ -52,20 +52,20 @@ import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 @Slf4j
 public class AmqpConsumer extends Consumer {
 
-    private final AmqpChannel channel;
+    protected final AmqpChannel channel;
 
     private QueueContainer queueContainer;
 
-    private final boolean autoAck;
+    protected final boolean autoAck;
 
-    private final String consumerTag;
+    protected final String consumerTag;
 
-    private final String queueName;
+    protected final String queueName;
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
     private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
-    private static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
+    protected static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "availablePermits");
     private volatile int availablePermits;
 

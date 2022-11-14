@@ -15,6 +15,8 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
+
+import io.netty.channel.Channel;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
@@ -51,7 +53,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueuePurgeOkBody;
  * Client decoder for client-server interaction tests.
  * Copied from Qpid tests lib.
  */
-public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extends ClientChannelMethodProcessor>>
+public class AmqpClientDecoder extends AmqpDecoder<ClientMethodProcessor<? extends ClientChannelMethodProcessor>>
 {
     private QpidByteBuffer _incompleteBuffer;
 
@@ -62,7 +64,13 @@ public class AmqpClientDecoder extends AMQDecoder<ClientMethodProcessor<? extend
      */
     public AmqpClientDecoder(final ClientMethodProcessor<? extends ClientChannelMethodProcessor> methodProcessor)
     {
-        super(false, methodProcessor);
+        super(false, methodProcessor, null);
+    }
+
+    public AmqpClientDecoder(final ClientMethodProcessor<? extends ClientChannelMethodProcessor> methodProcessor,
+                             Channel clientChannel)
+    {
+        super(false, methodProcessor, clientChannel);
     }
 
     public void decodeBuffer(ByteBuffer incomingBuffer) throws AMQFrameDecodingException, AMQProtocolVersionException

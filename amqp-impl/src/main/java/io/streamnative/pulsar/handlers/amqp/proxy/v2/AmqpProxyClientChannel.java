@@ -32,7 +32,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueUnbindOkBody;
 public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     private final Integer channelId;
-    private ProxyBrokerConnection conn;
+    private final ProxyBrokerConnection conn;
 
     public AmqpProxyClientChannel(Integer channelId, ProxyBrokerConnection conn) {
         this.channelId = channelId;
@@ -47,10 +47,12 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveChannelAlert(int replyCode, AMQShortString replyText, FieldTable details) {
+        // nothing to do
     }
 
     @Override
     public void receiveAccessRequestOk(int ticket) {
+        // nothing to do
     }
 
     @Override
@@ -60,10 +62,12 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveExchangeDeleteOk() {
+        // nothing to do
     }
 
     @Override
     public void receiveExchangeBoundOk(int replyCode, AMQShortString replyText) {
+        // nothing to do
     }
 
     @Override
@@ -84,18 +88,22 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveQueuePurgeOk(long messageCount) {
+        // nothing to do
     }
 
     @Override
     public void receiveQueueDeleteOk(long messageCount) {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicRecoverSyncOk() {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicQosOk() {
+        // nothing to do
     }
 
     @Override
@@ -105,53 +113,65 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveBasicCancelOk(AMQShortString consumerTag) {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicReturn(int replyCode, AMQShortString replyText, AMQShortString exchange,
                                    AMQShortString routingKey) {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicDeliver(AMQShortString consumerTag, long deliveryTag, boolean redelivered,
                                     AMQShortString exchange, AMQShortString routingKey) {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicGetOk(long deliveryTag, boolean redelivered, AMQShortString exchange,
                                   AMQShortString routingKey, long messageCount) {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicGetEmpty() {
+        // nothing to do
     }
 
     @Override
     public void receiveTxSelectOk() {
+        // nothing to do
     }
 
     @Override
     public void receiveTxCommitOk() {
+        // nothing to do
     }
 
     @Override
     public void receiveTxRollbackOk() {
+        // nothing to do
     }
 
     @Override
     public void receiveConfirmSelectOk() {
+        // nothing to do
     }
 
     @Override
     public void receiveChannelFlow(boolean active) {
+        // nothing to do
     }
 
     @Override
     public void receiveChannelFlowOk(boolean active) {
+        // nothing to do
     }
 
     @Override
     public void receiveChannelClose(int replyCode, AMQShortString replyText, int classId, int methodId) {
+        // nothing to do
     }
 
     @Override
@@ -174,10 +194,12 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveMessageContent(QpidByteBuffer data) {
+        // nothing to do
     }
 
     @Override
     public void receiveMessageHeader(BasicContentHeaderProperties properties, long bodySize) {
+        // nothing to do
     }
 
     @Override
@@ -187,10 +209,12 @@ public class AmqpProxyClientChannel implements ClientChannelMethodProcessor {
 
     @Override
     public void receiveBasicNack(long deliveryTag, boolean multiple, boolean requeue) {
+        // nothing to do
     }
 
     @Override
     public void receiveBasicAck(long deliveryTag, boolean multiple) {
+        // nothing to do
     }
 
 }

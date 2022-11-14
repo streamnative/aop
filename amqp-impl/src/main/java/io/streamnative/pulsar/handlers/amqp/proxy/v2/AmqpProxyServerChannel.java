@@ -242,14 +242,17 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveTxSelect() {
+        // nothing to do
     }
 
     @Override
     public void receiveTxCommit() {
+        // nothing to do
     }
 
     @Override
     public void receiveTxRollback() {
+        // nothing to do
     }
 
     @Override
@@ -268,6 +271,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveChannelFlowOk(boolean active) {
+        // nothing to do
     }
 
     @Override
@@ -287,6 +291,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
 
     @Override
     public void receiveChannelCloseOk() {
+        // nothing to do
     }
 
     @Override
@@ -365,7 +370,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     private void deliverCurrentMessageIfComplete() {
         if (currentMessage.allContentReceived()) {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
-            String routingKey = AMQShortString.toString(info.getRoutingKey());
+//            String routingKey = AMQShortString.toString(info.getRoutingKey());
             String exchangeName = AMQShortString.toString(info.getExchange());
             Message<byte[]> message;
             try {

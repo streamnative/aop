@@ -81,13 +81,11 @@ public class AmqpConsumerOriginal extends AmqpConsumer {
         MESSAGE_PERMITS_UPDATER.addAndGet(this, -totalMessages);
         final AmqpConnection connection = channel.getConnection();
         connection.ctx.channel().eventLoop().execute(() -> {
-            double count = 0;
             for (Entry entry : entries) {
                 if (entry == null) {
                     // Entry was filtered out
                     continue;
                 }
-                count++;
                 sendMessage(entry);
             }
             connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);

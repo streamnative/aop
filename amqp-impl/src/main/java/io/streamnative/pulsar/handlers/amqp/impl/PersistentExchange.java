@@ -24,7 +24,6 @@ import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
-import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.ExchangeMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
@@ -146,16 +145,14 @@ public class PersistentExchange extends AbstractAmqpExchange {
                                 }
                             } else {
                                 for (AmqpQueue queue : queueSet) {
-                                    routeFutureList.add(
-                                            queue.writeIndexMessageAsync(
-                                                    exchangeName, position.getLedgerId(), position.getEntryId(), props));
+                                    routeFutureList.add(queue.writeIndexMessageAsync(
+                                            exchangeName, position.getLedgerId(), position.getEntryId(), props));
                                 }
                             }
                         } else if (exchangeType == Type.Fanout) {
                             for (AmqpQueue queue : queues) {
-                                routeFutureList.add(
-                                        queue.writeIndexMessageAsync(
-                                                exchangeName, position.getLedgerId(), position.getEntryId(), props));
+                                routeFutureList.add(queue.writeIndexMessageAsync(
+                                        exchangeName, position.getLedgerId(), position.getEntryId(), props));
                             }
                         } else {
                             for (AmqpQueue queue : queues) {
@@ -438,7 +435,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
                 new AsyncCallbacks.UpdatePropertiesCallback() {
                     @Override
                     public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
-                        PersistentExchange.this.exchangeMessageRouter.removeBinding(queue, "queue", routingKey, arguments);
+                        PersistentExchange.this.exchangeMessageRouter.removeBinding(queue, "queue",
+                                routingKey, arguments);
                         future.complete(null);
                     }
 

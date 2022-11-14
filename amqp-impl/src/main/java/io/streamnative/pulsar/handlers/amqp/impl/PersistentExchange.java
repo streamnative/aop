@@ -97,7 +97,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              Executor routeExecutor, int routeQueueSize, AmqpServiceConfiguration configuration) {
+                              Executor routeExecutor, int routeQueueSize, boolean proxyV2Enable)
+            throws JsonProcessingException {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
@@ -108,10 +109,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
             cursor.setInactive();
         }
 
-        if (configuration.isAmqpProxyV2Enable()) {
+        if (proxyV2Enable) {
             bindings = Sets.newConcurrentHashSet();
             if (persistentTopic.getManagedLedger().getProperties().containsKey(BINDINGS)) {
-                List<Binding> amqpQueueProperties = jsonMapper.readValue(
+                List<Binding> amqpQueueProperties = JSON_MAPPER.readValue(
                         persistentTopic.getManagedLedger().getProperties().get(BINDINGS), new TypeReference<>() {});
                 this.bindings.addAll(amqpQueueProperties);
             }
@@ -399,7 +400,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         this.bindings.add(new Binding(queue, "queue", routingKey, arguments));
         String bindingsJson;
         try {
-            bindingsJson = jsonMapper.writeValueAsString(this.bindings);
+            bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
         } catch (JsonProcessingException e) {
             log.error("Failed to bind queue {} to exchange {}", queue, exchangeName, e);
             return CompletableFuture.failedFuture(e);
@@ -427,7 +428,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         this.bindings.remove(new Binding(queue, "queue", routingKey, arguments));
         String bindingsJson;
         try {
-            bindingsJson = jsonMapper.writeValueAsString(this.bindings);
+            bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
         } catch (JsonProcessingException e) {
             log.error("Failed to unbind queue {} to exchange {}", queue, exchangeName, e);
             return CompletableFuture.failedFuture(e);

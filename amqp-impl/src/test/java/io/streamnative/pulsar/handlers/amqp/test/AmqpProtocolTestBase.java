@@ -174,8 +174,6 @@ public abstract class AmqpProtocolTestBase {
                 Mockito.any(), Mockito.anyBoolean())).thenReturn(subFuture);
         Mockito.when(subscription.getDispatcher()).thenReturn(Mockito.mock(MockDispatcher.class));
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
-        ManagedLedger managedLedger = mock(ManagedLedger.class);
-        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
         Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
         CompletableFuture deleteCpm = new CompletableFuture<>();
         Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);

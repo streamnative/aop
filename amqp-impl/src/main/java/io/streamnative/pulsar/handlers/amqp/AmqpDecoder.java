@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.AmqpOutputConverter.PROXY_V2_DIRECT_TYPE;
+
 import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -164,8 +166,8 @@ public abstract class AmqpDecoder<T extends MethodProcessor> {
             case 3 -> ContentBody.process(in, methodProcessor.getChannelMethodProcessor(channel), bodySize);
             case 8 ->
 //                HeartbeatBody.process(channel, in, _methodProcessor, bodySize);
-                    redirectData(in, bodySize, 8);
-            case 9 -> redirectData(in, bodySize, 9);
+                    redirectData(in, bodySize, (byte) 8);
+            case PROXY_V2_DIRECT_TYPE -> redirectData(in, bodySize, PROXY_V2_DIRECT_TYPE);
             default -> throw new AMQFrameDecodingException("Unsupported frame type: " + type);
         }
     }
@@ -187,7 +189,7 @@ public abstract class AmqpDecoder<T extends MethodProcessor> {
                         + ".", null);
     }
 
-    protected void redirectData(QpidByteBuffer in, long messageSize, int type) {
+    protected void redirectData(QpidByteBuffer in, long messageSize, byte type) {
         if (log.isDebugEnabled()) {
             log.debug("redirect data type: {}, messageSize: {}", type, messageSize);
         }

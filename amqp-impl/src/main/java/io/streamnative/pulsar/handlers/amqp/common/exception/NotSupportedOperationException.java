@@ -11,12 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.proxy.v2;
+package io.streamnative.pulsar.handlers.amqp.common.exception;
 
-public class ProxyV2ServiceException extends RuntimeException{
+/**
+ * Not supported operation exception.
+ */
+public class NotSupportedOperationException extends RuntimeException{
 
-    public ProxyV2ServiceException(Exception e) {
-        super(e);
+    public NotSupportedOperationException(String message) {
+        super(message);
     }
 
 }

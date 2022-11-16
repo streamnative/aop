@@ -73,7 +73,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
     @Getter
     private String vhost;
     @Getter
-    private final ProxyServer proxyServer;
+    private final ProxyServiceV2 proxyServer;
     @Getter
     private int currentClassId;
     @Getter
@@ -87,7 +87,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
 
     public ProxyClientConnection(ProxyConfiguration config,
                                  PulsarServiceLookupHandler lookupHandler,
-                                 ProxyServer proxyServer) {
+                                 ProxyServiceV2 proxyServer) {
         this.config = config;
         this.decoder = new AmqpBrokerDecoder(this);
         this.state = State.INIT;
@@ -258,7 +258,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
         } catch (QpidException e) {
             log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
             writeFrame(new ProtocolInitiation(ProtocolVersion.v0_91));
-            throw new ProxyV2ServiceException(e);
+            throw new ProxyServiceV2Exception(e);
         }
     }
 

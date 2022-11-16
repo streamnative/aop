@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.common.exception.NotSupportedOperationException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
@@ -154,11 +155,13 @@ public interface AmqpExchange {
     int getQueueSize();
 
     default CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
-        return null;
+        return CompletableFuture.failedFuture(
+                new NotSupportedOperationException("Amqp exchange queue bind operation is not supported."));
     }
 
     default CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
-        return null;
-    };
+        return CompletableFuture.failedFuture(
+                new NotSupportedOperationException("Amqp exchange queue unbind operation is not supported."));
+    }
 
 }

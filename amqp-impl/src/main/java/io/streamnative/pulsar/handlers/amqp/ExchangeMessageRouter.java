@@ -68,18 +68,13 @@ public abstract class ExchangeMessageRouter {
     private static final int defaultReadMaxSizeBytes = 4 * 1024 * 1024;
     private static final int replicatorQueueSize = 1000;
     private volatile int pendingQueueSize = 0;
+
     private static final AtomicIntegerFieldUpdater<ExchangeMessageRouter> PENDING_SIZE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(ExchangeMessageRouter.class, "pendingQueueSize");
 
     private volatile int havePendingRead = FALSE;
     private static final AtomicIntegerFieldUpdater<ExchangeMessageRouter> HAVE_PENDING_READ_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(ExchangeMessageRouter.class, "havePendingRead");
-
-    private enum State {
-        INIT,
-        READY,
-        ERROR
-    }
 
     @AllArgsConstructor
     @EqualsAndHashCode

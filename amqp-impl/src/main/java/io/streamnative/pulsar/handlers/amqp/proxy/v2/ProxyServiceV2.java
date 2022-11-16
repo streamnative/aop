@@ -37,14 +37,14 @@ import org.apache.pulsar.client.api.PulsarClient;
  * Proxy server, the proxy server should be an individual service, it could be scale up.
  */
 @Slf4j
-public class ProxyServer {
+public class ProxyServiceV2 {
 
     private final ProxyConfiguration config;
     private final PulsarService pulsar;
     private final Map<String, CompletableFuture<Producer<byte[]>>> producerMap;
     private PulsarServiceLookupHandler lookupHandler;
 
-    public ProxyServer(ProxyConfiguration config, PulsarService pulsarService) {
+    public ProxyServiceV2(ProxyConfiguration config, PulsarService pulsarService) {
         this.config = config;
         this.pulsar = pulsarService;
         this.producerMap = new ConcurrentHashMap<>();
@@ -65,7 +65,7 @@ public class ProxyServer {
                         ch.pipeline().addLast("consolidation", new FlushConsolidationHandler(
                                 config.getAmqpExplicitFlushAfterFlushes(), true));
                         ch.pipeline().addLast("handler",
-                                new ProxyClientConnection(config, lookupHandler, ProxyServer.this));
+                                new ProxyClientConnection(config, lookupHandler, ProxyServiceV2.this));
                         ch.pipeline().addLast("directHandler", new AmqpProxyDirectHandler());
                     }
                 });

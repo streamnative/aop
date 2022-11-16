@@ -32,9 +32,8 @@ import org.apache.pulsar.common.api.proto.KeySharedMeta;
 import org.apache.pulsar.common.protocol.Commands;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
-
 /**
- * Amqp consumer Used to forward messages.
+ * AMQP consumer original is used to forward original messages, not index messages.
  */
 @Slf4j
 public class AmqpConsumerOriginal extends AmqpConsumer {

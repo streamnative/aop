@@ -31,6 +31,6 @@ public class AmqpPulsarServerCnx extends ServerCnx {
 
     @Override
     public void closeConsumer(Consumer consumer) {
-        // avoid close the connection when close the consumer
+        // avoid close the connection when closing the consumer
     }
 }

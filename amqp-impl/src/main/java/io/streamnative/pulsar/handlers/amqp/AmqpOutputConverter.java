@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import static org.apache.qpid.server.protocol.v0_8.transport.AMQFrame.FRAME_END_BYTE;
+
 import java.io.IOException;
 import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.QpidException;
@@ -32,6 +34,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.apache.qpid.server.util.GZIPUtils;
 
+
 /**
  * Used to process command output.
  */
@@ -41,6 +44,16 @@ public class AmqpOutputConverter {
     private static final int BASIC_CLASS_ID = 60;
     private final AmqpConnection connection;
     private static final AMQShortString GZIP_ENCODING = AMQShortString.valueOf(GZIPUtils.GZIP_CONTENT_ENCODING);
+
+    // data with this type will not be decoded by proxy v2.
+    public static final byte PROXY_V2_DIRECT_TYPE = 9;
+    private static final int PROXY_V2_DIRECT_EXTENDS_SIZE = 8;
+    private static final QpidByteBuffer FRAME_END_BYTE_BUFFER = QpidByteBuffer.allocateDirect(1);
+
+    static {
+        FRAME_END_BYTE_BUFFER.put(FRAME_END_BYTE);
+        FRAME_END_BYTE_BUFFER.flip();
+    }
 
     public AmqpOutputConverter(AmqpConnection connection) {
         this.connection = connection;
@@ -359,16 +372,16 @@ public class AmqpOutputConverter {
 
         @Override
         public long getSize() {
-            return (amqpProxyV2Enable ? 8 : 0) + OVERHEAD + (long) methodBody.getSize() + (long) headerBody.getSize()
-                    + (long) contentBody.getSize();
+            return (amqpProxyV2Enable ? PROXY_V2_DIRECT_EXTENDS_SIZE : 0) + OVERHEAD + (long) methodBody.getSize()
+                    + (long) headerBody.getSize() + (long) contentBody.getSize();
         }
 
         @Override
         public long writePayload(final ByteBufferSender sender) {
             if (amqpProxyV2Enable) {
                 // wrap the delivery message data with a special type 9 to skip data decode in proxy
-                QpidByteBuffer buffer = QpidByteBuffer.allocate(7);
-                buffer.put((byte) 9);
+                QpidByteBuffer buffer = QpidByteBuffer.allocate(PROXY_V2_DIRECT_EXTENDS_SIZE - 1);
+                buffer.put(PROXY_V2_DIRECT_TYPE);
                 buffer.putUnsignedShort(0);
                 buffer.putUnsignedInt(getSize() - 8);
                 buffer.flip();
@@ -383,11 +396,10 @@ public class AmqpOutputConverter {
 
             if (amqpProxyV2Enable) {
                 // wrap the delivery message data to skip data decode in proxy
-                QpidByteBuffer endBuffer = QpidByteBuffer.allocate(1);
-                endBuffer.put((byte) 0xCE);
-                endBuffer.flip();
-                sender.send(endBuffer);
-                size += 8;
+                try (QpidByteBuffer endFrame = FRAME_END_BYTE_BUFFER.duplicate()) {
+                    sender.send(endFrame);
+                }
+                size += PROXY_V2_DIRECT_EXTENDS_SIZE;
             }
             return size;
         }

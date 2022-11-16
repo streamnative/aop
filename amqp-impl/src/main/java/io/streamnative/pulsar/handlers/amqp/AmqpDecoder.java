@@ -159,7 +159,6 @@ public abstract class AmqpDecoder<T extends MethodProcessor> {
 
     protected void processFrame(final int channel, final byte type, final long bodySize, final QpidByteBuffer in)
             throws AMQFrameDecodingException {
-        System.out.println("xxxx process frame " + type);
         switch (type) {
             case 1 -> processMethod(channel, in);
             case 2 -> ContentHeaderBody.process(in, methodProcessor.getChannelMethodProcessor(channel), bodySize);

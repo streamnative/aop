@@ -18,6 +18,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
@@ -109,6 +110,7 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         ByteBuf byteBuf = (ByteBuf) msg;
         if (state.equals(State.INIT)) {
+            byteBuf.retain();
             connectionCommands.add(byteBuf);
         }
         try {
@@ -116,6 +118,8 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
         } catch (Exception e) {
             this.state = State.FAILED;
             log.error("ProxyClientConnection failed to decode requests.", e);
+        } finally {
+            byteBuf.release();
         }
     }
 
@@ -213,10 +217,6 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
             log.debug("ProxyClientConnection receive connection close request, replyCode: {}, replyText: {}, "
                             + "classId: {}, methodId: {}.", replyCode, replyText, classId, methodId);
         }
-        if (log.isDebugEnabled()) {
-            log.debug("ProxyClientConnection receive connection close request, replyCode: {}, replyText: {}, "
-                            + "classId: {}, methodId: {}", replyCode, replyText, classId, methodId);
-        }
         for (ProxyBrokerConnection conn : getConnectionMap().values()) {
             conn.getChannel().writeAndFlush(
                     new ConnectionCloseBody(
@@ -280,6 +280,14 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
             log.debug("ProxyClientConnection write frame: {}", frame);
         }
         this.ctx.writeAndFlush(frame);
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        for (ByteBuf command : connectionCommands) {
+            ReferenceCountUtil.safeRelease(command);
+        }
     }
 
     public void sendChannelClose(int channelId, int replyCode, final String replyText) {

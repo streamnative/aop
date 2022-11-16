@@ -119,7 +119,11 @@ public class ProxyBrokerConnection {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            clientDecoder.decodeBuffer(((ByteBuf) msg).nioBuffer());
+            try {
+                clientDecoder.decodeBuffer(((ByteBuf) msg).nioBuffer());
+            } finally {
+                ((ByteBuf) msg).release();
+            }
         }
 
         public synchronized void writeFrame(AMQDataBlock frame) {

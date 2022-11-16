@@ -18,7 +18,6 @@ import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.TRUE;
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
 
 import com.google.common.collect.Sets;
-import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.impl.HeadersMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
@@ -41,6 +40,7 @@ import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
+import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.PulsarServerException;
@@ -179,18 +179,25 @@ public abstract class ExchangeMessageRouter {
             String routingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
             Set<Destination> destinations = getDestinations(routingKey, getMessageHeaders());
             List<CompletableFuture<Void>> futures = new ArrayList<>();
-            for (Destination des : destinations) {
-                futures.add(sendMessage(des, message, props));
+            byte[] data;
+            if (!destinations.isEmpty()) {
+                data = new byte[message.getDataBuffer().readableBytes()];
+                message.getDataBuffer().readBytes(data);
+                for (Destination des : destinations) {
+                    futures.add(sendMessage(des, data, props));
+                }
             }
+            final Position position = entry.getPosition();
+            entry.release();
             FutureUtil.waitForAll(futures).whenComplete((__, t) -> {
                 if (t != null) {
-                    log.error("Failed to route message {}", entry.getPosition(), t);
+                    log.error("Failed to route message {}", position, t);
                     cursor.rewind();
                     sendComplete();
                     return;
                 }
                 sendComplete();
-                cursor.asyncDelete(entry.getPosition(), new AsyncCallbacks.DeleteCallback() {
+                cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
                     @Override
                     public void deleteComplete(Object ctx) {
                         if (log.isDebugEnabled()) {
@@ -215,29 +222,13 @@ public abstract class ExchangeMessageRouter {
     }
 
     private CompletableFuture<Void> sendMessage(Destination des,
-                                                MessageImpl<byte[]> message,
+                                                byte[] data,
                                                 Map<String, String> props) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-        ByteBuf payload = message.getDataBuffer().slice();
-        byte[] data = new byte[payload.readableBytes()];
-        payload.readBytes(data);
-        String msg = new String(data);
-        getProducer(des.name, des.type).thenCompose(producer -> {
-                    log.info("try to send message `" + msg + "` to des `" + des + "`");
-                    return producer.newMessage()
-                            .value(data)
-                            .properties(props)
-                            .sendAsync();
-                })
-                .thenAccept(__ -> {
-                    log.info("success to send message `" + msg + "` to des `" + des + "`");
-                    future.complete(null);
-                })
-                .exceptionally(t -> {
-                    future.completeExceptionally(t);
-                    return null;
-                });
-        return future;
+        return getProducer(des.name, des.type).thenCompose(producer -> producer.newMessage()
+                .value(data)
+                .properties(props)
+                .sendAsync())
+                .thenApply(__ -> null);
     }
 
     private CompletableFuture<Producer<byte[]>> getProducer(String des, String desType) {

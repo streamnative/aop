@@ -48,6 +48,7 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.MessageImpl;
+import org.apache.pulsar.client.impl.ProducerImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -171,23 +172,24 @@ public abstract class ExchangeMessageRouter {
                 props = message.getMessageBuilder().getPropertiesList().stream()
                         .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
             } catch (IOException e) {
-                log.error("Deserialize entry dataBuffer failed. exchangeName: {}, skip it first.",
+                log.error("Deserialize entry dataBuffer failed for exchange {}, skip it first.",
                         exchange.getName(), e);
                 PENDING_SIZE_UPDATER.decrementAndGet(this);
+                entry.release();
                 continue;
             }
             String routingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
             Set<Destination> destinations = getDestinations(routingKey, getMessageHeaders());
+
+            final Position position = entry.getPosition();
+
             List<CompletableFuture<Void>> futures = new ArrayList<>();
-            byte[] data;
             if (!destinations.isEmpty()) {
-                data = new byte[message.getDataBuffer().readableBytes()];
-                message.getDataBuffer().readBytes(data);
+                final int readerIndex = message.getDataBuffer().readerIndex();
                 for (Destination des : destinations) {
-                    futures.add(sendMessage(des, data, props));
+                    futures.add(sendMessage(message, des, readerIndex));
                 }
             }
-            final Position position = entry.getPosition();
             entry.release();
             FutureUtil.waitForAll(futures).whenComplete((__, t) -> {
                 if (t != null) {
@@ -221,13 +223,15 @@ public abstract class ExchangeMessageRouter {
         }
     }
 
-    private CompletableFuture<Void> sendMessage(Destination des,
-                                                byte[] data,
-                                                Map<String, String> props) {
-        return getProducer(des.name, des.type).thenCompose(producer -> producer.newMessage()
-                .value(data)
-                .properties(props)
-                .sendAsync())
+    private CompletableFuture<Void> sendMessage(MessageImpl<byte[]> msg, Destination des, int readerIndex) {
+        return getProducer(des.name, des.type)
+                .thenCompose(producer -> {
+                    msg.getDataBuffer().retain();
+                    msg.getMessageBuilder().clearProducerName();
+                    msg.getMessageBuilder().clearPublishTime();
+                    msg.getDataBuffer().readerIndex(readerIndex);
+                    return ((ProducerImpl<byte[]>) producer).sendAsync(msg);
+                })
                 .thenApply(__ -> null);
     }
 
@@ -237,7 +241,7 @@ public abstract class ExchangeMessageRouter {
             pulsarClient = exchange.getTopic().getBrokerService().pulsar().getClient();
         } catch (PulsarServerException e) {
             log.error("Failed to get pulsar client", e);
-            return CompletableFuture.failedFuture(e);
+            return FutureUtil.failedFuture(e);
         }
         NamespaceName namespaceName = TopicName.get(exchange.getTopic().getName()).getNamespaceObject();
         String prefix = desType.equals("queue") ? PersistentQueue.TOPIC_PREFIX : PersistentExchange.TOPIC_PREFIX;

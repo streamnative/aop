@@ -20,6 +20,7 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Interface of the AMQP exchange.
@@ -155,12 +156,12 @@ public interface AmqpExchange {
     int getQueueSize();
 
     default CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
-        return CompletableFuture.failedFuture(
+        return FutureUtil.failedFuture(
                 new NotSupportedOperationException("Amqp exchange queue bind operation is not supported."));
     }
 
     default CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
-        return CompletableFuture.failedFuture(
+        return FutureUtil.failedFuture(
                 new NotSupportedOperationException("Amqp exchange queue unbind operation is not supported."));
     }
 

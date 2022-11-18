@@ -400,7 +400,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
         } catch (JsonProcessingException e) {
             log.error("Failed to bind queue {} to exchange {}", queue, exchangeName, e);
-            return CompletableFuture.failedFuture(e);
+            return FutureUtil.failedFuture(e);
         }
         CompletableFuture<Void> future = new CompletableFuture<>();
         this.persistentTopic.getManagedLedger().asyncSetProperty(BINDINGS, bindingsJson,
@@ -428,7 +428,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
         } catch (JsonProcessingException e) {
             log.error("Failed to unbind queue {} to exchange {}", queue, exchangeName, e);
-            return CompletableFuture.failedFuture(e);
+            return FutureUtil.failedFuture(e);
         }
         CompletableFuture<Void> future = new CompletableFuture<>();
         this.persistentTopic.getManagedLedger().asyncSetProperty("BINDINGS", bindingsJson,

@@ -32,6 +32,7 @@ import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Proxy server, the proxy server should be an individual service, it could be scale up.
@@ -77,7 +78,7 @@ public class ProxyServiceV2 {
         try {
             client = pulsar.getClient();
         } catch (PulsarServerException e) {
-            return CompletableFuture.failedFuture(e);
+            return FutureUtil.failedFuture(e);
         }
         return producerMap.computeIfAbsent(topic, k -> {
             CompletableFuture<Producer<byte[]>> producerFuture = new CompletableFuture<>();

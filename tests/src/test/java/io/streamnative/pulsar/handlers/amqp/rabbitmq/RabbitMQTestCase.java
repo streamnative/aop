@@ -154,7 +154,7 @@ public class RabbitMQTestCase {
 
         countDownLatch.await();
         System.out.println("[" + testName + "] Test finish. Receive total msg cnt: " + totalReceiveMsgCnt);
-        Assert.assertEquals(expectedMsgCntPerQueue * queueList.size(), totalReceiveMsgCnt.get());
+        Assert.assertEquals(totalReceiveMsgCnt.get(), expectedMsgCntPerQueue * queueList.size());
     }
 
     public void defaultEmptyExchangeTest(int aopPort, String vhost) throws Exception {

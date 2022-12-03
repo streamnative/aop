@@ -24,14 +24,22 @@ import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpProxyDirectHandler;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
 import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
+import org.apache.pulsar.client.api.SubscriptionType;
 import org.apache.pulsar.common.util.FutureUtil;
 
 /**
@@ -41,6 +49,7 @@ import org.apache.pulsar.common.util.FutureUtil;
 public class ProxyServiceV2 {
 
     private final ProxyConfiguration config;
+    @Getter
     private final PulsarService pulsar;
     private final Map<String, CompletableFuture<Producer<byte[]>>> producerMap;
     private PulsarServiceLookupHandler lookupHandler;

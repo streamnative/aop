@@ -257,6 +257,76 @@ public final class MessageConvertUtils {
         return Pair.of(props, messagePublishInfo);
     }
 
+    public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
+            Map<String, String> messageProperties) throws UnsupportedEncodingException {
+        BasicContentHeaderProperties props = new BasicContentHeaderProperties();
+        Map<String, Object> headers = new HashMap<>();
+        MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
+
+        for (Map.Entry<String, String> keyValue : messageProperties.entrySet()) {
+            switch (keyValue.getKey()) {
+                case PROP_CONTENT_TYPE:
+                    props.setContentType(keyValue.getValue());
+                    break;
+                case PROP_ENCODING:
+                    props.setEncoding(keyValue.getValue());
+                    break;
+                case PROP_DELIVERY_MODE:
+                    props.setDeliveryMode(stringToByte(keyValue.getValue()));
+                    break;
+                case PROP_PRIORITY_PRIORITY:
+                    props.setPriority(stringToByte(keyValue.getValue()));
+                    break;
+                case PROP_CORRELATION_ID:
+                    props.setCorrelationId(keyValue.getValue());
+                    break;
+                case PROP_REPLY_TO:
+                    props.setReplyTo(keyValue.getValue());
+                    break;
+                case PROP_EXPIRATION:
+                    props.setExpiration(Long.parseLong(keyValue.getValue()));
+                    break;
+                case PROP_MESSAGE_ID:
+                    props.setMessageId(keyValue.getValue());
+                    break;
+                case PROP_TIMESTAMP:
+                    props.setTimestamp(Long.parseLong(keyValue.getValue()));
+                    break;
+                case PROP_TYPE:
+                    props.setType(keyValue.getValue());
+                    break;
+                case PROP_USER_ID:
+                    props.setUserId(keyValue.getValue());
+                    break;
+                case PROP_APP_ID:
+                    props.setAppId(keyValue.getValue());
+                    break;
+                case PROP_CLUSTER_ID:
+                    props.setClusterId(keyValue.getValue());
+                    break;
+                case PROP_PROPERTY_FLAGS:
+                    props.setPropertyFlags(Integer.parseInt(keyValue.getValue()));
+                    break;
+                case PROP_EXCHANGE:
+                    messagePublishInfo.setExchange(AMQShortString.createAMQShortString(keyValue.getValue()));
+                    break;
+                case PROP_IMMEDIATE:
+                    messagePublishInfo.setImmediate(Boolean.parseBoolean(keyValue.getValue()));
+                    break;
+                case PROP_MANDATORY:
+                    messagePublishInfo.setMandatory(Boolean.parseBoolean(keyValue.getValue()));
+                    break;
+                case PROP_ROUTING_KEY:
+                    messagePublishInfo.setRoutingKey(AMQShortString.createAMQShortString(keyValue.getValue()));
+                    break;
+                default:
+                    headers.put(keyValue.getKey().substring(BASIC_PROP_HEADER_PRE.length()), keyValue.getValue());
+            }
+        }
+        props.setHeaders(FieldTableFactory.createFieldTable(headers));
+        return Pair.of(props, messagePublishInfo);
+    }
+
     public static List<AmqpMessageData> entriesToAmqpBodyList(List<Entry> entries)
                                                                 throws UnsupportedEncodingException {
         ImmutableList.Builder<AmqpMessageData> builder = ImmutableList.builder();
@@ -341,6 +411,24 @@ public final class MessageConvertUtils {
         } finally {
             payload.release();
         }
+    }
+
+    public static AmqpMessageData messageToAmqpBody(Message<byte[]> message)
+            throws UnsupportedEncodingException {
+        AmqpMessageData amqpMessage = null;
+
+        Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
+                getPropertiesFromMetadata(message.getProperties());
+
+        ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
+        contentHeaderBody.setBodySize(message.getData().length);
+
+        amqpMessage = AmqpMessageData.builder()
+                .messagePublishInfo(metaData.getRight())
+                .contentHeaderBody(contentHeaderBody)
+                .contentBody(new ContentBody(QpidByteBuffer.wrap(message.getData())))
+                .build();
+        return amqpMessage;
     }
 
     private static String byteToString(byte b) throws UnsupportedEncodingException {

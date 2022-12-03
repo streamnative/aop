@@ -20,6 +20,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
+import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
 import io.streamnative.pulsar.handlers.amqp.proxy.PulsarServiceLookupHandler;
@@ -39,6 +40,7 @@ import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQDataBlock;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ChannelCloseBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ChannelOpenOkBody;
@@ -316,6 +318,32 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
                 return null;
             }
         }));
+    }
+
+    public void closeChannelAndWriteFrame(AmqpChannel channel, int cause, String message) {
+        writeFrame(new ChannelCloseBody(cause, AMQShortString.validValueOf(message), currentClassId, currentMethodId)
+                .generateFrame(channel.getChannelId()));
+        closeChannel(channel, true);
+    }
+
+    void closeChannel(AmqpChannel channel, boolean mark) {
+        int channelId = channel.getChannelId();
+        try {
+            channel.close();
+            if (mark) {
+//                markChannelAwaitingCloseOk(channelId);
+            }
+        } finally {
+            removeChannel(channelId);
+        }
+    }
+
+//    private void markChannelAwaitingCloseOk(int channelId) {
+//        closingChannelsList.put(channelId, System.currentTimeMillis());
+//    }
+
+    private synchronized void removeChannel(int channelId) {
+        serverChannelMap.remove(channelId);
     }
 
 }

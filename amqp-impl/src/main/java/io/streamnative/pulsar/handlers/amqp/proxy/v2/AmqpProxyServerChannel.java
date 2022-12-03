@@ -20,17 +20,38 @@ import static org.apache.qpid.server.protocol.ErrorCodes.MESSAGE_TOO_LARGE;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
+import io.streamnative.pulsar.handlers.amqp.AmqpOutputConverter;
+import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.broker.PulsarServerException;
+import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
+import org.apache.pulsar.client.api.SubscriptionType;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.message.MessageDestination;
+import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ChannelCloseBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ChannelOpenBody;
@@ -51,10 +72,20 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     private boolean isInit;
 
     private IncomingMessage currentMessage;
+    private final AmqpOutputConverter outputConverter;
+
+    private final List<CompletableFuture<AmqpConsumer>> consumerList;
+    private final AtomicLong deliveryTag = new AtomicLong();
+    private final UnacknowledgedMessageMap unacknowledgedMessageMap;
+    private final AmqpFlowCreditManager creditManager;
 
     public AmqpProxyServerChannel(Integer channelId, ProxyClientConnection proxyConnection) {
         this.channelId = channelId;
         this.proxyConnection = proxyConnection;
+        this.outputConverter = new AmqpOutputConverter(this.proxyConnection.getCtx().channel());
+        this.consumerList = new ArrayList<>();
+        this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
+        this.creditManager = new AmqpFlowCreditManager(0, 0);
     }
 
     public CompletableFuture<ProxyBrokerConnection> getConn(String topic) {
@@ -184,12 +215,90 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                     + "noAck: {}, exclusive: {}, nowait: {}, arguments: {}.",
                     queue, consumerTag, noLocal, noAck, exclusive, noAck, arguments);
         }
-        getConn(queue.toString()).thenAccept(conn -> {
-            initChannelIfNeeded(conn);
-            BasicConsumeBody basicConsumeBody =
-                    new BasicConsumeBody(0, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
-            conn.getChannel().writeAndFlush(basicConsumeBody.generateFrame(channelId));
+        String topic = "persistent://public/" + proxyConnection.getVhost() + "/__amqp_queue__" + queue;
+        String finalConsumerTag = getConsumerTag(consumerTag);
+        getConsumer(topic, finalConsumerTag, noAck).thenAccept(consumer -> {
+            BasicConsumeOkBody basicConsumeOkBody = new BasicConsumeOkBody(AMQShortString.valueOf(finalConsumerTag));
+            proxyConnection.getCtx().channel().writeAndFlush(basicConsumeOkBody.generateFrame(channelId));
+            new Thread(() -> {
+                startToConsume(consumer);
+            }).start();
         });
+//        getConn(queue.toString()).thenAccept(conn -> {
+//            initChannelIfNeeded(conn);
+//            BasicConsumeBody basicConsumeBody =
+//                    new BasicConsumeBody(0, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
+//            conn.getChannel().writeAndFlush(basicConsumeBody.generateFrame(channelId));
+//        });
+    }
+
+    private String getConsumerTag(AMQShortString consumerTag) {
+        if (consumerTag == null) {
+            return "aop.ctag-" + proxyConnection.getCtx().channel().remoteAddress() + "-" + UUID.randomUUID();
+        } else {
+            // don't change the consumer tag if the consumerTag is existing
+            return consumerTag.toString();
+        }
+    }
+
+    private void startToConsume(AmqpConsumer consumer) {
+        Message<byte[]> message = null;
+        while (true) {
+            try {
+                message = consumer.getConsumer().receive();
+                MessageId messageId = message.getMessageId();
+                long deliveryIndex = deliveryTag.incrementAndGet();
+                outputConverter.writeDeliver(
+                        MessageConvertUtils.messageToAmqpBody(message),
+                        channelId,
+                        false,
+                        deliveryIndex,
+                        AMQShortString.createAMQShortString(consumer.getConsumerTag()));
+                if (consumer.isAutoAck()) {
+                    log.info("ack message {} for topic {} by auto ack.", messageId, consumer.getTopic());
+                    consumer.getConsumer().acknowledgeAsync(message.getMessageId()).exceptionally(t -> {
+                        log.error("Failed to ack message {} for topic {} by auto ack.",
+                                messageId, consumer.getTopic(), t);
+                        return null;
+                    });
+                } else {
+                    unacknowledgedMessageMap.add(deliveryIndex, message.getMessageId(), consumer, 1);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } finally {
+                if (message != null) {
+                    message.release();
+                }
+            }
+        }
+    }
+
+    public CompletableFuture<AmqpConsumer> getConsumer(String topic, String consumerTag, boolean autoAck) {
+        PulsarClient client;
+        try {
+            client = proxyConnection.getProxyServer().getPulsar().getClient();
+        } catch (PulsarServerException e) {
+            return FutureUtil.failedFuture(e);
+        }
+        CompletableFuture<AmqpConsumer> consumerFuture = new CompletableFuture<>();
+        client.newConsumer()
+                .topic(topic)
+                .subscriptionType(SubscriptionType.Shared)
+                .subscriptionName("AMQP_DEFAULT")
+                .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                .consumerName(UUID.randomUUID().toString())
+//                .receiverQueueSize(0)
+                .subscribeAsync()
+                .thenAccept(consumer-> {
+                    consumerFuture.complete(new AmqpConsumer(consumer, consumerTag, autoAck));
+                    consumerList.add(consumerFuture);
+                })
+                .exceptionally(t -> {
+                    consumerFuture.completeExceptionally(t);
+                    return null;
+                });
+        return consumerFuture;
     }
 
     @Override
@@ -229,6 +338,23 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
         if (log.isDebugEnabled()) {
             log.debug("ProxyServerChannel receive basic ack request, deliveryTag: {}, multiple: {}.",
                     deliveryTag, multiple);
+        }
+        messageAck(deliveryTag, multiple);
+    }
+
+    private void messageAck(long deliveryTag, boolean multiple) {
+        Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
+                unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
+        if (!ackedMessages.isEmpty()) {
+            ackedMessages.forEach(entry -> {
+                entry.getConsumer().acknowledgeAsync(entry.getMessageId()).exceptionally(t -> {
+                    log.error("Failed to ack message with delivery tag {}(messageId: {}).",
+                            deliveryTag, entry.getMessageId(), t);
+                    return null;
+                });
+            });
+        } else {
+            // TODO close channel
         }
     }
 

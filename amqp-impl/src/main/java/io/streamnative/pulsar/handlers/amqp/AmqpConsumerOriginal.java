@@ -101,10 +101,13 @@ public class AmqpConsumerOriginal extends AmqpConsumer {
                         entry.getPosition(), this, entry.getLength());
             }
 
+            boolean isRedelivery = getRedeliveryTracker()
+                    .getRedeliveryCount(
+                            entry.getPosition().getLedgerId(), entry.getPosition().getEntryId()) > 0;
             channel.getConnection().getAmqpOutputConverter().writeDeliver(
                     MessageConvertUtils.entryToAmqpBody(entry),
                     channel.getChannelId(),
-                    getRedeliveryTracker().contains(entry.getPosition()),
+                    isRedelivery,
                     deliveryTag,
                     AMQShortString.createAMQShortString(consumerTag));
 

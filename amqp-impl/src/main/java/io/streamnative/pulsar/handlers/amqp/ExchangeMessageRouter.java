@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,6 +48,7 @@ import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.client.impl.ProducerImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
@@ -54,6 +56,7 @@ import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.protocol.Commands;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.exchange.topic.TopicParser;
 
@@ -168,10 +171,14 @@ public abstract class ExchangeMessageRouter {
             Map<String, String> props;
             MessageImpl<byte[]> message;
             try {
-                message = MessageImpl.deserialize(entry.getDataBuffer());
+                message = MessageImpl.create(null, null,
+                        Commands.parseMessageMetadata(entry.getDataBuffer()),
+                        entry.getDataBuffer(),
+                        null, null, Schema.BYTES, 0, true, -1L);
+//                message = MessageImpl.deserialize(entry.getDataBuffer());
                 props = message.getMessageBuilder().getPropertiesList().stream()
                         .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
-            } catch (IOException e) {
+            } catch (Exception e) {
                 log.error("Deserialize entry dataBuffer failed for exchange {}, skip it first.",
                         exchange.getName(), e);
                 PENDING_SIZE_UPDATER.decrementAndGet(this);
@@ -185,6 +192,7 @@ public abstract class ExchangeMessageRouter {
 
             List<CompletableFuture<Void>> futures = new ArrayList<>();
             if (!destinations.isEmpty()) {
+                entry.getDataBuffer().retain(destinations.size());
                 final int readerIndex = message.getDataBuffer().readerIndex();
                 for (Destination des : destinations) {
                     futures.add(sendMessage(message, des, readerIndex));
@@ -226,7 +234,6 @@ public abstract class ExchangeMessageRouter {
     private CompletableFuture<Void> sendMessage(MessageImpl<byte[]> msg, Destination des, int readerIndex) {
         return getProducer(des.name, des.type)
                 .thenCompose(producer -> {
-                    msg.getDataBuffer().retain();
                     msg.getMessageBuilder().clearProducerName();
                     msg.getMessageBuilder().clearPublishTime();
                     msg.getDataBuffer().readerIndex(readerIndex);

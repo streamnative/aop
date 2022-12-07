@@ -33,7 +33,11 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pulsar.broker.PulsarServerException;
+import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -289,6 +293,9 @@ public class ProxyClientConnection extends ChannelInboundHandlerAdapter
         super.channelInactive(ctx);
         for (ByteBuf command : connectionCommands) {
             ReferenceCountUtil.safeRelease(command);
+        }
+        for (AmqpProxyServerChannel serverChannel : serverChannelMap.values()) {
+            serverChannel.close();
         }
     }
 

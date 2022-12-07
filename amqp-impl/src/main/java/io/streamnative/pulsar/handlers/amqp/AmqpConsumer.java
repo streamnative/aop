@@ -17,6 +17,10 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,6 +30,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.concurrent.atomic.LongAdder;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -43,6 +49,7 @@ import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
 import org.apache.pulsar.common.protocol.Commands;
+import org.apache.pulsar.common.stats.Rate;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
@@ -75,6 +82,12 @@ public class AmqpConsumer extends Consumer {
 
     private final int maxPermits = 1000;
 
+    protected Field msgOutField;
+    protected Field msgOutCounterField;
+    protected Field bytesOutCounterField;
+    protected Method recordMultpleEventsMethod;
+    protected Method addMethod;
+
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId,
         int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
@@ -89,6 +102,21 @@ public class AmqpConsumer extends Consumer {
         this.consumerTag = consumerTag;
         this.queueName = queueName;
         this.unAckMessages = new ConcurrentHashMap<>();
+
+        try {
+            this.msgOutField = Consumer.class.getDeclaredField("msgOut");
+            this.msgOutField.setAccessible(true);
+            this.msgOutCounterField = Consumer.class.getDeclaredField("msgOutCounter");
+            this.msgOutCounterField.setAccessible(true);
+            this.bytesOutCounterField = Consumer.class.getDeclaredField("bytesOutCounter");
+            this.bytesOutCounterField.setAccessible(true);
+            this.recordMultpleEventsMethod =
+                    Rate.class.getDeclaredMethod("recordMultipleEvents", long.class, long.class);
+            this.addMethod = LongAdder.class.getDeclaredMethod("add", long.class);
+        } catch (Exception e) {
+            log.warn("Failed to get stats field.", e);
+        }
+        ;
     }
 
     @Override
@@ -134,6 +162,16 @@ public class AmqpConsumer extends Consumer {
                     writePromise.setFailure(throwable);
                     return;
                 }
+                try {
+                    this.recordMultpleEventsMethod.invoke(this.msgOutField.get(this), totalMessages, totalBytes);
+                    this.addMethod.invoke(this.msgOutCounterField.get(this), totalMessages);
+                    this.addMethod.invoke(this.bytesOutCounterField.get(this), totalBytes);
+                } catch (Exception e) {
+                    log.error("Failed to record delivery stats.", e);
+                }
+//                this.msgOut.recordMultipleEvents((long)totalMessages, totalBytes);
+//                this.msgOutCounter.add((long)totalMessages);
+//                this.bytesOutCounter.add(totalBytes);
                 connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);
             });
             batchSizes.recyle();
@@ -166,8 +204,14 @@ public class AmqpConsumer extends Consumer {
                         }
 
                         try {
+<<<<<<< HEAD
                             boolean isRedelivery = getRedeliveryTracker().getRedeliveryCount(
                                     index.getPosition().getLedgerId(), index.getPosition().getEntryId()) > 0;
+=======
+                            boolean isRedelivery = getRedeliveryTracker()
+                                    .getRedeliveryCount(index.getPosition().getLedgerId(),
+                                            index.getPosition().getEntryId()) > 0;
+>>>>>>> 939932c (fix)
                             channel.getConnection().getAmqpOutputConverter().writeDeliver(
                                     MessageConvertUtils.entryToAmqpBody(msg),
                                     channel.getChannelId(),

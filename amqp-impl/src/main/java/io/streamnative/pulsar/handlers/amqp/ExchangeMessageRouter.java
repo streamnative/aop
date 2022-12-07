@@ -69,7 +69,7 @@ public abstract class ExchangeMessageRouter {
 
     private final Map<String, CompletableFuture<Producer<byte[]>>> producerMap = new ConcurrentHashMap<>();
 
-    private static final int defaultReadMaxSizeBytes = 4 * 1024 * 1024;
+    private static final int defaultReadMaxSizeBytes = 5 * 1024 * 1024;
     private static final int replicatorQueueSize = 1000;
     private volatile int pendingQueueSize = 0;
 
@@ -126,7 +126,7 @@ public abstract class ExchangeMessageRouter {
                 if (log.isDebugEnabled()) {
                     log.debug("{} Schedule read of {} messages.", exchange.getName(), availablePermits);
                 }
-                cursor.asyncReadEntriesOrWait(100, defaultReadMaxSizeBytes,
+                cursor.asyncReadEntriesOrWait(availablePermits, defaultReadMaxSizeBytes,
                         new AsyncCallbacks.ReadEntriesCallback() {
                     @Override
                     public void readEntriesComplete(List<Entry> entries, Object ctx) {
@@ -141,6 +141,8 @@ public abstract class ExchangeMessageRouter {
                     }
                 }, null, null);
             } else {
+                log.warn("{} Not schedule read due to pending read. Messages to read {}.",
+                        exchange.getName(), availablePermits);
                 if (log.isDebugEnabled()) {
                     log.debug("{} Not schedule read due to pending read. Messages to read {}.",
                             exchange.getName(), availablePermits);
@@ -166,15 +168,17 @@ public abstract class ExchangeMessageRouter {
     }
 
     private void processMessages(List<Entry> entries) {
+        PENDING_SIZE_UPDATER.addAndGet(this, entries.size());
         for (Entry entry : entries) {
-            PENDING_SIZE_UPDATER.incrementAndGet(this);
+//            PENDING_SIZE_UPDATER.incrementAndGet(this);
             Map<String, String> props;
             MessageImpl<byte[]> message;
             try {
                 message = MessageImpl.create(null, null,
                         Commands.parseMessageMetadata(entry.getDataBuffer()),
                         entry.getDataBuffer(),
-                        null, null, Schema.BYTES, 0, true, -1L);
+                        Optional.empty(), null, Schema.BYTES, 0, true, -1L);
+                message.getMessageBuilder().clearSequenceId();
 //                message = MessageImpl.deserialize(entry.getDataBuffer());
                 props = message.getMessageBuilder().getPropertiesList().stream()
                         .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
@@ -192,7 +196,9 @@ public abstract class ExchangeMessageRouter {
 
             List<CompletableFuture<Void>> futures = new ArrayList<>();
             if (!destinations.isEmpty()) {
-                entry.getDataBuffer().retain(destinations.size());
+                if (destinations.size() > 1) {
+                    entry.getDataBuffer().retain(destinations.size() - 1);
+                }
                 final int readerIndex = message.getDataBuffer().readerIndex();
                 for (Destination des : destinations) {
                     futures.add(sendMessage(message, des, readerIndex));
@@ -203,10 +209,8 @@ public abstract class ExchangeMessageRouter {
                 if (t != null) {
                     log.error("Failed to route message {}", position, t);
                     cursor.rewind();
-                    sendComplete();
                     return;
                 }
-                sendComplete();
                 cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
                     @Override
                     public void deleteComplete(Object ctx) {
@@ -220,14 +224,11 @@ public abstract class ExchangeMessageRouter {
                         log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
                     }
                 }, entry.getPosition());
+                if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
+                        && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
+                    this.readMoreEntries();
+                }
             });
-        }
-    }
-
-    private void sendComplete() {
-        int pending = PENDING_SIZE_UPDATER.decrementAndGet(this);
-        if (pending == 0 && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
-            this.readMoreEntries();
         }
     }
 

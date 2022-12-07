@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +91,22 @@ public class AmqpConsumerOriginal extends AmqpConsumer {
             connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);
             batchSizes.recyle();
         });
+        writePromise.addListener(new GenericFutureListener<Future<? super Void>>() {
+            @Override
+            public void operationComplete(Future<? super Void> future) throws Exception {
+                try {
+                    AmqpConsumerOriginal.this.recordMultpleEventsMethod.invoke(
+                            AmqpConsumerOriginal.this.msgOutField.get(AmqpConsumerOriginal.this), totalMessages, totalBytes);
+                    AmqpConsumerOriginal.this.addMethod.invoke(
+                            AmqpConsumerOriginal.this.msgOutCounterField.get(AmqpConsumerOriginal.this), totalMessages);
+                    AmqpConsumerOriginal.this.addMethod.invoke(
+                            AmqpConsumerOriginal.this.bytesOutCounterField.get(AmqpConsumerOriginal.this), totalBytes);
+                } catch (Exception e) {
+                    log.error("Failed to record delivery stats.", e);
+                }
+
+            }
+        });
         return writePromise;
     }
 
@@ -102,8 +119,8 @@ public class AmqpConsumerOriginal extends AmqpConsumer {
             }
 
             boolean isRedelivery = getRedeliveryTracker()
-                    .getRedeliveryCount(
-                            entry.getPosition().getLedgerId(), entry.getPosition().getEntryId()) > 0;
+                    .getRedeliveryCount(entry.getPosition().getLedgerId(),
+                            entry.getPosition().getEntryId()) > 0;
             channel.getConnection().getAmqpOutputConverter().writeDeliver(
                     MessageConvertUtils.entryToAmqpBody(entry),
                     channel.getChannelId(),

@@ -413,7 +413,7 @@ public final class MessageConvertUtils {
         }
     }
 
-    public static AmqpMessageData messageToAmqpBody(Message<byte[]> message)
+    public static AmqpMessageData messageToAmqpBody(MessageImpl<byte[]> message)
             throws UnsupportedEncodingException {
         AmqpMessageData amqpMessage = null;
 

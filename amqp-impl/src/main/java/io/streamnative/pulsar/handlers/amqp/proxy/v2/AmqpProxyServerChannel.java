@@ -39,10 +39,12 @@ import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.SubscriptionInitialPosition;
 import org.apache.pulsar.client.api.SubscriptionType;
+import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.message.MessageDestination;
@@ -74,7 +76,9 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     private IncomingMessage currentMessage;
     private final AmqpOutputConverter outputConverter;
 
+    private final Map<String, CompletableFuture<Producer<byte[]>>> producerMap;
     private final List<CompletableFuture<AmqpConsumer>> consumerList;
+
     private final AtomicLong deliveryTag = new AtomicLong();
     private final UnacknowledgedMessageMap unacknowledgedMessageMap;
     private final AmqpFlowCreditManager creditManager;
@@ -83,6 +87,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
         this.channelId = channelId;
         this.proxyConnection = proxyConnection;
         this.outputConverter = new AmqpOutputConverter(this.proxyConnection.getCtx().channel());
+        this.producerMap = new ConcurrentHashMap<>();
         this.consumerList = new ArrayList<>();
         this.unacknowledgedMessageMap = new UnacknowledgedMessageMap(this);
         this.creditManager = new AmqpFlowCreditManager(0, 0);
@@ -242,10 +247,10 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
     }
 
     private void startToConsume(AmqpConsumer consumer) {
-        Message<byte[]> message = null;
+        MessageImpl<byte[]> message = null;
         while (true) {
             try {
-                message = consumer.getConsumer().receive();
+                message = (MessageImpl<byte[]>) consumer.getConsumer().receive();
                 MessageId messageId = message.getMessageId();
                 long deliveryIndex = deliveryTag.incrementAndGet();
                 outputConverter.writeDeliver(
@@ -255,20 +260,21 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                         deliveryIndex,
                         AMQShortString.createAMQShortString(consumer.getConsumerTag()));
                 if (consumer.isAutoAck()) {
-                    log.info("ack message {} for topic {} by auto ack.", messageId, consumer.getTopic());
-                    consumer.getConsumer().acknowledgeAsync(message.getMessageId()).exceptionally(t -> {
+//                    log.info("ack message {} for topic {} by auto ack.", messageId, consumer.getTopic());
+                    consumer.getConsumer().acknowledgeAsync(messageId).exceptionally(t -> {
                         log.error("Failed to ack message {} for topic {} by auto ack.",
                                 messageId, consumer.getTopic(), t);
                         return null;
                     });
                 } else {
-                    unacknowledgedMessageMap.add(deliveryIndex, message.getMessageId(), consumer, 1);
+                    unacknowledgedMessageMap.add(deliveryIndex, messageId, consumer, 1);
                 }
             } catch (Exception e) {
+                log.error("Failed to send message", e);
                 throw new RuntimeException(e);
             } finally {
                 if (message != null) {
-                    message.release();
+                    message.getDataBuffer().release();
                 }
             }
         }
@@ -288,6 +294,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                 .subscriptionName("AMQP_DEFAULT")
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .consumerName(UUID.randomUUID().toString())
+//                .poolMessages(true)
 //                .receiverQueueSize(0)
                 .subscribeAsync()
                 .thenAccept(consumer-> {
@@ -406,6 +413,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
             log.debug("ProxyServerChannel receive channel close request, replyCode: {}, replyText: {}, classId: {}, "
                             + "methodId: {}.", replyCode, replyText, classId, methodId);
         }
+        close();
         proxyConnection.getConnectionMap().values().forEach(conn -> {
             if (conn.getChannelState().getOrDefault(channelId, null)
                     == ProxyBrokerConnection.ChannelState.OPEN) {
@@ -413,6 +421,16 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                         new ChannelCloseBody(replyCode, replyText, classId, methodId).generateFrame(channelId));
             }
         });
+    }
+
+    protected void close() {
+        log.info("cleanup resource for channel {}.", channelId);
+        for (CompletableFuture<Producer<byte[]>> producerFuture : producerMap.values()) {
+            producerFuture.thenAccept(Producer::closeAsync);
+        }
+        for (CompletableFuture<AmqpConsumer> consumerFuture : consumerList) {
+            consumerFuture.thenAccept(amqpConsumer -> amqpConsumer.getConsumer().closeAsync());
+        }
     }
 
     @Override
@@ -519,8 +537,7 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
             }
 
             String topic = "persistent://public/" + proxyConnection.getVhost() + "/__amqp_exchange__" + exchangeName;
-            proxyConnection.getProxyServer()
-                    .getProducer(topic)
+            getProducer(topic)
                     .thenCompose(producer -> {
                         return producer.newMessage()
                                 .value(message.getData())
@@ -537,6 +554,29 @@ public class AmqpProxyServerChannel implements ServerChannelMethodProcessor {
                         return null;
                     });
         }
+    }
+
+    public CompletableFuture<Producer<byte[]>> getProducer(String topic) {
+        PulsarClient client;
+        try {
+            client = proxyConnection.getProxyServer().getPulsar().getClient();
+        } catch (PulsarServerException e) {
+            return FutureUtil.failedFuture(e);
+        }
+        return producerMap.computeIfAbsent(topic, k -> {
+            CompletableFuture<Producer<byte[]>> producerFuture = new CompletableFuture<>();
+            client.newProducer()
+                    .topic(topic)
+                    .enableBatching(false)
+                    .createAsync()
+                    .thenAccept(producerFuture::complete)
+                    .exceptionally(t -> {
+                        producerFuture.completeExceptionally(t);
+                        producerMap.remove(topic, producerFuture);
+                        return null;
+                    });
+            return producerFuture;
+        });
     }
 
     @Override

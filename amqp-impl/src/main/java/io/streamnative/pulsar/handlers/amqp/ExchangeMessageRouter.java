@@ -131,6 +131,12 @@ public abstract class ExchangeMessageRouter {
                     @Override
                     public void readEntriesComplete(List<Entry> entries, Object ctx) {
                         HAVE_PENDING_READ_UPDATER.set(ExchangeMessageRouter.this, FALSE);
+                        if (entries.size() == 0) {
+                            log.warn("read empty entries, scheduled to read again.");
+                            exchange.getTopic().getBrokerService().getPulsar().getExecutor()
+                                    .schedule(ExchangeMessageRouter.this::readMoreEntries, 1, TimeUnit.MILLISECONDS);
+                            return;
+                        }
                         processMessages(entries);
                     }
 
@@ -158,6 +164,8 @@ public abstract class ExchangeMessageRouter {
     private int getAvailablePermits() {
         int availablePermits = replicatorQueueSize - PENDING_SIZE_UPDATER.get(this);
         if (availablePermits <= 0) {
+            log.warn("{} Replicator queue is full, availablePermits: {}, pause route.",
+                    exchange.getName(), availablePermits);
             if (log.isDebugEnabled()) {
                 log.debug("{} Replicator queue is full, availablePermits: {}, pause route.",
                         exchange.getName(), availablePermits);
@@ -209,6 +217,10 @@ public abstract class ExchangeMessageRouter {
                 if (t != null) {
                     log.error("Failed to route message {}", position, t);
                     cursor.rewind();
+                    if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
+                            && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
+                        this.readMoreEntries();
+                    }
                     return;
                 }
                 cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {

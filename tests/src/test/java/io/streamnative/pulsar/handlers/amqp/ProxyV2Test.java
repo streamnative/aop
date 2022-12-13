@@ -13,9 +13,17 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import io.streamnative.pulsar.handlers.amqp.rabbitmq.RabbitMQTestCase;
-import java.util.concurrent.CountDownLatch;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
+import org.awaitility.Awaitility;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -29,64 +37,39 @@ public class ProxyV2Test extends AmqpTestBase {
     @Override
     public void setup() throws Exception {
         setBrokerCount(3);
-        ((AmqpServiceConfiguration) this.conf).setAmqpProxyV2Enable(true);
+        ((AmqpServiceConfiguration) this.conf).setAmqpMultiBundleEnable(true);
         super.setup();
     }
 
     @Test
-    public void rabbitMQProxyTest() throws Exception {
-        int proxyPort = getProxyPort();
-        RabbitMQTestCase rabbitMQTestCase = new RabbitMQTestCase(admin);
+    public void e2eTest() throws Exception {
+        int port = getAmqpBrokerPortList().get(0);
+        @Cleanup
+        Connection conn = getConnection("vhost1", port);
+        @Cleanup
+        Channel channel = conn.createChannel();
+        String ex = randExName();
+        channel.exchangeDeclare(ex, "direct", false, true, null);
+        String qu = randQuName();
+        channel.queueDeclare(qu, false, false, true, null);
+        String routingKey = "key1";
+        channel.queueBind(qu, ex, routingKey);
 
-        rabbitMQTestCase.basicFanoutTest(proxyPort, "rabbitmq-proxy-test1",
-                "vhost1", false, 2);
-        rabbitMQTestCase.basicFanoutTest(proxyPort, "rabbitmq-proxy-test2",
-                "vhost2", false, 3);
-        rabbitMQTestCase.basicFanoutTest(proxyPort, "rabbitmq-proxy-test3",
-                "vhost3", false, 2);
+        int messageCount = 100;
+        for (int i = 0; i < messageCount; i++) {
+            channel.basicPublish(ex, routingKey, null, "data".getBytes());
+        }
 
-        CountDownLatch countDownLatch = new CountDownLatch(3);
-        new Thread(() -> {
-            try {
-                rabbitMQTestCase.basicFanoutTest(proxyPort, "rabbitmq-proxy-test4",
-                        "vhost1", false, 2);
-                countDownLatch.countDown();
-            } catch (Exception e) {
-                log.error("Test4 error for vhost1.", e);
+        AtomicInteger receiveCount = new AtomicInteger();
+        channel.basicConsume(qu, true, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException {
+                System.out.println("receive message " + new String(body));
+                receiveCount.incrementAndGet();
             }
-        }).start();
-        new Thread(() -> {
-            try {
-                rabbitMQTestCase.basicFanoutTest(proxyPort, "rabbitmq-proxy-test5",
-                        "vhost2", false, 3);
-                countDownLatch.countDown();
-            } catch (Exception e) {
-                log.error("Test5 error for vhost2.", e);
-            }
-        }).start();
-        new Thread(() -> {
-            try {
-                rabbitMQTestCase.basicFanoutTest(proxyPort, "rabbitmq-proxy-test6",
-                        "vhost3", false, 3);
-                countDownLatch.countDown();
-            } catch (Exception e) {
-                log.error("Test6 error for vhost3.", e);
-            }
-        }).start();
-        countDownLatch.await();
-    }
-
-    @Test
-    public void unloadBundleTest() throws Exception {
-        int proxyPort = getProxyPort();
-
-        RabbitMQTestCase rabbitMQTestCase = new RabbitMQTestCase(admin);
-        rabbitMQTestCase.basicFanoutTest(proxyPort, "unload-bundle-test1",
-                "vhost1", true, 3);
-        rabbitMQTestCase.basicFanoutTest(proxyPort, "unload-bundle-test2",
-                "vhost2", true, 2);
-        rabbitMQTestCase.basicFanoutTest(proxyPort, "unload-bundle-test3",
-                "vhost3", true, 2);
+        });
+        Awaitility.waitAtMost(5, TimeUnit.SECONDS)
+                .until(() -> receiveCount.get() == messageCount);
     }
 
 }

@@ -100,6 +100,8 @@ public abstract class AmqpProtocolHandlerTestBase {
     private List<Integer> amqpBrokerPortList = new ArrayList<>();
     @Getter
     private List<Integer> aopProxyPortList = new ArrayList<>();
+    @Getter
+    private List<Integer> aopAdminPortList = new ArrayList<>();
 
     public AmqpProtocolHandlerTestBase() {
         resetConfig();
@@ -275,6 +277,10 @@ public abstract class AmqpProtocolHandlerTestBase {
             conf.setWebServicePort(Optional.of(brokerWebServicePort));
             conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
             conf.setBrokerShutdownTimeoutMs(0L);
+
+            int amqpAdminPort = PortManager.nextFreePort();
+            aopAdminPortList.add(amqpAdminPort);
+            ((AmqpServiceConfiguration) conf).setAmqpAdminPort(amqpAdminPort);
 
             log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, aopProxyPort: {}",
                     i, brokerPort, amqpBrokerPort, aopProxyPort);

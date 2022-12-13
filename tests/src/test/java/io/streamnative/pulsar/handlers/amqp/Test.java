@@ -11,7 +11,7 @@ public class Test {
         ConnectionFactory connectionFactory = new ConnectionFactory();
         connectionFactory.setVirtualHost("/");
         connectionFactory.setHost("127.0.0.1");
-        connectionFactory.setPort(5682);
+        connectionFactory.setPort(5672);
         Connection connection = connectionFactory.newConnection();
         Channel channel = connection.createChannel();
         String ex = "ex-perf";

@@ -164,7 +164,7 @@ public class ExchangeContainer {
                             amqpExchange = new PersistentExchange(exchangeName,
                                     AmqpExchange.Type.value(currentType), persistentTopic, currentDurable,
                                     currentAutoDelete, currentInternal, currentArguments, routeExecutor,
-                                    config.getAmqpExchangeRouteQueueSize(), config.isAmqpProxyV2Enable());
+                                    config.getAmqpExchangeRouteQueueSize(), config.isAmqpMultiBundleEnable());
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
                                     exchangeName, namespaceName.getLocalName(), e);

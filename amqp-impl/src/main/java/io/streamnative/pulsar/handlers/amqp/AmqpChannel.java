@@ -19,6 +19,9 @@ import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
@@ -37,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Subscription;
@@ -44,6 +48,11 @@ import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
+import org.apache.pulsar.client.api.SubscriptionType;
+import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
@@ -59,6 +68,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.AccessRequestOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicCancelOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
 import org.apache.qpid.server.protocol.v0_8.transport.ChannelFlowOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
@@ -134,6 +144,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     private ExchangeContainer exchangeContainer;
     private QueueContainer queueContainer;
 
+    private final Map<String, CompletableFuture<Producer<byte[]>>> producerMap;
+    private final List<CompletableFuture<AmqpWrappedConsumer>> consumerList;
+
     public AmqpChannel(int channelId, AmqpConnection connection, AmqpBrokerService amqpBrokerService) {
         this.channelId = channelId;
         this.connection = connection;
@@ -143,6 +156,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         this.queueService = amqpBrokerService.getQueueService();
         this.exchangeContainer = amqpBrokerService.getExchangeContainer();
         this.queueContainer = amqpBrokerService.getQueueContainer();
+        this.producerMap = new ConcurrentHashMap<>();
+        this.consumerList = new ArrayList<>();
     }
 
     @Override
@@ -165,16 +180,32 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveExchangeDeclare(AMQShortString exchange, AMQShortString type, boolean passive, boolean durable,
                                        boolean autoDelete, boolean internal, boolean nowait, FieldTable arguments) {
-        if (log.isDebugEnabled()) {
-            log.debug("RECV[{}] ExchangeDeclare[ exchange: {},"
+        if (log.isInfoEnabled()) {
+            log.info("RECV[{}] ExchangeDeclare[ exchange: {},"
                             + " type: {}, passive: {}, durable: {}, autoDelete: {}, internal: {}, "
                             + "nowait: {}, arguments: {} ]", channelId, exchange,
                     type, passive, durable, autoDelete, internal, nowait, arguments);
         }
 
-        this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(),
-                type != null ? type.toString() : null,
-                passive, durable, autoDelete, internal, FieldTable.convertToMap(arguments)).thenAccept(__ -> {
+        CompletableFuture<Void> future;
+        if (this.connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
+            ExchangeDeclareParams params = new ExchangeDeclareParams();
+            params.setType(type != null ? type.toString() : null);
+            params.setInternal(internal);
+            params.setAutoDelete(autoDelete);
+            params.setDurable(durable);
+            params.setPassive(passive);
+            params.setArguments(FieldTable.convertToMap(arguments));
+            future = this.connection.getAmqpBrokerService().getAmqpAdmin().exchangeDeclare(
+                    connection.getNamespaceName().toString(), exchange.toString(), params);
+        } else {
+            future = this.exchangeService.exchangeDeclare(connection.getNamespaceName(), exchange.toString(),
+                    type != null ? type.toString() : null,
+                    passive, durable, autoDelete, internal, FieldTable.convertToMap(arguments))
+                    .thenApply(__ -> null);
+        }
+
+        future.thenAccept(__ -> {
             if (!nowait) {
                 connection.writeFrame(
                         connection.getMethodRegistry().createExchangeDeclareOkBody().generateFrame(channelId));
@@ -252,12 +283,27 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }
-        queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
-                autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
-            setDefaultQueue(amqpQueue);
+
+        CompletableFuture<Void> future;
+        if (this.connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
+            QueueDeclareParams params = new QueueDeclareParams();
+            params.setDurable(durable);
+            params.setExclusive(exclusive);
+            params.setAutoDelete(autoDelete);
+            params.setArguments(FieldTable.convertToMap(arguments));
+            future = this.connection.getAmqpBrokerService().getAmqpAdmin().queueDeclare(
+                    connection.getNamespaceName().toString(), queue.toString(), params);
+        } else {
+            future = queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
+                            autoDelete, nowait, arguments, connection.getConnectionId())
+                    .thenApply(__ -> null);
+        }
+
+        future.thenAccept(amqpQueue -> {
+//            setDefaultQueue(amqpQueue);
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(
-                    AMQShortString.createAMQShortString(amqpQueue.getName()), 0, 0);
+                    AMQShortString.createAMQShortString(queue.toString()), 0, 0);
             connection.writeFrame(responseBody.generateFrame(channelId));
         }).exceptionally(t -> {
             log.error("Failed to declare queue {} in vhost {}", queue, connection.getNamespaceName(), t);
@@ -274,31 +320,28 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
 
-        if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
-            exchangeService.queueBind(connection.getNamespaceName(), exchange.toString(), getQueueName(queue),
-                            bindingKey != null ? bindingKey.toString() : null, FieldTable.convertToMap(argumentsTable))
-                    .thenAccept(__ -> {
-                        MethodRegistry methodRegistry = connection.getMethodRegistry();
-                        AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
-                        connection.writeFrame(responseBody.generateFrame(channelId));
-                    }).exceptionally(t -> {
-                        log.error("Failed to bind queue {} to exchange {} v2.", queue, exchange, t);
-                        handleAoPException(t);
-                        return null;
-                    });
+        CompletableFuture<Void> future;
+        if (connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
+            BindingParams params = new BindingParams();
+            params.setRoutingKey(bindingKey != null ? bindingKey.toString() : null);
+            params.setArguments(FieldTable.convertToMap(argumentsTable));
+            future = this.connection.getAmqpBrokerService().getAmqpAdmin().queueBind(
+                    connection.getNamespaceName().toString(), exchange.toString(), queue.toString(), params);
         } else {
-            queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
-                bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
-                connection.getConnectionId()).thenAccept(__ -> {
-                    MethodRegistry methodRegistry = connection.getMethodRegistry();
-                    AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
-                    connection.writeFrame(responseBody.generateFrame(channelId));
-                }).exceptionally(t -> {
-                    log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
-                    handleAoPException(t);
-                    return null;
-                });
+            future = queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
+                    bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
+                    connection.getConnectionId());
         }
+
+        future.thenAccept(__ -> {
+            MethodRegistry methodRegistry = connection.getMethodRegistry();
+            AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+            connection.writeFrame(responseBody.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     @Override
@@ -360,7 +403,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     exchange, bindingKey, arguments);
         }
 
-        if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
+        if (connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
             exchangeService.queueUnBind(connection.getNamespaceName(), exchange.toString(), queue.toString(),
                             bindingKey.toString(), FieldTable.convertToMap(arguments))
                     .thenAccept(__ -> {
@@ -413,6 +456,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] BasicConsume[queue:{} consumerTag:{} noLocal:{} noAck:{} exclusive:{} nowait:{}"
                     + " arguments:{}]", channelId, queue, consumerTag, noLocal, noAck, exclusive, nowait, arguments);
         }
+        if (connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
+            String topic = "persistent://public/" + connection.getNamespaceName().getLocalName()
+                    + "/" + PersistentQueue.TOPIC_PREFIX + queue;
+            String finalConsumerTag = getConsumerTag(consumerTag);
+            getConsumer(topic, finalConsumerTag, noAck).thenAccept(consumer -> {
+                BasicConsumeOkBody basicConsumeOkBody = new BasicConsumeOkBody(AMQShortString.valueOf(finalConsumerTag));
+                connection.writeFrame(basicConsumeOkBody.generateFrame(channelId));
+                new Thread(() -> {
+                    startToConsume(consumer);
+                }).start();
+            });
+            return;
+        }
         CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
                 queueService.getQueue(connection.getNamespaceName(), queue.toString(), false,
                         connection.getConnectionId());
@@ -429,6 +485,40 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 }
             }
         });
+    }
+
+    private void startToConsume(AmqpWrappedConsumer consumer) {
+        MessageImpl<byte[]> message = null;
+        while (true) {
+            try {
+                message = (MessageImpl<byte[]>) consumer.getConsumer().receive();
+                MessageId messageId = message.getMessageId();
+                long deliveryIndex = getNextDeliveryTag();
+                connection.getAmqpOutputConverter().writeDeliver(
+                        MessageConvertUtils.messageToAmqpBody(message),
+                        channelId,
+                        false,
+                        deliveryIndex,
+                        AMQShortString.createAMQShortString(consumer.getConsumerTag()));
+                if (consumer.isAutoAck()) {
+//                    log.info("ack message {} for topic {} by auto ack.", messageId, consumer.getTopic());
+                    consumer.getConsumer().acknowledgeAsync(messageId).exceptionally(t -> {
+                        log.error("Failed to ack message {} for topic {} by auto ack.",
+                                messageId, consumer.getTopic(), t);
+                        return null;
+                    });
+                } else {
+//                    unacknowledgedMessageMap.add(deliveryIndex, messageId, consumer, 1);
+                }
+            } catch (Exception e) {
+                log.error("Failed to send message", e);
+                throw new RuntimeException(e);
+            } finally {
+                if (message != null) {
+                    message.getDataBuffer().release();
+                }
+            }
+        }
     }
 
     private String getConsumerTag(AMQShortString consumerTag) {
@@ -462,7 +552,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
                 AmqpConsumer consumer;
-                if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
+                if (connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
                     consumer = new AmqpConsumerOriginal(queueContainer, subscription,
                             exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
                             topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
@@ -749,21 +839,51 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             if (exchangeName == null || exchangeName.length() == 0) {
                 exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
             }
-            CompletableFuture<AmqpExchange> completableFuture = exchangeContainer.
-                    asyncGetExchange(connection.getNamespaceName(), exchangeName, createIfMissing, exchangeType);
-            completableFuture.thenApply(amqpExchange -> amqpExchange.writeMessageAsync(message, routingKey).
-                    thenApply(position -> {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Publish message success, position {}", position.toString());
-                        }
-                        if (confirmOnPublish) {
-                            confirmedMessageCounter++;
-                            BasicAckBody body = connection.getMethodRegistry().
-                                    createBasicAckBody(confirmedMessageCounter, false);
-                            connection.writeFrame(body.generateFrame(channelId));
-                        }
-                        return position;
-                    })).exceptionally(throwable -> {
+
+            final CompletableFuture<Void> future = new CompletableFuture<>();
+            if (this.connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
+                String topic = "persistent://public/" + connection.getNamespaceName().getLocalName() + "/__amqp_exchange__" + exchangeName;
+                getProducer(topic)
+                        .thenCompose(producer -> {
+                            return producer.newMessage()
+                                    .value(message.getData())
+                                    .properties(message.getProperties())
+                                    .sendAsync();
+                        })
+                        .thenAccept(position -> {
+                            if (log.isDebugEnabled()) {
+                                log.debug("Publish message success, position {}", position.toString());
+                            }
+                            future.complete(null);
+                        })
+                        .exceptionally(t -> {
+                            log.error("Failed to write message to exchange", t);
+                            return null;
+                        });
+            } else {
+                exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, createIfMissing, exchangeType)
+                        .thenCompose(amqpExchange -> {
+                            return amqpExchange.writeMessageAsync(message, routingKey);
+                        })
+                        .thenAccept(position -> {
+                            if (log.isDebugEnabled()) {
+                                log.debug("Publish message success, position {}", position);
+                            }
+                            future.complete(null);
+                        })
+                        .exceptionally(t -> {
+                            future.completeExceptionally(t);
+                            return null;
+                        });
+            }
+            future.thenAccept(__ -> {
+                if (confirmOnPublish) {
+                    confirmedMessageCounter++;
+                    BasicAckBody body = connection.getMethodRegistry().
+                            createBasicAckBody(confirmedMessageCounter, false);
+                    connection.writeFrame(body.generateFrame(channelId));
+                }
+            }).exceptionally(throwable -> {
                 log.error("Failed to write message to exchange", throwable);
                 return null;
             });
@@ -1065,6 +1185,55 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (exception.isCloseConnection()) {
             connection.sendConnectionClose(exception.getErrorCode(), exception.getMessage(), channelId);
         }
+    }
+
+    public CompletableFuture<Producer<byte[]>> getProducer(String topic) {
+        PulsarClient client;
+        try {
+            client = connection.getPulsarService().getClient();
+        } catch (PulsarServerException e) {
+            return FutureUtil.failedFuture(e);
+        }
+        return producerMap.computeIfAbsent(topic, k -> {
+            CompletableFuture<Producer<byte[]>> producerFuture = new CompletableFuture<>();
+            client.newProducer()
+                    .topic(topic)
+                    .enableBatching(false)
+                    .createAsync()
+                    .thenAccept(producerFuture::complete)
+                    .exceptionally(t -> {
+                        producerFuture.completeExceptionally(t);
+                        producerMap.remove(topic, producerFuture);
+                        return null;
+                    });
+            return producerFuture;
+        });
+    }
+
+    public CompletableFuture<AmqpWrappedConsumer> getConsumer(String topic, String consumerTag, boolean autoAck) {
+        PulsarClient client;
+        try {
+            client = connection.getPulsarService().getClient();
+        } catch (PulsarServerException e) {
+            return FutureUtil.failedFuture(e);
+        }
+        CompletableFuture<AmqpWrappedConsumer> consumerFuture = new CompletableFuture<>();
+        client.newConsumer()
+                .topic(topic)
+                .subscriptionType(SubscriptionType.Shared)
+                .subscriptionName("AMQP_DEFAULT")
+                .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                .consumerName(UUID.randomUUID().toString())
+                .subscribeAsync()
+                .thenAccept(consumer-> {
+                    consumerFuture.complete(new AmqpWrappedConsumer(consumer, consumerTag, autoAck));
+                    consumerList.add(consumerFuture);
+                })
+                .exceptionally(t -> {
+                    consumerFuture.completeExceptionally(t);
+                    return null;
+                });
+        return consumerFuture;
     }
 
 }

@@ -21,7 +21,6 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyConfiguration;
 import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
-import io.streamnative.pulsar.handlers.amqp.proxy.v2.ProxyServiceV2;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
@@ -110,13 +109,8 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             proxyConfig.setBrokerServiceURL(internalListener.getBrokerServiceUrl().toString());
 
             try {
-                if (amqpConfig.isAmqpProxyV2Enable()) {
-                    ProxyServiceV2 proxyServer = new ProxyServiceV2(proxyConfig, service.getPulsar());
-                    proxyServer.start();
-                } else {
-                    ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
-                    proxyService.start();
-                }
+                ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
+                proxyService.start();
                 log.info("Start amqp proxy service at port: {}", proxyConfig.getAmqpProxyPort());
             } catch (Exception e) {
                 log.error("Failed to start amqp proxy service.");

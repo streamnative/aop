@@ -15,6 +15,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
+import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import lombok.Getter;
@@ -39,6 +40,8 @@ public class AmqpBrokerService {
     private ConnectionContainer connectionContainer;
     @Getter
     private PulsarService pulsarService;
+    @Getter
+    private AmqpAdmin amqpAdmin;
 
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         this.pulsarService = pulsarService;
@@ -49,6 +52,7 @@ public class AmqpBrokerService {
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
+        this.amqpAdmin = new AmqpAdmin("localhost", config.getAmqpAdminPort());
     }
 
     private Executor initRouteExecutor(AmqpServiceConfiguration config) {

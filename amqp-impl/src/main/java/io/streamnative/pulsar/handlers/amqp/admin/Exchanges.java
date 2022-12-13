@@ -15,7 +15,9 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.ExchangeBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -27,6 +29,9 @@ import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 
 /**
  * Exchange endpoints.
@@ -80,12 +85,18 @@ public class Exchanges extends ExchangeBase {
     public void declareExchange(@Suspended final AsyncResponse response,
                                 @PathParam("vhost") String vhost,
                                 @PathParam("exchange") String exchange,
-                                ExchangeDeclareParams params) {
-        declareExchange(vhost, exchange, params)
+                                ExchangeDeclareParams params,
+                                @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> declareExchange(vhost, exchange, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
-                    log.error("Failed to declare exchange {} for tenant {} belong to vhost {}",
-                            exchange, tenant, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to declare exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

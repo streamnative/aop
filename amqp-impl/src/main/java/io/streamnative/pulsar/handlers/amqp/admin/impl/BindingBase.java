@@ -69,8 +69,13 @@ public class BindingBase extends BaseResources {
 
     protected CompletableFuture<Void> queueBindAsync(String vhost, String exchange, String queue,
                                                      BindingParams params) {
-        return queueService().queueBind(NamespaceName.get(tenant, vhost), queue, exchange, params.getRoutingKey(),
-                false, FieldTable.convertToFieldTable(params.getArguments()), -1);
+        if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
+            return exchangeService().queueBind(NamespaceName.get(tenant, vhost), exchange, queue,
+                    params.getRoutingKey(), params.getArguments());
+        } else {
+            return queueService().queueBind(NamespaceName.get(tenant, vhost), queue, exchange, params.getRoutingKey(),
+                    false, FieldTable.convertToFieldTable(params.getArguments()), -1);
+        }
     }
 
     protected CompletableFuture<Void> queueUnbindAsync(String vhost, String exchange, String queue,

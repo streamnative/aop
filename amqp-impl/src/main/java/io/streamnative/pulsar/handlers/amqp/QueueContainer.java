@@ -99,7 +99,7 @@ public class QueueContainer {
                         // TODO: reset connectionId, exclusive and autoDelete
                         PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
                                 0, false, false);
-                        if (!config.isAmqpProxyV2Enable()) {
+                        if (!config.isAmqpMultiBundleEnable()) {
                             try {
                                 amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
                                         namespaceName);

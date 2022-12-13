@@ -129,6 +129,6 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
             category = CATEGORY_AMQP,
             required = false
     )
-    private boolean amqpProxyV2Enable = false;
+    private boolean amqpMultiBundleEnable = false;
 
 }

@@ -106,6 +106,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AtomicBoolean blocked = new AtomicBoolean();
     private AmqpOutputConverter amqpOutputConverter;
     private ServerCnx pulsarServerCnx;
+    @Getter
     private AmqpBrokerService amqpBrokerService;
     private AuthenticationState authenticationState;
 

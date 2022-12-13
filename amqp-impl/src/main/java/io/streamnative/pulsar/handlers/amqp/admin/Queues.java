@@ -15,7 +15,9 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.QueueBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -27,6 +29,9 @@ import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 
 /**
  * Queue endpoints.
@@ -77,13 +82,19 @@ public class Queues extends QueueBase {
     @PUT
     @Path("/{vhost}/{queue}")
     public void declareQueue(@Suspended final AsyncResponse response,
-                                @PathParam("vhost") String vhost,
-                                @PathParam("queue") String queue,
-                                QueueDeclareParams params) {
-        declareQueueAsync(vhost, queue, params)
+                             @PathParam("vhost") String vhost,
+                             @PathParam("queue") String queue,
+                             QueueDeclareParams params,
+                             @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                NamespaceName.get("public", vhost), PersistentQueue.TOPIC_PREFIX + queue);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> declareQueueAsync(vhost, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
-                    log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

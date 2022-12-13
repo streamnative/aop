@@ -1,9 +1,9 @@
-package io.streamnative.pulsar.handlers.amqp.proxy.v2;
+package io.streamnative.pulsar.handlers.amqp;
 
 import lombok.Getter;
 import org.apache.pulsar.client.api.Consumer;
 
-public class AmqpConsumer {
+public class AmqpWrappedConsumer {
 
     @Getter
     private final Consumer<byte[]> consumer;
@@ -12,7 +12,7 @@ public class AmqpConsumer {
     @Getter
     private boolean autoAck = false;
 
-    public AmqpConsumer(Consumer<byte[]> consumer, String consumerTag, boolean autoAck) {
+    public AmqpWrappedConsumer(Consumer<byte[]> consumer, String consumerTag, boolean autoAck) {
         this.consumer = consumer;
         this.consumerTag = consumerTag;
         this.autoAck = autoAck;

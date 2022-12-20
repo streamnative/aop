@@ -74,7 +74,11 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         for (String vhost : vhostList) {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
-                admin.namespaces().createNamespace(ns, 1);
+                if (conf.isAmqpMultiBundleEnable()) {
+                    admin.namespaces().createNamespace(ns, 16);
+                } else {
+                    admin.namespaces().createNamespace(ns, 1);
+                }
                 admin.lookups().lookupTopicAsync(TopicName.get(TopicDomain.persistent.value(),
                         NamespaceName.get(ns), "__lookup__").toString());
             }

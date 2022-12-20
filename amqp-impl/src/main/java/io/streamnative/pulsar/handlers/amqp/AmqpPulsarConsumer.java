@@ -22,6 +22,7 @@ import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
@@ -36,6 +37,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
     private final AmqpChannel amqpChannel;
     private final ScheduledExecutorService executorService;
     private final boolean autoAck;
+    private volatile boolean isClosed = false;
 
     public AmqpPulsarConsumer(String consumerTag, Consumer<byte[]> consumer, boolean autoAck, AmqpChannel amqpChannel,
                               ScheduledExecutorService executorService) {
@@ -51,6 +53,10 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
     }
 
     private void consume() {
+        if (isClosed) {
+            return;
+        }
+
         Message<byte[]> message;
         try {
             message = this.consumer.receive(0, TimeUnit.SECONDS);
@@ -95,6 +101,12 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         for (PositionImpl pos : positions) {
             consumer.negativeAcknowledge(new MessageIdImpl(pos.getLedgerId(), pos.getEntryId(), -1));
         }
+    }
+
+    public void close() throws PulsarClientException {
+        this.isClosed = true;
+        this.consumer.pause();
+        this.consumer.close();
     }
 
 }

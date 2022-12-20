@@ -795,47 +795,32 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 exchangeName = AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE;
             }
 
-            final CompletableFuture<Void> future = new CompletableFuture<>();
+            final CompletableFuture<Object> future = new CompletableFuture<>();
             if (this.connection.getAmqpConfig().isAmqpMultiBundleEnable()) {
-                String topic = TopicDomain.persistent + "://"
-                        + connection.getAmqpConfig().getAmqpTenant() + "/"
-                        + connection.getNamespaceName().getLocalName() + "/"
-                        + PersistentExchange.TOPIC_PREFIX + exchangeName;
-                getProducer(topic)
-                        .thenCompose(producer -> {
-                            return producer.newMessage()
-                                    .value(message.getData())
-                                    .properties(message.getProperties())
-                                    .sendAsync();
-                        })
-                        .thenAccept(position -> {
-                            if (log.isDebugEnabled()) {
-                                log.debug("Publish message success, position {}", position.toString());
-                            }
-                            future.complete(null);
-                        })
+                getProducer(exchangeName)
+                        .thenCompose(producer -> producer.newMessage()
+                                .value(message.getData())
+                                .properties(message.getProperties())
+                                .sendAsync())
+                        .thenAccept(future::complete)
                         .exceptionally(t -> {
-                            log.error("Failed to write message to exchange", t);
+                            future.completeExceptionally(t);
                             return null;
                         });
             } else {
                 exchangeContainer.asyncGetExchange(connection.getNamespaceName(), exchangeName, createIfMissing,
                                 exchangeType)
-                        .thenCompose(amqpExchange -> {
-                            return amqpExchange.writeMessageAsync(message, routingKey);
-                        })
-                        .thenAccept(position -> {
-                            if (log.isDebugEnabled()) {
-                                log.debug("Publish message success, position {}", position);
-                            }
-                            future.complete(null);
-                        })
+                        .thenCompose(amqpExchange -> amqpExchange.writeMessageAsync(message, routingKey))
+                        .thenAccept(future::complete)
                         .exceptionally(t -> {
                             future.completeExceptionally(t);
                             return null;
                         });
             }
-            future.thenAccept(__ -> {
+            future.thenAccept(position -> {
+                if (log.isDebugEnabled()) {
+                    log.debug("Publish message success, position {}", position);
+                }
                 if (confirmOnPublish) {
                     confirmedMessageCounter++;
                     BasicAckBody body = connection.getMethodRegistry().
@@ -1150,15 +1135,19 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return this.connection.getAmqpBrokerService().getAmqpAdmin();
     }
 
-    public CompletableFuture<Producer<byte[]>> getProducer(String topic) {
+    public CompletableFuture<Producer<byte[]>> getProducer(String exchange) {
         PulsarClient client;
         try {
             client = connection.getPulsarService().getClient();
         } catch (PulsarServerException e) {
             return FutureUtil.failedFuture(e);
         }
-        return producerMap.computeIfAbsent(topic, k -> {
+        return producerMap.computeIfAbsent(exchange, k -> {
             CompletableFuture<Producer<byte[]>> producerFuture = new CompletableFuture<>();
+            String topic = TopicDomain.persistent + "://"
+                    + connection.getAmqpConfig().getAmqpTenant() + "/"
+                    + connection.getNamespaceName().getLocalName() + "/"
+                    + PersistentExchange.TOPIC_PREFIX + exchange;
             client.newProducer()
                     .topic(topic)
                     .enableBatching(false)

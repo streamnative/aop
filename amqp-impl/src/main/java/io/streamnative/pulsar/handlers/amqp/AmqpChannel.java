@@ -216,7 +216,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         }
 
         exchangeService.exchangeBound(
-                        connection.getNamespaceName(), exchange.toString(), routingKey.toString(), queueName.toString())
+                connection.getNamespaceName(), exchange.toString(), routingKey.toString(), queueName.toString())
                 .thenAccept(replyCode -> {
                     String replyText = null;
                     switch (replyCode) {
@@ -360,7 +360,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicQos(long prefetchSize, int prefetchCount, boolean global) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] BasicQos[prefetchSize: {} prefetchCount: {} global: {}]",
-                    channelId, prefetchSize, prefetchCount, global);
+                channelId, prefetchSize, prefetchCount, global);
         }
         if (prefetchSize > 0) {
             closeChannel(ErrorCodes.NOT_IMPLEMENTED, "prefetchSize not supported ");
@@ -411,7 +411,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private synchronized void subscribe(String consumerTag, String queueName, Topic topic,
-                                        boolean ack, boolean exclusive, boolean nowait){
+                           boolean ack, boolean exclusive, boolean nowait) {
 
         CompletableFuture<Void> future = new CompletableFuture<>();
         future.whenComplete((ignored, e) -> {
@@ -431,28 +431,28 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
                 defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
-            AmqpConsumer consumer = new AmqpConsumer(queueContainer, subscription,
-                    exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
-                    topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
-                    consumerTag, true, connection.getServerCnx(), "", null,
-                    false, MessageId.latest,
-                    null, this, consumerTag, queueName, ack);
-            subscription.addConsumer(consumer).thenAccept(__ -> {
-                consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
-                tag2ConsumersMap.put(consumerTag, consumer);
+                AmqpConsumer consumer = new AmqpConsumer(queueContainer, subscription,
+                        exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
+                        topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
+                        consumerTag, true, connection.getServerCnx(), "", null,
+                        false, MessageId.latest,
+                        null, this, consumerTag, queueName, ack);
+                subscription.addConsumer(consumer).thenAccept(__ -> {
+                    consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
+                    tag2ConsumersMap.put(consumerTag, consumer);
 
-                if (!nowait) {
-                    MethodRegistry methodRegistry = connection.getMethodRegistry();
-                    AMQMethodBody responseBody = methodRegistry.
-                            createBasicConsumeOkBody(AMQShortString.
-                                    createAMQShortString(consumer.getConsumerTag()));
-                    connection.writeFrame(responseBody.generateFrame(channelId));
-                }
-                future.complete(null);
-            }).exceptionally(t -> {
-                future.completeExceptionally(t);
-                return null;
-            });
+                    if (!nowait) {
+                        MethodRegistry methodRegistry = connection.getMethodRegistry();
+                        AMQMethodBody responseBody = methodRegistry.
+                                createBasicConsumeOkBody(AMQShortString.
+                                        createAMQShortString(consumer.getConsumerTag()));
+                        connection.writeFrame(responseBody.generateFrame(channelId));
+                    }
+                    future.complete(null);
+                }).exceptionally(t -> {
+                    future.completeExceptionally(t);
+                    return null;
+                });
         }).exceptionally(t -> {
             future.completeExceptionally(t);
             return null;
@@ -739,14 +739,14 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     public void receiveBasicNack(long deliveryTag, boolean multiple, boolean requeue) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[ {} ] BasicNAck[deliveryTag: {} multiple: {} requeue: {}]",
-                    channelId, deliveryTag, multiple, requeue);
+                channelId, deliveryTag, multiple, requeue);
         }
         messageNAck(deliveryTag, multiple, requeue);
     }
 
     public void messageNAck(long deliveryTag, boolean multiple, boolean requeue) {
         Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
-                unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
+            unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
             if (requeue) {
                 requeue(ackedMessages);
@@ -762,7 +762,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     @Override
     public void receiveBasicRecover(boolean requeue, boolean sync) {
         Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
-                unacknowledgedMessageMap.acknowledgeAll();
+            unacknowledgedMessageMap.acknowledgeAll();
         if (!ackedMessages.isEmpty()) {
             requeue(ackedMessages);
         }
@@ -781,7 +781,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         messages.stream().forEach(association -> {
             UnacknowledgedMessageMap.MessageProcessor consumer = association.getConsumer();
             List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
-                    list -> new ArrayList<>());
+                list -> new ArrayList<>());
             positions.add((PositionImpl) association.getPosition());
         });
         positionMap.entrySet().stream().forEach(entry -> {

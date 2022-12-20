@@ -83,17 +83,20 @@ public class RabbitMQTestCase {
                     if (bundleUnloadTest) {
                         if (!isBundleUnload.get() && sendMsgCnt.get() < (expectedMsgCntPerQueue / 2)) {
                             // if bundle will be unloaded, we send half of `expectedMsgCntPerQueue`
-                            channel.basicPublish(exchangeName, "", null, (contentMsg + sendMsgCnt.incrementAndGet()).getBytes());
+                            channel.basicPublish(exchangeName, "", null,
+                                    (contentMsg + sendMsgCnt.incrementAndGet()).getBytes());
                         } else if (isBundleUnload.get()) {
                             // send message until consumer get enough messages
                             // Add send confirm, only send expected messages is enough
-                            channel.basicPublish(exchangeName, "", null, (contentMsg + sendMsgCnt.incrementAndGet()).getBytes());
+                            channel.basicPublish(exchangeName, "", null,
+                                    (contentMsg + sendMsgCnt.incrementAndGet()).getBytes());
                             Thread.sleep(10);
                         }
                     } else {
                         // bundle not change
                         if (sendMsgCnt.get() < expectedMsgCntPerQueue) {
-                            channel.basicPublish(exchangeName, "", null, (contentMsg + sendMsgCnt.incrementAndGet()).getBytes());
+                            channel.basicPublish(exchangeName, "", null,
+                                    (contentMsg + sendMsgCnt.incrementAndGet()).getBytes());
                         } else {
                             log.info("message send finish. produce msg cnt: {}", sendMsgCnt.get());
                             break;

@@ -102,8 +102,12 @@ public class Bindings extends BindingBase {
                                 @PathParam("exchange") String exchange,
                                 @PathParam("queue") String queue,
                                 @PathParam("props") String propsKey,
-                                QueueDeclareParams params) {
-        queueUnbindAsync(vhost, exchange, queue, propsKey)
+                                QueueDeclareParams params,
+                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> queueUnbindAsync(vhost, exchange, queue, propsKey))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",

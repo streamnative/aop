@@ -424,7 +424,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
-            final AmqpChannel channel = new AmqpChannel(channelId, this, amqpBrokerService);
+            final AmqpChannel channel;
+            if (getAmqpConfig().isAmqpMultiBundleEnable()) {
+                channel = new AmqpChannelMultiBundles(channelId, this, amqpBrokerService);
+            } else {
+                channel = new AmqpChannel(channelId, this, amqpBrokerService);
+            }
             addChannel(channel);
 
             ChannelOpenOkBody response = getMethodRegistry().createChannelOpenOkBody();

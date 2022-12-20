@@ -121,7 +121,6 @@ public class RabbitMQTestCase {
                 public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
                                            byte[] body) throws IOException {
                     String message = new String(body, "UTF-8");
-                    System.out.println("receive message from queue " + queueName + " - " + message);
 //                    Assert.assertEquals(message, contentMsg);
                     if (bundleUnloadTest && totalReceiveMsgCnt.get() == expectedMsgCntPerQueue * queueList.size()) {
                         // If test is bundleUnloadTest, stop totalReceiveMsgCnt

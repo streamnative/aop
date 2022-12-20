@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
  * AMQP proxy related test.
  */
 @Slf4j
-public class ProxyV2Test extends AmqpTestBase {
+public class MultiBundlesTest extends AmqpTestBase {
 
     @BeforeClass
     @Override

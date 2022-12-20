@@ -32,7 +32,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.transport.ByteBufferSender;
 import org.apache.qpid.server.util.GZIPUtils;
 
-
 /**
  * Used to process command output.
  */
@@ -367,6 +366,7 @@ public class AmqpOutputConverter {
             size += (new AMQFrame(channel, headerBody)).writePayload(sender);
 
             size += (new AMQFrame(channel, contentBody)).writePayload(sender);
+
             return size;
         }
 

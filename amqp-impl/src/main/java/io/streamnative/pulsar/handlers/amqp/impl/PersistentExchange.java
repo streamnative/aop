@@ -96,7 +96,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              Executor routeExecutor, int routeQueueSize, boolean proxyV2Enable)
+                              Executor routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
             throws JsonProcessingException {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
@@ -108,7 +108,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             cursor.setInactive();
         }
 
-        if (proxyV2Enable) {
+        if (amqpMultiBundleEnable) {
             bindings = Sets.newConcurrentHashSet();
             if (persistentTopic.getManagedLedger().getProperties().containsKey(BINDINGS)) {
                 List<Binding> amqpQueueProperties = JSON_MAPPER.readValue(
@@ -120,54 +120,57 @@ public class PersistentExchange extends AbstractAmqpExchange {
                 this.exchangeMessageRouter.addBinding(binding.des, binding.desType, binding.key, binding.arguments);
             }
             this.exchangeMessageRouter.start();
-        } else {
-            if (messageReplicator == null) {
-                messageReplicator = new AmqpExchangeReplicator(this, routeExecutor, routeQueueSize) {
-                    @Override
-                    public CompletableFuture<Void> readProcess(ByteBuf data, Position position) {
-                        Map<String, Object> props;
-                        try {
-                            MessageImpl<byte[]> message = MessageImpl.deserialize(data);
-                            props = message.getMessageBuilder().getPropertiesList().stream()
-                                    .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
-                        } catch (Exception e) {
-                            log.error("Failed to deserialize entry dataBuffer. exchangeName: {}", exchangeName, e);
-                            return FutureUtil.failedFuture(e);
-                        }
+            return;
+        }
 
-                        List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
-                        if (exchangeType == Type.Direct) {
-                            String bindingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
-                            Set<AmqpQueue> queueSet = bindingKeyQueueMap.get(bindingKey);
-                            if (queueSet == null) {
-                                if (log.isDebugEnabled()) {
-                                    log.debug("The queue set of the bindingKey {} is not exist.", bindingKey);
-                                }
-                            } else {
-                                for (AmqpQueue queue : queueSet) {
-                                    routeFutureList.add(queue.writeIndexMessageAsync(
-                                            exchangeName, position.getLedgerId(), position.getEntryId(), props));
-                                }
-                            }
-                        } else if (exchangeType == Type.Fanout) {
-                            for (AmqpQueue queue : queues) {
-                                routeFutureList.add(queue.writeIndexMessageAsync(
-                                        exchangeName, position.getLedgerId(), position.getEntryId(), props));
+        if (messageReplicator == null) {
+            messageReplicator = new AmqpExchangeReplicator(this, routeExecutor, routeQueueSize) {
+                @Override
+                public CompletableFuture<Void> readProcess(ByteBuf data, Position position) {
+                    Map<String, Object> props;
+                    try {
+                        MessageImpl<byte[]> message = MessageImpl.deserialize(data);
+                        props = message.getMessageBuilder().getPropertiesList().stream()
+                                .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
+                    } catch (Exception e) {
+                        log.error("Failed to deserialize entry dataBuffer. exchangeName: {}", exchangeName, e);
+                        return FutureUtil.failedFuture(e);
+                    }
+
+                    List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
+                    if (exchangeType == Type.Direct) {
+                        String bindingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
+                        Set<AmqpQueue> queueSet = bindingKeyQueueMap.get(bindingKey);
+                        if (queueSet == null) {
+                            if (log.isDebugEnabled()) {
+                                log.debug("The queue set of the bindingKey {} is not exist.", bindingKey);
                             }
                         } else {
-                            for (AmqpQueue queue : queues) {
-                                CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
-                                        position.getLedgerId(), position.getEntryId(),
-                                        props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
-                                        props);
-                                routeFutureList.add(routeFuture);
+                            for (AmqpQueue queue : queueSet) {
+                                routeFutureList.add(
+                                        queue.writeIndexMessageAsync(
+                                                exchangeName, position.getLedgerId(), position.getEntryId(), props));
                             }
                         }
-                        return FutureUtil.waitForAll(routeFutureList);
+                    } else if (exchangeType == Type.Fanout) {
+                        for (AmqpQueue queue : queues) {
+                            routeFutureList.add(
+                                    queue.writeIndexMessageAsync(
+                                            exchangeName, position.getLedgerId(), position.getEntryId(), props));
+                        }
+                    } else {
+                        for (AmqpQueue queue : queues) {
+                            CompletableFuture<Void> routeFuture = queue.getRouter(exchangeName).routingMessage(
+                                    position.getLedgerId(), position.getEntryId(),
+                                    props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString(),
+                                    props);
+                            routeFutureList.add(routeFuture);
+                        }
                     }
-                };
-                messageReplicator.startReplicate();
-            }
+                    return FutureUtil.waitForAll(routeFutureList);
+                }
+            };
+            messageReplicator.startReplicate();
         }
         this.amqpEntryWriter = new AmqpEntryWriter(persistentTopic);
     }

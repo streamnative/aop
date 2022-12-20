@@ -17,8 +17,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +26,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.concurrent.atomic.LongAdder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -46,7 +43,6 @@ import org.apache.pulsar.common.api.proto.CommandAck;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeySharedMeta;
 import org.apache.pulsar.common.protocol.Commands;
-import org.apache.pulsar.common.stats.Rate;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
@@ -56,20 +52,20 @@ import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 @Slf4j
 public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.MessageProcessor {
 
-    protected final AmqpChannel channel;
+    private final AmqpChannel channel;
 
     private QueueContainer queueContainer;
 
-    protected final boolean autoAck;
+    private final boolean autoAck;
 
-    protected final String consumerTag;
+    private final String consumerTag;
 
-    protected final String queueName;
+    private final String queueName;
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
     private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
-    protected static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
+    private static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "availablePermits");
     private volatile int availablePermits;
 
@@ -78,12 +74,6 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
     private volatile int addPermits = 0;
 
     private final int maxPermits = 1000;
-
-    protected Field msgOutField;
-    protected Field msgOutCounterField;
-    protected Field bytesOutCounterField;
-    protected Method recordMultpleEventsMethod;
-    protected Method addMethod;
 
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
         CommandSubscribe.SubType subType, String topicName, long consumerId,
@@ -99,20 +89,6 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
         this.consumerTag = consumerTag;
         this.queueName = queueName;
         this.unAckMessages = new ConcurrentHashMap<>();
-
-        try {
-            this.msgOutField = Consumer.class.getDeclaredField("msgOut");
-            this.msgOutField.setAccessible(true);
-            this.msgOutCounterField = Consumer.class.getDeclaredField("msgOutCounter");
-            this.msgOutCounterField.setAccessible(true);
-            this.bytesOutCounterField = Consumer.class.getDeclaredField("bytesOutCounter");
-            this.bytesOutCounterField.setAccessible(true);
-            this.recordMultpleEventsMethod =
-                    Rate.class.getDeclaredMethod("recordMultipleEvents", long.class, long.class);
-            this.addMethod = LongAdder.class.getDeclaredMethod("add", long.class);
-        } catch (Exception e) {
-            log.warn("Failed to get stats field.", e);
-        }
     }
 
     @Override
@@ -158,16 +134,6 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
                     writePromise.setFailure(throwable);
                     return;
                 }
-                try {
-                    this.recordMultpleEventsMethod.invoke(this.msgOutField.get(this), totalMessages, totalBytes);
-                    this.addMethod.invoke(this.msgOutCounterField.get(this), totalMessages);
-                    this.addMethod.invoke(this.bytesOutCounterField.get(this), totalBytes);
-                } catch (Exception e) {
-                    log.error("Failed to record delivery stats.", e);
-                }
-//                this.msgOut.recordMultipleEvents((long)totalMessages, totalBytes);
-//                this.msgOutCounter.add((long)totalMessages);
-//                this.bytesOutCounter.add(totalBytes);
                 connection.getCtx().writeAndFlush(Unpooled.EMPTY_BUFFER, writePromise);
             });
             batchSizes.recyle();
@@ -232,7 +198,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
         return sendFuture;
     }
 
-    public void ack(List<Position> position) {
+    public void messagesAck(List<Position> position) {
         incrementPermits(position.size());
         ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
         Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
@@ -260,7 +226,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
 
     @Override
     public void messageAck(Position position) {
-        ack(Collections.singletonList(position));
+        messagesAck(Collections.singletonList(position));
     }
 
     @Override

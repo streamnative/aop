@@ -566,13 +566,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         getCtx().writeAndFlush(frame);
     }
 
-    public synchronized void writeData(Object obj) {
-        if (log.isDebugEnabled()) {
-            log.debug("write data to client: " + obj);
-        }
-        getCtx().channel().writeAndFlush(obj);
-    }
-
     public MethodRegistry getMethodRegistry() {
         return methodRegistry;
     }

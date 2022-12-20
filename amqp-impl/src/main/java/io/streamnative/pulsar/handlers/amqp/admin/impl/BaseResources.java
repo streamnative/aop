@@ -201,7 +201,8 @@ public class BaseResources {
                         if (log.isDebugEnabled()) {
                             log.debug("Failed to find owner for topic: {}", topicName, ex);
                         }
-                        throw new RestException(Response.Status.PRECONDITION_FAILED, "Can't find owner for topic " + topicName);
+                        throw new RestException(Response.Status.PRECONDITION_FAILED,
+                                "Can't find owner for topic " + topicName);
                     } else if (ex.getCause() instanceof WebApplicationException) {
                         throw (WebApplicationException) ex.getCause();
                     } else {

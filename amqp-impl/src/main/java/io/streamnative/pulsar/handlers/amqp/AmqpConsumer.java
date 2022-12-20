@@ -17,9 +17,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.concurrent.Future;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,7 +29,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.LongAdder;
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
@@ -57,7 +54,7 @@ import org.apache.qpid.server.protocol.v0_8.AMQShortString;
  * Amqp consumer Used to forward messages.
  */
 @Slf4j
-public class AmqpConsumer extends Consumer {
+public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.MessageProcessor {
 
     protected final AmqpChannel channel;
 
@@ -116,7 +113,6 @@ public class AmqpConsumer extends Consumer {
         } catch (Exception e) {
             log.warn("Failed to get stats field.", e);
         }
-        ;
     }
 
     @Override
@@ -228,7 +224,7 @@ public class AmqpConsumer extends Consumer {
                         }
 
                         if (autoAck) {
-                            messagesAck(index.getPosition());
+                            messageAck(index.getPosition());
                         }
                     } finally {
                         index.release();
@@ -243,7 +239,7 @@ public class AmqpConsumer extends Consumer {
         return sendFuture;
     }
 
-    public void messagesAck(List<Position> position) {
+    public void ack(List<Position> position) {
         incrementPermits(position.size());
         ManagedCursor cursor = ((PersistentSubscription) getSubscription()).getCursor();
         Position previousMarkDeletePosition = cursor.getMarkDeletedPosition();
@@ -269,11 +265,13 @@ public class AmqpConsumer extends Consumer {
         }
     }
 
-    public void messagesAck(Position position) {
-        messagesAck(Collections.singletonList(position));
+    @Override
+    public void messageAck(Position position) {
+        ack(Collections.singletonList(position));
     }
 
-    public void redeliverAmqpMessages(List<PositionImpl> positions) {
+    @Override
+    public void requeue(List<PositionImpl> positions) {
         getSubscription().getDispatcher().redeliverUnacknowledgedMessages(this, positions);
     }
 

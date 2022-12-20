@@ -74,14 +74,14 @@ public final class MessageFetchContext {
                 channel.getConnection().getAmqpOutputConverter().writeGetOk(pair.getRight(), channel.getChannelId(),
                         isRedelivery, deliveryTag, 0);
                 if (autoAck) {
-                    consumer.messagesAck(pair.getLeft());
+                    consumer.messageAck(pair.getLeft());
                 } else {
                     channel.getUnacknowledgedMessageMap().add(deliveryTag, pair.getLeft(), consumer, 0);
                     channel.getCreditManager().useCreditForMessages(1, 0);
                 }
             } else {
                 if (pair != null && pair.getLeft() != null) {
-                    consumer.messagesAck(pair.getLeft());
+                    consumer.messageAck(pair.getLeft());
                 }
                 MethodRegistry methodRegistry = channel.getConnection().getMethodRegistry();
                 BasicGetEmptyBody responseBody = methodRegistry.createBasicGetEmptyBody(null);

@@ -69,7 +69,7 @@ import org.apache.zookeeper.data.ACL;
 @Slf4j
 public abstract class AmqpProtocolHandlerTestBase {
 
-    protected ServiceConfiguration conf;
+    protected AmqpServiceConfiguration conf;
     protected PulsarAdmin admin;
     protected URL brokerUrl;
     protected URL brokerUrlTls;
@@ -271,16 +271,16 @@ public abstract class AmqpProtocolHandlerTestBase {
             brokerWebServicePortTlsList.add(brokerWebServicePortTls);
 
             conf.setBrokerServicePort(Optional.of(brokerPort));
-            ((AmqpServiceConfiguration) conf).setAmqpListeners("amqp://127.0.0.1:" + amqpBrokerPort);
-            ((AmqpServiceConfiguration) conf).setAmqpProxyPort(aopProxyPort);
-            ((AmqpServiceConfiguration) conf).setAmqpProxyEnable(true);
+            conf.setAmqpListeners("amqp://127.0.0.1:" + amqpBrokerPort);
+            conf.setAmqpProxyPort(aopProxyPort);
+            conf.setAmqpProxyEnable(true);
             conf.setWebServicePort(Optional.of(brokerWebServicePort));
             conf.setWebServicePortTls(Optional.of(brokerWebServicePortTls));
             conf.setBrokerShutdownTimeoutMs(0L);
 
             int amqpAdminPort = PortManager.nextFreePort();
             aopAdminPortList.add(amqpAdminPort);
-            ((AmqpServiceConfiguration) conf).setAmqpAdminPort(amqpAdminPort);
+            conf.setAmqpAdminPort(amqpAdminPort);
 
             log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, aopProxyPort: {}",
                     i, brokerPort, amqpBrokerPort, aopProxyPort);

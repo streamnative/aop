@@ -200,14 +200,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
                         }
 
                         try {
-<<<<<<< HEAD
-                            boolean isRedelivery = getRedeliveryTracker().getRedeliveryCount(
-                                    index.getPosition().getLedgerId(), index.getPosition().getEntryId()) > 0;
-=======
-                            boolean isRedelivery = getRedeliveryTracker()
-                                    .getRedeliveryCount(index.getPosition().getLedgerId(),
-                                            index.getPosition().getEntryId()) > 0;
->>>>>>> 939932c (fix)
+                            boolean isRedelivery = getRedeliveryTracker().getRedeliveryCount(index.getPosition()) > 0;
                             channel.getConnection().getAmqpOutputConverter().writeDeliver(
                                     MessageConvertUtils.entryToAmqpBody(msg),
                                     channel.getChannelId(),

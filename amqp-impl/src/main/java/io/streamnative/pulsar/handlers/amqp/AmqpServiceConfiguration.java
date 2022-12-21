@@ -131,4 +131,10 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private boolean amqpMultiBundleEnable = false;
 
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false
+    )
+    private int amqpPulsarConsumerQueueSize = 10000;
+
 }

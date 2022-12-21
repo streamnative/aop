@@ -177,7 +177,6 @@ public abstract class ExchangeMessageRouter {
     private void processMessages(List<Entry> entries) {
         PENDING_SIZE_UPDATER.addAndGet(this, entries.size());
         for (Entry entry : entries) {
-//            PENDING_SIZE_UPDATER.incrementAndGet(this);
             Map<String, String> props;
             MessageImpl<byte[]> message;
             try {
@@ -186,7 +185,6 @@ public abstract class ExchangeMessageRouter {
                         entry.getDataBuffer(),
                         Optional.empty(), null, Schema.BYTES, 0, true, -1L);
                 message.getMessageBuilder().clearSequenceId();
-//                message = MessageImpl.deserialize(entry.getDataBuffer());
                 props = message.getMessageBuilder().getPropertiesList().stream()
                         .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
             } catch (Exception e) {

@@ -52,12 +52,12 @@ import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
  * Amqp Channel level method processor.
  */
 @Log4j2
-public class AmqpChannelMultiBundles extends AmqpChannel {
+public class AmqpMultiBundlesChannel extends AmqpChannel {
 
     private final Map<String, Producer<byte[]>> producerMap;
     private final List<AmqpPulsarConsumer> consumerList;
 
-    public AmqpChannelMultiBundles(int channelId, AmqpConnection connection, AmqpBrokerService amqpBrokerService) {
+    public AmqpMultiBundlesChannel(int channelId, AmqpConnection connection, AmqpBrokerService amqpBrokerService) {
         super(channelId, connection, amqpBrokerService);
         this.producerMap = new ConcurrentHashMap<>();
         this.consumerList = new ArrayList<>();
@@ -321,11 +321,12 @@ public class AmqpChannelMultiBundles extends AmqpChannel {
                 .subscriptionName("AMQP_DEFAULT")
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .consumerName(UUID.randomUUID().toString())
+                .receiverQueueSize(getConnection().getAmqpConfig().getAmqpPulsarConsumerQueueSize())
                 .subscribeAsync()
                 .thenAccept(consumer-> {
                     AmqpPulsarConsumer amqpPulsarConsumer = new AmqpPulsarConsumer(consumerTag, consumer, autoAck,
-                            AmqpChannelMultiBundles.this,
-                            AmqpChannelMultiBundles.this.connection.getPulsarService().getExecutor());
+                            AmqpMultiBundlesChannel.this,
+                            AmqpMultiBundlesChannel.this.connection.getPulsarService().getExecutor());
                     consumerFuture.complete(amqpPulsarConsumer);
                     consumerList.add(amqpPulsarConsumer);
                 })

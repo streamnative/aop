@@ -426,7 +426,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             log.debug("Connecting to: {}", namespaceName.getLocalName());
             final AmqpChannel channel;
             if (getAmqpConfig().isAmqpMultiBundleEnable()) {
-                channel = new AmqpChannelMultiBundles(channelId, this, amqpBrokerService);
+                channel = new AmqpMultiBundlesChannel(channelId, this, amqpBrokerService);
             } else {
                 channel = new AmqpChannel(channelId, this, amqpBrokerService);
             }

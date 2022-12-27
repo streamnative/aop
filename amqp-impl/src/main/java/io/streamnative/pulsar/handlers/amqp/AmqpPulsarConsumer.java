@@ -52,6 +52,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         this.consumeBackoff = new BackoffBuilder()
                 .setInitialTime(1, TimeUnit.MILLISECONDS)
                 .setMax(1, TimeUnit.SECONDS)
+                .setMandatoryStop(0, TimeUnit.SECONDS)
                 .create();
     }
 

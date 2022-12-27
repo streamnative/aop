@@ -13,7 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import io.streamnative.pulsar.handlers.amqp.common.exception.NotSupportedOperationException;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException.NotSupportedOperationException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;

@@ -19,6 +19,7 @@ import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
@@ -302,7 +303,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                         .enableBatching(false)
                         .create();
             } catch (PulsarClientException e) {
-                throw new RuntimeException(e);
+                throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);
             }
         });
     }

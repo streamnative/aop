@@ -69,9 +69,8 @@ public final class MessageFetchContext {
         message.whenComplete((pair, throwable) -> {
             if (pair != null && pair.getRight() != null) {
                 long deliveryTag = channel.getNextDeliveryTag();
-                boolean isRedelivery = consumer.getRedeliveryTracker().getRedeliveryCount(pair.getLeft()) > 0;
                 channel.getConnection().getAmqpOutputConverter().writeGetOk(pair.getRight(), channel.getChannelId(),
-                        isRedelivery, deliveryTag, 0);
+                        consumer.getRedeliveryTracker().contains(pair.getLeft()), deliveryTag, 0);
                 if (autoAck) {
                     consumer.messageAck(pair.getLeft());
                 } else {

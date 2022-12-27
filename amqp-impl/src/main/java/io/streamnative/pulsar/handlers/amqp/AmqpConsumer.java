@@ -166,11 +166,10 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
                         }
 
                         try {
-                            boolean isRedelivery = getRedeliveryTracker().getRedeliveryCount(index.getPosition()) > 0;
                             channel.getConnection().getAmqpOutputConverter().writeDeliver(
                                     MessageConvertUtils.entryToAmqpBody(msg),
                                     channel.getChannelId(),
-                                    isRedelivery,
+                                    getRedeliveryTracker().contains(index.getPosition()),
                                     deliveryTag,
                                     AMQShortString.createAMQShortString(consumerTag));
                             sendFuture.complete(null);

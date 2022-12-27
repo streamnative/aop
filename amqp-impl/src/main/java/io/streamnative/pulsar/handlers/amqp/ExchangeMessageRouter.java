@@ -194,8 +194,8 @@ public abstract class ExchangeMessageRouter {
                 entry.release();
                 continue;
             }
-            String routingKey = props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, "").toString();
-            Set<Destination> destinations = getDestinations(routingKey, getMessageHeaders());
+            Set<Destination> destinations = getDestinations(
+                    props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, ""), getMessageHeaders());
 
             final Position position = entry.getPosition();
 
@@ -212,14 +212,12 @@ public abstract class ExchangeMessageRouter {
             entry.release();
             FutureUtil.waitForAll(futures).whenComplete((__, t) -> {
                 if (t != null) {
-                    log.error("Failed to route message {}", position, t);
+                    log.error("Failed to route message {} for exchange {}.", position, exchange.exchangeName, t);
                     cursor.rewind();
-                    if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
-                            && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
-                        this.readMoreEntries();
-                    }
+                    tryToReadMoreEntries();
                     return;
                 }
+
                 cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
                     @Override
                     public void deleteComplete(Object ctx) {
@@ -233,11 +231,15 @@ public abstract class ExchangeMessageRouter {
                         log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
                     }
                 }, entry.getPosition());
-                if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
-                        && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
-                    this.readMoreEntries();
-                }
+                tryToReadMoreEntries();
             });
+        }
+    }
+
+    private void tryToReadMoreEntries() {
+        if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
+                && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
+            this.readMoreEntries();
         }
     }
 

@@ -238,6 +238,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         brokerWebservicePortList.clear();
         brokerWebServicePortTlsList.clear();
         aopProxyPortList.clear();
+        aopAdminPortList.clear();
         pulsarServiceList.clear();
         amqpBrokerPortList.clear();
     }

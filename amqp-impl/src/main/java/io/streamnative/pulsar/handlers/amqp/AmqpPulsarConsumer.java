@@ -23,6 +23,8 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.impl.Backoff;
+import org.apache.pulsar.client.impl.BackoffBuilder;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
@@ -38,6 +40,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
     private final ScheduledExecutorService executorService;
     private final boolean autoAck;
     private volatile boolean isClosed = false;
+    private final Backoff consumeBackoff;
 
     public AmqpPulsarConsumer(String consumerTag, Consumer<byte[]> consumer, boolean autoAck, AmqpChannel amqpChannel,
                               ScheduledExecutorService executorService) {
@@ -46,6 +49,10 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         this.autoAck = autoAck;
         this.amqpChannel = amqpChannel;
         this.executorService = executorService;
+        this.consumeBackoff = new BackoffBuilder()
+                .setInitialTime(1, TimeUnit.MILLISECONDS)
+                .setMax(1, TimeUnit.SECONDS)
+                .create();
     }
 
     public void startConsume() {
@@ -61,7 +68,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         try {
             message = this.consumer.receive(0, TimeUnit.SECONDS);
             if (message == null) {
-                this.executorService.schedule(this::consume, 100, TimeUnit.MILLISECONDS);
+                this.executorService.schedule(this::consume, consumeBackoff.next(), TimeUnit.MILLISECONDS);
                 return;
             }
 
@@ -84,10 +91,12 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
                         deliveryIndex, PositionImpl.get(messageId.getLedgerId(), messageId.getEntryId()),
                         AmqpPulsarConsumer.this, message.size());
             }
+            consumeBackoff.reset();
             this.consume();
         } catch (Exception e) {
-            log.error("Failed to send message", e);
-            throw new RuntimeException(e);
+            long backoff = consumeBackoff.next();
+            log.error("Failed to receive message and send to client, retry in {} ms.", backoff, e);
+            this.executorService.schedule(this::consume, backoff, TimeUnit.MILLISECONDS);
         }
     }
 

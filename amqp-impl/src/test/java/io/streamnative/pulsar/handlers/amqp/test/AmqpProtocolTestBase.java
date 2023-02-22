@@ -30,7 +30,6 @@ import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
 import io.streamnative.pulsar.handlers.amqp.ConnectionContainer;
 import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
-import io.streamnative.pulsar.handlers.amqp.test.mock.MockManagedLedger;
 import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -187,7 +186,6 @@ public abstract class AmqpProtocolTestBase {
                 Mockito.any(), Mockito.anyBoolean(), Mockito.any())).thenReturn(subFuture);
         Mockito.when(subscription.getDispatcher()).thenReturn(mock(MockDispatcher.class));
         Mockito.when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
-        Mockito.when(persistentTopic.getManagedLedger()).thenReturn(new MockManagedLedger());
         Mockito.when(persistentTopic.getBrokerService()).thenReturn(brokerService);
         CompletableFuture deleteCpm = new CompletableFuture<>();
         Mockito.when(persistentTopic.delete()).thenReturn(deleteCpm);

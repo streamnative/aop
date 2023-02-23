@@ -59,7 +59,9 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     @FieldContext(
             category = CATEGORY_AMQP,
             required = false,
-            doc = "The namespace used for storing Amqp metadata topics"
+            doc = "Comma-separated list of URIs we will listen on and the listener names.\n"
+                    + "e.g. amqp://localhost:5672.\n"
+                    + "If hostname is not set, bind to the default interface."
     )
     private String amqpListeners;
 

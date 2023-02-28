@@ -16,7 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
@@ -55,7 +55,7 @@ public class AmqpBrokerService {
         this.amqpAdmin = new AmqpAdmin("localhost", config.getAmqpAdminPort());
     }
 
-    private Executor initRouteExecutor(AmqpServiceConfiguration config) {
+    private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {
         return Executors.newFixedThreadPool(config.getAmqpExchangeRouteExecutorThreads(),
                 new DefaultThreadFactory("exchange-route"));
     }

@@ -14,6 +14,7 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -38,7 +39,7 @@ public interface QueueService {
      */
     CompletableFuture<AmqpQueue> queueDeclare(NamespaceName namespaceName, String queue, boolean passive,
                                               boolean durable, boolean exclusive, boolean autoDelete, boolean nowait,
-                                              FieldTable arguments, long connectionId);
+                                              Map<String, Object> arguments, long connectionId);
 
     /**
      *  Delete a queue.

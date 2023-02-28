@@ -204,6 +204,16 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         });
     }
 
+    @Override
+    public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory,
+                                    boolean immediate) {
+        // TODO handle default exchange(exchange name is empty)
+        // 1. declare default exchange
+        // 2. declare queue
+        // 3. queue bind
+        super.receiveBasicPublish(exchange, routingKey, mandatory, immediate);
+    }
+
     protected void deliverCurrentMessageIfComplete() {
         if (currentMessage.allContentReceived()) {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
@@ -249,6 +259,18 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 return null;
             });
         }
+    }
+
+    @Override
+    public void receiveBasicReject(long deliveryTag, boolean requeue) {
+        // TODO handle message reject, message requeue
+        log.error("Not supported operation receiveBasicReject.");
+    }
+
+    @Override
+    public void receiveBasicNack(long deliveryTag, boolean multiple, boolean requeue) {
+        // TODO handle message negative ack, message requeue
+        log.error("Not supported operation receiveBasicNack.");
     }
 
     public void close() {

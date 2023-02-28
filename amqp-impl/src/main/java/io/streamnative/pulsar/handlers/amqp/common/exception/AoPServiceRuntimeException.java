@@ -41,4 +41,10 @@ public class AoPServiceRuntimeException extends RuntimeException {
         }
     }
 
+    public static class MessageRouteException extends AoPServiceRuntimeException{
+        public MessageRouteException(String message) {
+            super(message);
+        }
+    }
+
 }

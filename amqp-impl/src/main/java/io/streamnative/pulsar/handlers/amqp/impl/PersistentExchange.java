@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -96,7 +96,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              Executor routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
+                              ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
             throws JsonProcessingException {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
@@ -115,7 +115,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         persistentTopic.getManagedLedger().getProperties().get(BINDINGS), new TypeReference<>() {});
                 this.bindings.addAll(amqpQueueProperties);
             }
-            this.exchangeMessageRouter = ExchangeMessageRouter.getInstance(this);
+            this.exchangeMessageRouter = ExchangeMessageRouter.getInstance(this, routeExecutor);
             for (Binding binding : this.bindings) {
                 this.exchangeMessageRouter.addBinding(binding.des, binding.desType, binding.key, binding.arguments);
             }

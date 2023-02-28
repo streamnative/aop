@@ -94,7 +94,7 @@ public class QueueBase extends BaseResources {
                                                            QueueDeclareParams declareParams) {
         return queueService().queueDeclare(NamespaceName.get(tenant, vhost), queue, false,
                 declareParams.isDurable(), declareParams.isExclusive(), declareParams.isAutoDelete(),
-                true, null, -1);
+                true, declareParams.getArguments(), -1);
     }
 
     protected CompletableFuture<Void> deleteQueueAsync(String vhost, String queue, boolean ifUnused,

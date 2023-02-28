@@ -18,6 +18,8 @@ import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.TRUE;
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
 
 import com.google.common.collect.Sets;
+import io.netty.util.ReferenceCountUtil;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import io.streamnative.pulsar.handlers.amqp.impl.HeadersMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
@@ -30,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.stream.Collectors;
@@ -45,8 +48,9 @@ import org.apache.bookkeeper.mledger.impl.ManagedCursorImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
-import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.client.impl.ProducerImpl;
@@ -63,10 +67,11 @@ import org.apache.qpid.server.exchange.topic.TopicParser;
 public abstract class ExchangeMessageRouter {
 
     private final PersistentExchange exchange;
+    private final ExecutorService routeExecutor;
 
     private ManagedCursorImpl cursor;
 
-    private final Map<String, CompletableFuture<Producer<byte[]>>> producerMap = new ConcurrentHashMap<>();
+    private final Map<String, ProducerImpl<byte[]>> producerMap = new ConcurrentHashMap<>();
 
     private static final int defaultReadMaxSizeBytes = 5 * 1024 * 1024;
     private static final int replicatorQueueSize = 1000;
@@ -86,8 +91,9 @@ public abstract class ExchangeMessageRouter {
         String type;
     }
 
-    public ExchangeMessageRouter(PersistentExchange exchange) {
+    public ExchangeMessageRouter(PersistentExchange exchange, ExecutorService routeExecutor) {
         this.exchange = exchange;
+        this.routeExecutor = routeExecutor;
     }
 
     public abstract void addBinding(String des, String desType, String routingKey, Map<String, Object> arguments);
@@ -136,7 +142,18 @@ public abstract class ExchangeMessageRouter {
                                     .schedule(ExchangeMessageRouter.this::readMoreEntries, 1, TimeUnit.MILLISECONDS);
                             return;
                         }
-                        processMessages(entries);
+                        routeExecutor.submit(() -> {
+                            try {
+                                routeMessages(entries);
+                            } catch (Exception e) {
+                                log.error("Failed to route messages.", e);
+                                cursor.rewind();
+                                for (Entry entry : entries) {
+                                    ReferenceCountUtil.safeRelease(entry);
+                                }
+                                tryToReadMoreEntries();
+                            }
+                        });
                     }
 
                     @Override
@@ -174,7 +191,7 @@ public abstract class ExchangeMessageRouter {
         return availablePermits;
     }
 
-    private void processMessages(List<Entry> entries) {
+    private void routeMessages(List<Entry> entries) throws PulsarServerException {
         PENDING_SIZE_UPDATER.addAndGet(this, entries.size());
         for (Entry entry : entries) {
             Map<String, String> props;
@@ -194,22 +211,30 @@ public abstract class ExchangeMessageRouter {
                 entry.release();
                 continue;
             }
+
             Set<Destination> destinations = getDestinations(
                     props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, ""), getMessageHeaders());
+            initProducerIfNeeded(destinations);
 
             final Position position = entry.getPosition();
-
-            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            List<CompletableFuture<MessageId>> futures = new ArrayList<>();
             if (!destinations.isEmpty()) {
-                if (destinations.size() > 1) {
-                    entry.getDataBuffer().retain(destinations.size() - 1);
-                }
                 final int readerIndex = message.getDataBuffer().readerIndex();
                 for (Destination des : destinations) {
-                    futures.add(sendMessage(message, des, readerIndex));
+                    ProducerImpl<byte[]> producer = producerMap.get(des.name);
+                    if (producer == null) {
+                        log.error("Failed to get producer for des {}.", des.name);
+                        throw new AoPServiceRuntimeException.MessageRouteException(
+                                "Failed to get producer for des " + des.name + ".");
+                    }
+                    message.getMessageBuilder().clearProducerName();
+                    message.getMessageBuilder().clearPublishTime();
+                    message.getDataBuffer().readerIndex(readerIndex);
+                    futures.add(producer.sendAsync(message));
                 }
             }
             entry.release();
+
             FutureUtil.waitForAll(futures).whenComplete((__, t) -> {
                 if (t != null) {
                     log.error("Failed to route message {} for exchange {}.", position, exchange.exchangeName, t);
@@ -217,7 +242,6 @@ public abstract class ExchangeMessageRouter {
                     tryToReadMoreEntries();
                     return;
                 }
-
                 cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
                     @Override
                     public void deleteComplete(Object ctx) {
@@ -230,7 +254,7 @@ public abstract class ExchangeMessageRouter {
                     public void deleteFailed(ManagedLedgerException exception, Object ctx) {
                         log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
                     }
-                }, entry.getPosition());
+                }, position);
                 tryToReadMoreEntries();
             });
         }
@@ -243,43 +267,39 @@ public abstract class ExchangeMessageRouter {
         }
     }
 
-    private CompletableFuture<Void> sendMessage(MessageImpl<byte[]> msg, Destination des, int readerIndex) {
-        return getProducer(des.name, des.type)
-                .thenCompose(producer -> {
-                    msg.getMessageBuilder().clearProducerName();
-                    msg.getMessageBuilder().clearPublishTime();
-                    msg.getDataBuffer().readerIndex(readerIndex);
-                    return ((ProducerImpl<byte[]>) producer).sendAsync(msg);
-                })
-                .thenApply(__ -> null);
+    private void initProducerIfNeeded(Set<Destination> destinations) throws PulsarServerException {
+        PulsarClient pulsarClient = exchange.getTopic().getBrokerService().pulsar().getClient();
+        for (Destination des : destinations) {
+            producerMap.computeIfAbsent(des.name, k -> {
+                String topic = getTopic(des.name, des.type);
+                try {
+                    return (ProducerImpl<byte[]>) pulsarClient.newProducer()
+                            .topic(topic)
+                            .enableBatching(false)
+                            .create();
+                } catch (PulsarClientException e) {
+                    throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);
+                }
+            });
+        }
     }
 
-    private CompletableFuture<Producer<byte[]>> getProducer(String des, String desType) {
-        PulsarClient pulsarClient;
-        try {
-            pulsarClient = exchange.getTopic().getBrokerService().pulsar().getClient();
-        } catch (PulsarServerException e) {
-            log.error("Failed to get pulsar client", e);
-            return FutureUtil.failedFuture(e);
-        }
+    private String getTopic(String des, String desType) {
         NamespaceName namespaceName = TopicName.get(exchange.getTopic().getName()).getNamespaceObject();
         String prefix = desType.equals("queue") ? PersistentQueue.TOPIC_PREFIX : PersistentExchange.TOPIC_PREFIX;
-        return producerMap.computeIfAbsent(des, k -> pulsarClient.newProducer()
-                .topic(TopicName.get(TopicDomain.persistent.toString(), namespaceName, prefix + des).toString())
-                .enableBatching(false)
-                .createAsync());
+        return TopicName.get(TopicDomain.persistent.toString(), namespaceName, prefix + des).toString();
     }
 
     protected Map<String, Object> getMessageHeaders() {
         return null;
     }
 
-    public static ExchangeMessageRouter getInstance(PersistentExchange exchange) {
+    public static ExchangeMessageRouter getInstance(PersistentExchange exchange, ExecutorService routeExecutor) {
         return switch (exchange.getType()) {
-            case Fanout -> new FanoutExchangeMessageRouter(exchange);
-            case Direct -> new DirectExchangeMessageRouter(exchange);
-            case Topic -> new TopicExchangeMessageRouter(exchange);
-            case Headers -> new HeadersExchangeMessageRouter(exchange);
+            case Fanout -> new FanoutExchangeMessageRouter(exchange, routeExecutor);
+            case Direct -> new DirectExchangeMessageRouter(exchange, routeExecutor);
+            case Topic -> new TopicExchangeMessageRouter(exchange, routeExecutor);
+            case Headers -> new HeadersExchangeMessageRouter(exchange, routeExecutor);
         };
     }
 
@@ -287,8 +307,8 @@ public abstract class ExchangeMessageRouter {
 
         private final Set<Destination> destinationSet;
 
-        public FanoutExchangeMessageRouter(PersistentExchange exchange) {
-            super(exchange);
+        public FanoutExchangeMessageRouter(PersistentExchange exchange, ExecutorService routeExecutor) {
+            super(exchange, routeExecutor);
             destinationSet = Sets.newConcurrentHashSet();
         }
 
@@ -315,8 +335,8 @@ public abstract class ExchangeMessageRouter {
 
         private final Map<String, Set<Destination>> destinationMap;
 
-        public DirectExchangeMessageRouter(PersistentExchange exchange) {
-            super(exchange);
+        public DirectExchangeMessageRouter(PersistentExchange exchange, ExecutorService routeExecutor) {
+            super(exchange, routeExecutor);
             destinationMap = new ConcurrentHashMap<>();
         }
 
@@ -349,15 +369,19 @@ public abstract class ExchangeMessageRouter {
 
         private final Map<Destination, TopicRoutingKeyParser> destinationMap;
 
-        public TopicExchangeMessageRouter(PersistentExchange exchange) {
-            super(exchange);
+        public TopicExchangeMessageRouter(PersistentExchange exchange, ExecutorService routeExecutor) {
+            super(exchange, routeExecutor);
             destinationMap = new ConcurrentHashMap<>();
         }
 
         static class TopicRoutingKeyParser {
 
-            Set<String> bindingKeys;
+            final Set<String> bindingKeys;
             TopicParser topicParser;
+
+            TopicRoutingKeyParser() {
+                this.bindingKeys = new HashSet<>();
+            }
 
             void addBinding(String routingKey) {
                 if (bindingKeys.add(routingKey)) {
@@ -375,7 +399,6 @@ public abstract class ExchangeMessageRouter {
             }
 
         }
-
 
         @Override
         public synchronized void addBinding(String des, String desType, String routingKey,
@@ -412,8 +435,8 @@ public abstract class ExchangeMessageRouter {
 
         private final Map<Destination, HeadersMessageRouter> messageRouterMap;
 
-        public HeadersExchangeMessageRouter(PersistentExchange exchange) {
-            super(exchange);
+        public HeadersExchangeMessageRouter(PersistentExchange exchange, ExecutorService routeExecutor) {
+            super(exchange, routeExecutor);
             messageRouterMap = new ConcurrentHashMap<>();
         }
 

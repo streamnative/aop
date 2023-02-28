@@ -126,15 +126,6 @@ public class BaseResources {
         return queueContainer;
     }
 
-//    protected static void resumeAsyncResponseExceptionally(AsyncResponse asyncResponse, Throwable exception) {
-//        Throwable realCause = FutureUtil.unwrapCompletionException(exception);
-//        if (realCause instanceof WebApplicationException) {
-//            asyncResponse.resume(realCause);
-//        } else {
-//            asyncResponse.resume(new RestException(Response.Status.BAD_REQUEST, realCause.getMessage()));
-//        }
-//    }
-
     protected CompletableFuture<List<VhostBean>> getVhostListAsync() {
         return namespaceResource().listNamespacesAsync(tenant)
                 .thenApply(nsList -> {

@@ -20,7 +20,7 @@ import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
@@ -80,9 +80,9 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
     private final Backoff readFailureBackoff = new Backoff(
             1, TimeUnit.SECONDS, 1, TimeUnit.MINUTES, 0, TimeUnit.MILLISECONDS);
 
-    private final Executor routeExecutor;
+    private final ExecutorService routeExecutor;
 
-    protected AmqpExchangeReplicator(PersistentExchange persistentExchange, Executor routeExecutor,
+    protected AmqpExchangeReplicator(PersistentExchange persistentExchange, ExecutorService routeExecutor,
                                      int routeQueueSize) {
         this.persistentExchange = persistentExchange;
         this.topic = (PersistentTopic) persistentExchange.getTopic();

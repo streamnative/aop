@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -47,11 +47,11 @@ public class ExchangeContainer {
 
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
-    private final Executor routeExecutor;
+    private final ExecutorService routeExecutor;
     private final AmqpServiceConfiguration config;
 
     protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                                Executor routeExecutor, AmqpServiceConfiguration config) {
+                                ExecutorService routeExecutor, AmqpServiceConfiguration config) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.routeExecutor = routeExecutor;

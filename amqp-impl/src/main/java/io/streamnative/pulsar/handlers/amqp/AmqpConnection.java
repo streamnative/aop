@@ -241,7 +241,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                     String authRole = authenticationState.getAuthRole();
                     log.debug("Authentication succeeded: mechanism={}, authRole={}", mechanism, authRole);
                 }
-            } catch (AuthenticationException e) {
+            } catch (Exception e) {
                 log.error("Failed to authenticate: mechanism={}", mechanism, e);
                 sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Authentication failed", 0);
                 return;

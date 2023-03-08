@@ -54,6 +54,7 @@ import org.apache.pulsar.client.admin.PulsarAdminBuilder;
 import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.common.policies.data.TopicType;
 import org.apache.pulsar.compaction.Compactor;
 import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
 import org.apache.pulsar.metadata.impl.ZKMetadataStore;
@@ -119,7 +120,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setAuthenticationEnabled(false);
         amqpConfig.setAuthorizationEnabled(false);
         amqpConfig.setAllowAutoTopicCreation(true);
-        amqpConfig.setAllowAutoTopicCreationType("partitioned");
+        amqpConfig.setAllowAutoTopicCreationType(TopicType.PARTITIONED);
         amqpConfig.setBrokerDeleteInactiveTopicsEnabled(false);
         amqpConfig.setBrokerEntryMetadataInterceptors(
                 Sets.newHashSet("org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor"));

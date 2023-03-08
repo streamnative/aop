@@ -125,6 +125,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setBrokerEntryMetadataInterceptors(
                 Sets.newHashSet("org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor"));
         amqpConfig.setBrokerShutdownTimeoutMs(0L);
+        amqpConfig.setDefaultNumPartitions(1);
 
         // set protocol related config
         URL testHandlerUrl = this.getClass().getClassLoader().getResource("test-protocol-handler.nar");

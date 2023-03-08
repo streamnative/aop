@@ -273,17 +273,32 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueBind[ queue: {}, exchange: {}, bindingKey:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, exchange, bindingKey, nowait, argumentsTable);
         }
-        queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
+
+        if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
+            exchangeService.queueBind(connection.getNamespaceName(), exchange.toString(), getQueueName(queue),
+                            bindingKey != null ? bindingKey.toString() : null, FieldTable.convertToMap(argumentsTable))
+                    .thenAccept(__ -> {
+                        MethodRegistry methodRegistry = connection.getMethodRegistry();
+                        AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+                        connection.writeFrame(responseBody.generateFrame(channelId));
+                    }).exceptionally(t -> {
+                        log.error("Failed to bind queue {} to exchange {} v2.", queue, exchange, t);
+                        handleAoPException(t);
+                        return null;
+                    });
+        } else {
+            queueService.queueBind(connection.getNamespaceName(), getQueueName(queue), exchange.toString(),
                 bindingKey != null ? bindingKey.toString() : null, nowait, argumentsTable,
                 connection.getConnectionId()).thenAccept(__ -> {
-            MethodRegistry methodRegistry = connection.getMethodRegistry();
-            AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
-            connection.writeFrame(responseBody.generateFrame(channelId));
-        }).exceptionally(t -> {
-            log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
-            handleAoPException(t);
-            return null;
-        });
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                }).exceptionally(t -> {
+                    log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
+                    handleAoPException(t);
+                    return null;
+                });
+        }
     }
 
     @Override
@@ -344,16 +359,31 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] QueueUnbind[ queue: {}, exchange:{}, bindingKey:{}, arguments:{} ]", channelId, queue,
                     exchange, bindingKey, arguments);
         }
-        queueService.queueUnbind(connection.getNamespaceName(), queue.toString(), exchange.toString(),
-                bindingKey.toString(), arguments, connection.getConnectionId()).thenAccept(__ -> {
-            AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
-            connection.writeFrame(responseBody.generateFrame(channelId));
-        }).exceptionally(t -> {
-            log.error("Failed to unbind queue {} with exchange {} in vhost {}",
-                    queue, exchange, connection.getNamespaceName(), t);
-            handleAoPException(t);
-            return null;
-        });
+
+        if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
+            exchangeService.queueUnBind(connection.getNamespaceName(), exchange.toString(), queue.toString(),
+                            bindingKey.toString(), FieldTable.convertToMap(arguments))
+                    .thenAccept(__ -> {
+                        MethodRegistry methodRegistry = connection.getMethodRegistry();
+                        AMQMethodBody responseBody = methodRegistry.createQueueUnbindOkBody();
+                        connection.writeFrame(responseBody.generateFrame(channelId));
+                    }).exceptionally(t -> {
+                        log.error("Failed to unbind queue {} to exchange {}.", queue, exchange, t);
+                        handleAoPException(t);
+                        return null;
+                    });
+        } else {
+            queueService.queueUnbind(connection.getNamespaceName(), queue.toString(), exchange.toString(),
+                    bindingKey.toString(), arguments, connection.getConnectionId()).thenAccept(__ -> {
+                AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
+                connection.writeFrame(responseBody.generateFrame(channelId));
+            }).exceptionally(t -> {
+                log.error("Failed to unbind queue {} with exchange {} in vhost {}",
+                        queue, exchange, connection.getNamespaceName(), t);
+                handleAoPException(t);
+                return null;
+            });
+        }
     }
 
     @Override
@@ -431,12 +461,22 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         CompletableFuture<Subscription> subscriptionFuture = topic.createSubscription(
                 defaultSubscription, CommandSubscribe.InitialPosition.Earliest, false, null);
         subscriptionFuture.thenAccept(subscription -> {
-                AmqpConsumer consumer = new AmqpConsumer(queueContainer, subscription,
-                        exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
-                        topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
-                        consumerTag, true, connection.getServerCnx(), "", null,
-                        false, MessageId.latest,
-                        null, this, consumerTag, queueName, ack);
+                AmqpConsumer consumer;
+                if (connection.getAmqpConfig().isAmqpProxyV2Enable()) {
+                    consumer = new AmqpConsumerOriginal(queueContainer, subscription,
+                            exclusive ? CommandSubscribe.SubType.Exclusive : CommandSubscribe.SubType.Shared,
+                            topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
+                            consumerTag, true, connection.getServerCnx(), "", null,
+                            false, MessageId.latest,
+                            null, this, consumerTag, queueName, ack);
+                } else {
+                    consumer = new AmqpConsumer(queueContainer, subscription, exclusive
+                            ? CommandSubscribe.SubType.Exclusive :
+                            CommandSubscribe.SubType.Shared, topic.getName(), CONSUMER_ID.incrementAndGet(), 0,
+                            consumerTag, true, connection.getServerCnx(), "", null,
+                            false, MessageId.latest,
+                            null, this, consumerTag, queueName, ack);
+                }
                 subscription.addConsumer(consumer).thenAccept(__ -> {
                     consumer.handleFlow(DEFAULT_CONSUMER_PERMIT);
                     tag2ConsumersMap.put(consumerTag, consumer);

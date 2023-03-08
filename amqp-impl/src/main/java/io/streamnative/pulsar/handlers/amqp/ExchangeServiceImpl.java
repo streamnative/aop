@@ -189,4 +189,17 @@ public class ExchangeServiceImpl implements ExchangeService {
         return future;
     }
 
+    @Override
+    public CompletableFuture<Void> queueBind(NamespaceName namespaceName, String exchange, String queue,
+                                             String routingKey, Map<String, Object> arguments) {
+        return exchangeContainer.asyncGetExchange(namespaceName, exchange, false, null)
+                .thenCompose(amqpExchange -> amqpExchange.queueBind(queue, routingKey, arguments));
+    }
+
+    @Override
+    public CompletableFuture<Void> queueUnBind(NamespaceName namespaceName, String exchange, String queue,
+                                               String routingKey, Map<String, Object> arguments) {
+        return exchangeContainer.asyncGetExchange(namespaceName, exchange, false, null)
+                .thenCompose(amqpExchange -> amqpExchange.queueUnBind(queue, routingKey, arguments));
+    }
 }

@@ -48,12 +48,13 @@
     <!-- plugin dependencies -->
     <dockerfile-maven.version>1.4.9</dockerfile-maven.version>
     <license-maven-plugin.version>3.0.rc1</license-maven-plugin.version>
-    <maven-checkstyle-plugin.version>3.1.1</maven-checkstyle-plugin.version>
+    <maven-checkstyle-plugin.version>3.1.2</maven-checkstyle-plugin.version>
     <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
     <maven-surefire-plugin.version>3.0.0-M1</maven-surefire-plugin.version>
     <os-maven-plugin.version>1.4.1.Final</os-maven-plugin.version>
-    <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
+    <puppycrawl.checkstyle.version>8.37</puppycrawl.checkstyle.version>
     <spotbugs-maven-plugin.version>4.2.2</spotbugs-maven-plugin.version>
+    <spotbugs.version>4.2.2</spotbugs.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
     <assertj.version>3.15.0</assertj.version>
@@ -300,10 +301,23 @@
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
         <version>${spotbugs-maven-plugin.version}</version>
-        <configuration>
-          <excludeFilterFile>resources/findbugsExclude.xml</excludeFilterFile>
-        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs</artifactId>
+            <version>${spotbugs.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
+
+<!--      <plugin>-->
+<!--        <groupId>com.github.spotbugs</groupId>-->
+<!--        <artifactId>spotbugs-maven-plugin</artifactId>-->
+<!--        <version>${spotbugs-maven-plugin.version}</version>-->
+<!--        <configuration>-->
+<!--          <excludeFilterFile>resources/findbugsExclude.xml</excludeFilterFile>-->
+<!--        </configuration>-->
+<!--      </plugin>-->
 
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>

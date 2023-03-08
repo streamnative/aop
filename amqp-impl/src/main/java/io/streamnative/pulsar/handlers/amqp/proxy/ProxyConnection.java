@@ -25,7 +25,9 @@ import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
+import io.streamnative.pulsar.handlers.amqp.AopVersion;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,6 +41,7 @@ import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
+import org.apache.qpid.server.common.ServerPropertyNames;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -168,7 +171,11 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             AMQMethodBody responseBody = this.methodRegistry.createConnectionStartBody(
                     (short) protocolVersion.getMajorVersion(),
                     (short) pv.getActualMinorVersion(),
-                    null,
+                    FieldTable.convertToFieldTable(new HashMap<>(2) {
+                        {
+                            put(ServerPropertyNames.VERSION, AopVersion.getVersion());
+                        }
+                    }),
                     // TODO temporary modification
                     "PLAIN token".getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));

@@ -88,7 +88,7 @@ public class Exchanges extends ExchangeBase {
                                 ExchangeDeclareParams params,
                                 @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+                NamespaceName.get(tenant, vhost), PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> declareExchange(vhost, exchange, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))

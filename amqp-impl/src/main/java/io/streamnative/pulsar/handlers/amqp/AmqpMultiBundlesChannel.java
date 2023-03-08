@@ -30,18 +30,17 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.pulsar.broker.PulsarServerException;
-import org.apache.pulsar.client.api.Message;
-import org.apache.pulsar.client.api.Producer;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.api.SubscriptionInitialPosition;
-import org.apache.pulsar.client.api.SubscriptionType;
+import org.apache.pulsar.client.api.*;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.qpid.server.exchange.ExchangeDefaults;
+import org.apache.qpid.server.message.MessageDestination;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
+import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeOkBody;
@@ -207,13 +206,54 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
     @Override
     public void receiveBasicPublish(AMQShortString exchange, AMQShortString routingKey, boolean mandatory,
                                     boolean immediate) {
-        // TODO handle default exchange(exchange name is empty)
-        // 1. declare default exchange
-        // 2. declare queue
-        // 3. queue bind
-        super.receiveBasicPublish(exchange, routingKey, mandatory, immediate);
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] BasicPublish[exchange: {} routingKey: {} mandatory: {} immediate: {}]", channelId,
+                    exchange, routingKey, mandatory, immediate);
+        }
+        if (isDefaultExchange(exchange)) {
+            ExchangeDeclareParams exchangeParams = new ExchangeDeclareParams();
+            exchangeParams.setType(ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
+            exchangeParams.setInternal(false);
+            exchangeParams.setAutoDelete(false);
+            exchangeParams.setDurable(true);
+            exchangeParams.setPassive(false);
+            getAmqpAdmin().exchangeDeclare(connection.getNamespaceName().toString(),
+                    AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, exchangeParams
+            ).thenCompose(__ -> {
+                QueueDeclareParams queueParams = new QueueDeclareParams();
+                queueParams.setDurable(true);
+                queueParams.setExclusive(false);
+                queueParams.setAutoDelete(false);
+                return getAmqpAdmin().queueDeclare(connection.getNamespaceName().toString(), routingKey.toString(),
+                        queueParams);
+            }).thenCompose(__ -> {
+                BindingParams bindingParams = new BindingParams();
+                bindingParams.setRoutingKey(routingKey.toString());
+                return getAmqpAdmin().queueBind(connection.getNamespaceName().toString(),
+                        AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, routingKey.toString(), bindingParams);
+            }).thenRun(() -> {
+                MessagePublishInfo info =
+                        new MessagePublishInfo(AMQShortString.valueOf(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE),
+                                immediate, mandatory, routingKey);
+                setPublishFrame(info, null);
+            }).exceptionally(t -> {
+                log.error("Failed to bind queue {} to exchange {}", routingKey,
+                        AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, t);
+                handleAoPException(t);
+                return null;
+            }).join();
+        } else {
+            MessagePublishInfo info = new MessagePublishInfo(exchange, immediate, mandatory, routingKey);
+            setPublishFrame(info, null);
+        }
     }
 
+    private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {
+        currentMessage = new IncomingMessage(info);
+        currentMessage.setMessageDestination(e);
+    }
+
+    @Override
     protected void deliverCurrentMessageIfComplete() {
         if (currentMessage.allContentReceived()) {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
@@ -273,6 +313,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         log.error("Not supported operation receiveBasicNack.");
     }
 
+    @Override
     public void close() {
         closeAllConsumers();
         closeAllProducers();
@@ -345,6 +386,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .consumerName(UUID.randomUUID().toString())
                 .receiverQueueSize(getConnection().getAmqpConfig().getAmqpPulsarConsumerQueueSize())
+                .negativeAckRedeliveryDelay(0, TimeUnit.MILLISECONDS)
                 .subscribeAsync()
                 .thenAccept(consumer-> {
                     AmqpPulsarConsumer amqpPulsarConsumer = new AmqpPulsarConsumer(consumerTag, consumer, autoAck,

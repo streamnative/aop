@@ -61,9 +61,10 @@ public class ProxyHandler {
                  AMQMethodBody responseBody) throws Exception {
         this.proxyService = proxyService;
         this.proxyConnection = proxyConnection;
-        clientChannel = this.proxyConnection.getCnx().channel();
+        this.clientChannel = this.proxyConnection.getCnx().channel();
         this.connectMsgList = connectMsgList;
         this.vhost = vhost;
+        this.state = State.Init;
 
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(clientChannel.eventLoop())
@@ -85,7 +86,6 @@ public class ProxyHandler {
                 proxyConnection.close();
             }
         });
-        state = State.Init;
         log.info("Broker channel connect. vhost: {}, broker: {}:{}, isOpen: {}",
                 vhost, amqpBrokerHost, amqpBrokerPort, brokerChannel.isOpen());
     }

@@ -88,7 +88,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                             + "' in vhost '" + namespaceName.getLocalName() + "': received '%s' but current is '%s'";
                     if (ex.getType() == null || !StringUtils.equalsIgnoreCase(exchangeType, ex.getType().toString())) {
                         String replyText = String.format(
-                                replyTextFormat, "type", exchangeType, ex.getType().toString());
+                                replyTextFormat, "type", exchangeType, ex.getType());
                         future.completeExceptionally(new AoPException(ErrorCodes.IN_USE, replyText, true, false));
                         return;
                     }

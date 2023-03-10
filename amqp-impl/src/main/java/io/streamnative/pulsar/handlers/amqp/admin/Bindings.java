@@ -105,7 +105,7 @@ public class Bindings extends BindingBase {
                                 QueueDeclareParams params,
                            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+                NamespaceName.get(tenant, vhost), PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> queueUnbindAsync(vhost, exchange, queue, propsKey))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))

@@ -104,7 +104,7 @@ public class Exchanges extends ExchangeBase {
 
     @DELETE
     @Path("/{vhost}/{exchange}")
-    public void declareExchange(@Suspended final AsyncResponse response,
+    public void deleteExchange(@Suspended final AsyncResponse response,
                                 @PathParam("vhost") String vhost,
                                 @PathParam("exchange") String exchange,
                                 @QueryParam("if-unused") boolean ifUnused) {

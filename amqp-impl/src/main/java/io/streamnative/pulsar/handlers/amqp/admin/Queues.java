@@ -87,7 +87,7 @@ public class Queues extends QueueBase {
                              QueueDeclareParams params,
                              @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get("public", vhost), PersistentQueue.TOPIC_PREFIX + queue);
+                NamespaceName.get(tenant, vhost), PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> declareQueueAsync(vhost, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))

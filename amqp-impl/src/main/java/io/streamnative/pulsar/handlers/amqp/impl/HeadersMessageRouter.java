@@ -15,6 +15,7 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -32,7 +33,7 @@ public class HeadersMessageRouter extends AbstractAmqpMessageRouter {
     private final Map<String, Object> matches = new HashMap<>();
 
     public HeadersMessageRouter() {
-        super(Type.Headers);
+        super(ExchangeType.HEADERS);
     }
 
     @Override

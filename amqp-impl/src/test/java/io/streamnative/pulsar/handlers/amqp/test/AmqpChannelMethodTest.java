@@ -16,6 +16,10 @@ package io.streamnative.pulsar.handlers.amqp.test;
 import io.streamnative.pulsar.handlers.amqp.AmqpChannel;
 import io.streamnative.pulsar.handlers.amqp.AmqpConsumer;
 import io.streamnative.pulsar.handlers.amqp.UnacknowledgedMessageMap;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeBindBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeBindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeUnbindBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeUnbindOkBody;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -434,6 +438,54 @@ public class AmqpChannelMethodTest extends AmqpProtocolTestBase {
         toServerSender.flush();
         Assert.assertTrue(unacknowledgedMessageMap.size() == 1);
         Assert.assertTrue(!unacknowledgedMessageMap.getMap().containsKey(3));
+    }
+
+    @Test
+    public void exchangeBindTest() {
+        String source = "ex-source";
+        String destination = "ex-des";
+        String bindingKey = "ex-binding-key";
+
+        exchangeDeclare(source, true);
+        toServerSender.flush();
+        AMQBody response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        exchangeDeclare(destination, true);
+        toServerSender.flush();
+        response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
+        Assert.assertTrue(response instanceof ExchangeDeclareOkBody);
+
+        exchangeBind(source, destination, bindingKey);
+        toServerSender.flush();
+        response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
+        Assert.assertTrue(response instanceof ExchangeBindOkBody);
+
+        exchangeUnbind(source, destination, bindingKey);
+        toServerSender.flush();
+        response = (AMQBody) clientChannel.poll(1, TimeUnit.SECONDS);
+        Assert.assertTrue(response instanceof ExchangeUnbindOkBody);
+    }
+
+    private void exchangeBind(String source, String destination, String bindingKey) {
+        ExchangeBindBody exchangeBindBody = new ExchangeBindBody(
+                0,
+                AMQShortString.createAMQShortString(destination),
+                AMQShortString.createAMQShortString(source),
+                AMQShortString.createAMQShortString(bindingKey),
+                false,
+                null);
+        exchangeBindBody.generateFrame(1).writePayload(toServerSender);
+    }
+
+    private void exchangeUnbind(String source, String destination, String bindingKey) {
+        ExchangeUnbindBody exchangeUnbindBody = new ExchangeUnbindBody(
+                0,
+                AMQShortString.createAMQShortString(destination),
+                AMQShortString.createAMQShortString(source),
+                AMQShortString.createAMQShortString(bindingKey),
+                null);
+        exchangeUnbindBody.generateFrame(1).writePayload(toServerSender);
     }
 
 }

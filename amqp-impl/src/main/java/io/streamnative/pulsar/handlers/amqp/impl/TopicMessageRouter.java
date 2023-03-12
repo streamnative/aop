@@ -14,6 +14,8 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.AmqpBinding;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Collection;
 import java.util.Iterator;
@@ -27,7 +29,7 @@ import org.apache.qpid.server.exchange.topic.TopicParser;
 public class TopicMessageRouter extends AbstractAmqpMessageRouter {
 
     public TopicMessageRouter() {
-        super(Type.Topic);
+        super(ExchangeType.TOPIC);
     }
 
     /**
@@ -41,6 +43,9 @@ public class TopicMessageRouter extends AbstractAmqpMessageRouter {
         Iterator iterator = this.bindingKeys.iterator();
         while (iterator.hasNext()) {
             parser.addBinding((String) iterator.next(), null);
+        }
+        for (AmqpBinding binding : this.bindings.values()) {
+            parser.addBinding(binding.getRoutingKey(), null);
         }
         Collection<TopicMatcherResult> results = parser.parse(routingKey);
         if (results.size() > 0) {

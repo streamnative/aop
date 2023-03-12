@@ -28,6 +28,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionClientChannelMethodProcessor;
 import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,6 @@ import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
-import org.apache.qpid.server.protocol.v0_8.transport.ClientChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
@@ -91,7 +91,7 @@ public class ProxyHandler {
     }
 
     private class ProxyBackendHandler extends ChannelInboundHandlerAdapter implements
-            ClientMethodProcessor<ClientChannelMethodProcessor>, FutureListener<Void> {
+            ClientMethodProcessor<ExtensionClientChannelMethodProcessor>, FutureListener<Void> {
 
         private ChannelHandlerContext cnx;
         private final AMQMethodBody connectResponseBody;
@@ -222,7 +222,7 @@ public class ProxyHandler {
         }
 
         @Override
-        public ClientChannelMethodProcessor getChannelMethodProcessor(int i) {
+        public ExtensionClientChannelMethodProcessor getChannelMethodProcessor(int i) {
             if (log.isDebugEnabled()) {
                 log.debug("ProxyBackendHandler [getChannelMethodProcessor]");
             }

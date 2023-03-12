@@ -13,13 +13,15 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeBindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeUnbindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionClientChannelMethodProcessor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
-import org.apache.qpid.server.protocol.v0_8.transport.ClientChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ConfirmSelectOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
@@ -28,7 +30,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ContentHeaderBody;
  * Client channel level method processor for testing.
  */
 @Log4j2
-public class AmqpClientChannelMethodProcessor implements ClientChannelMethodProcessor {
+public class AmqpClientChannelMethodProcessor implements ExtensionClientChannelMethodProcessor {
 
     private final AmqpClientMethodProcessor clientMethodProcessor;
 
@@ -318,4 +320,21 @@ public class AmqpClientChannelMethodProcessor implements ClientChannelMethodProc
         }
         clientMethodProcessor.clientChannel.add(new BasicAckBody(deliveryTag, multiple));
     }
+
+    @Override
+    public void receiveExchangeBindOk() {
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE EXCHANGE BIND OK]");
+        }
+        clientMethodProcessor.clientChannel.add(new ExchangeBindOkBody());
+    }
+
+    @Override
+    public void receiveExchangeUnbindOk() {
+        if (log.isDebugEnabled()) {
+            log.debug("[RECEIVE EXCHANGE UNBIND OK]");
+        }
+        clientMethodProcessor.clientChannel.add(new ExchangeUnbindOkBody());
+    }
+
 }

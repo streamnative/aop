@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
@@ -110,7 +109,7 @@ public final class MessageFetchContext {
                                 try {
                                     message.complete(Pair.of(index.getPosition(),
                                             MessageConvertUtils.entryToAmqpBody(msg)));
-                                } catch (UnsupportedEncodingException e) {
+                                } catch (Exception e) {
                                     log.error("Failed to convert entry to AMQP body", e);
                                 }
                                 consumer.addUnAckMessages(indexMessage.getExchangeName(),

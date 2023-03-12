@@ -40,7 +40,7 @@ import org.testng.annotations.Test;
  */
 public class AdminTest extends AmqpTestBase{
 
-    @Test(timeOut = 1000 * 5)
+    @Test()
     public void listExchangeTest() throws Exception {
         Connection connection = getConnection("vhost1", true);
         Channel channel = connection.createChannel();

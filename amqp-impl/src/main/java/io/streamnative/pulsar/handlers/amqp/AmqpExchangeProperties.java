@@ -11,25 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.impl;
 
-import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
+package io.streamnative.pulsar.handlers.amqp;
+
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
-import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.util.Map;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
- * Direct message router.
+ * Properties for queue.
  */
-public class DirectMessageRouter extends AbstractAmqpMessageRouter {
-
-    public DirectMessageRouter() {
-        super(ExchangeType.DIRECT);
-    }
-
-    @Override
-    public boolean isMatch(Map<String, Object> properties) {
-        return this.bindingKeys.contains(properties.get(MessageConvertUtils.PROP_ROUTING_KEY).toString());
-    }
-
+@Data
+@NoArgsConstructor
+public class AmqpExchangeProperties {
+    private String exchangeName;
+    private ExchangeType type;
+    private Map<String, AmqpBinding> bindings;
+    private Map<String, Object> arguments;
 }

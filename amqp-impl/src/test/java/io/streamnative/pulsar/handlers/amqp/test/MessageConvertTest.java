@@ -21,7 +21,6 @@ import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +45,7 @@ import org.testng.annotations.Test;
 public class MessageConvertTest {
 
     @Test
-    private void test() throws UnsupportedEncodingException {
+    private void messageConvertTest() throws Exception {
         String exchange = "testExchange";
         boolean immediate = true;
         boolean mandatory = false;
@@ -114,7 +113,7 @@ public class MessageConvertTest {
     }
 
     @Test
-    private void positionConvert() {
+    private void positionConvertTest() {
         MessageImpl<byte[]> message;
         IndexMessage indexMessage = IndexMessage.create("test-exchange", 1L, 1L, null);
         message = MessageConvertUtils.toPulsarMessage(indexMessage);

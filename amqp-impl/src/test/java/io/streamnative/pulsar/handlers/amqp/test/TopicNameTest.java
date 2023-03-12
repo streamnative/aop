@@ -18,9 +18,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 import io.netty.channel.EventLoopGroup;
-import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import java.util.concurrent.Executors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
@@ -39,7 +39,7 @@ public class TopicNameTest {
     @Test
     public void exchangeTopicNameValidate() {
         String exchangeName = "ex-test";
-        AbstractAmqpExchange.Type exchangeType = AbstractAmqpExchange.Type.Direct;
+        ExchangeType exchangeType = ExchangeType.DIRECT;
         ManagedLedgerImpl managedLedger = Mockito.mock(ManagedLedgerImpl.class);
 
         BrokerService brokerService = Mockito.mock(BrokerService.class);

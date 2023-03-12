@@ -20,10 +20,13 @@ import static org.apache.qpid.server.transport.util.Functions.hex;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeBindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExchangeUnbindOkBody;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -70,7 +73,6 @@ import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
-import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.TxCommitOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.TxRollbackOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.TxSelectOkBody;
@@ -81,7 +83,7 @@ import org.apache.qpid.server.txn.ServerTransaction;
  * Amqp Channel level method processor.
  */
 @Log4j2
-public class AmqpChannel implements ServerChannelMethodProcessor {
+public class AmqpChannel implements ExtensionServerChannelMethodProcessor {
 
     private final int channelId;
     private final AmqpConnection connection;
@@ -505,7 +507,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                                 if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null
                                         || amqpExchange.getQueue(queueName) == null) {
                                     amqpQueue.bindExchange(amqpExchange,
-                                            AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
+                                            AbstractAmqpMessageRouter.generateRouter(ExchangeType.DIRECT),
                                             routingKey.toString(), null);
                                 }
                                 MessagePublishInfo info = new MessagePublishInfo(AMQShortString.
@@ -693,7 +695,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             Message<byte[]> message;
             try {
                 message = MessageConvertUtils.toPulsarMessage(currentMessage);
-            } catch (UnsupportedEncodingException e) {
+            } catch (Exception e) {
                 connection.sendConnectionClose(INTERNAL_ERROR, "Message encoding fail.", channelId);
                 return;
             }
@@ -858,6 +860,51 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (!nowait) {
             connection.writeFrame(new AMQFrame(channelId, ConfirmSelectOkBody.INSTANCE));
         }
+    }
+
+    @Override
+    public void receiveExchangeBind(AMQShortString destination, AMQShortString source,
+                                    AMQShortString routingKey, boolean nowait, FieldTable fieldTable) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeBind[ destination: {}, source: {}, routingKey:{}, nowait:{}, "
+                            + "arguments:{} ]",
+                    channelId, destination, source, routingKey, nowait, fieldTable);
+        }
+        Map<String, Object> params = fieldTable != null ? FieldTable.convertToMap(fieldTable) : null;
+        String key = routingKey == null ? null : routingKey.toString();
+        exchangeService.exchangeBind(connection.getNamespaceName(), destination.toString(), source.toString(),
+                key, params).thenAccept(__ -> {
+            ExchangeBindOkBody body = new ExchangeBindOkBody();
+            connection.writeFrame(body.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to bind exchange {} to source {} with bindingKey {} in vhost {}",
+                    destination, source, routingKey, fieldTable, t);
+            handleAoPException(t);
+            return null;
+        });
+    }
+
+    @Override
+    public void receiveExchangeUnbind(AMQShortString destination, AMQShortString source,
+                                      AMQShortString routingKey, boolean nowait, FieldTable fieldTable) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] ExchangeUnbind[ destination: {}, source: {}, routingKey:{}, nowait:{}, "
+                            + "arguments:{} ]",
+                    channelId, destination, source, routingKey, nowait, fieldTable);
+        }
+        Map<String, Object> params = fieldTable != null ? FieldTable.convertToMap(fieldTable) : null;
+        String key = routingKey == null ? null : routingKey.toString();
+        exchangeService.exchangeUnbind(
+                connection.getNamespaceName(), destination.toString(), source.toString(), key, params)
+                .thenAccept(__ -> {
+            ExchangeUnbindOkBody body = new ExchangeUnbindOkBody();
+            connection.writeFrame(body.generateFrame(channelId));
+        }).exceptionally(t -> {
+            log.error("Failed to unbind exchange {} to source {} with bindingKey {} in vhost {}",
+                    destination, source, routingKey, fieldTable, t);
+            handleAoPException(t);
+            return null;
+        });
     }
 
     public void receivedComplete() {

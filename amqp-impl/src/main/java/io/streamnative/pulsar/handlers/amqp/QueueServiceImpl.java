@@ -145,7 +145,8 @@ public class QueueServiceImpl implements QueueService {
                                 + queue + "'", true, false));
                         return;
                     }
-                    bind(namespaceName, exchange, amqpQueue, finalBindingKey, null).thenAccept(__ -> {
+                    bind(namespaceName, exchange, amqpQueue, finalBindingKey, FieldTable.convertToMap(argumentsTable))
+                            .thenAccept(__ -> {
                         future.complete(null);
                     }).exceptionally(t -> {
                         future.completeExceptionally(t);

@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.test;
 
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionClientChannelMethodProcessor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -26,7 +27,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
  * Client connection level method processor for testing.
  */
 @Log4j2
-public class AmqpClientMethodProcessor implements ClientMethodProcessor<AmqpClientChannelMethodProcessor> {
+public class AmqpClientMethodProcessor implements ClientMethodProcessor<ExtensionClientChannelMethodProcessor> {
 
     final AmqpClientChannel clientChannel;
     final MethodRegistry methodRegistry;
@@ -87,8 +88,8 @@ public class AmqpClientMethodProcessor implements ClientMethodProcessor<AmqpClie
     }
 
     @Override
-    public AmqpClientChannelMethodProcessor getChannelMethodProcessor(int channelId) {
-        return new AmqpClientChannelMethodProcessor(this);
+    public ExtensionClientChannelMethodProcessor getChannelMethodProcessor(int channelId) {
+        return (ExtensionClientChannelMethodProcessor) new AmqpClientChannelMethodProcessor(this);
     }
 
     @Override

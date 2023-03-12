@@ -26,6 +26,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.util.ArrayList;
@@ -136,7 +137,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
             amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
                 AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
-                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                        generateRouter(ExchangeType.value(amqpQueueProperty.getType().toString()));
                 messageRouter.setQueue(this);
                 messageRouter.setExchange(amqpExchange);
                 messageRouter.setArguments(arguments);

@@ -59,7 +59,11 @@ public class ExchangeServiceImpl implements ExchangeService {
             createIfMissing = true;
             exchangeType = getExchangeType(exchange);
         } else {
-            exchangeType = type;
+            if ("x-delayed-message".equalsIgnoreCase(type)) {
+                exchangeType = arguments.get("x-delayed-type").toString();
+            } else {
+                exchangeType = type;
+            }
         }
         CompletableFuture<AmqpExchange> future = new CompletableFuture<>();
         exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType,
@@ -187,6 +191,35 @@ public class ExchangeServiceImpl implements ExchangeService {
                     future.complete(replyCode);
                 });
         return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> exchangeBind(NamespaceName namespaceName, String destination, String source,
+                                                String routingKey, Map<String, Object> params) {
+        return exchangeContainer.asyncGetExchange(namespaceName, source, false, null)
+                .thenCombine(exchangeContainer.asyncGetExchange(namespaceName, destination, false, null),
+                        (sourceEx, desEx) -> desEx.bindExchange(sourceEx, getFinalKey(routingKey, destination), params))
+                .thenApply(__ -> null);
+    }
+
+    @Override
+    public CompletableFuture<Void> exchangeUnbind(NamespaceName namespaceName, String destination, String source,
+                                                  String routingKey, Map<String, Object> params) {
+        return exchangeContainer.asyncGetExchange(namespaceName, source, false, null)
+                .thenCombine(exchangeContainer.asyncGetExchange(namespaceName, destination, false, null),
+                        (sourceEx, desEx) ->
+                                desEx.unbindExchange(sourceEx, getFinalKey(routingKey, destination), params))
+                .thenApply(__ -> null);
+    }
+
+    private String getFinalKey(String routingKey, String destination) {
+        String finalKey;
+        if (routingKey == null) {
+            finalKey = destination;
+        } else {
+            finalKey = routingKey;
+        }
+        return finalKey;
     }
 
 }

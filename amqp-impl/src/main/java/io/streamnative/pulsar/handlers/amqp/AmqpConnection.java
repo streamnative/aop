@@ -24,6 +24,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.streamnative.pulsar.handlers.amqp.extension.ExtensionServerChannelMethodProcessor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -480,12 +481,12 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     @Override
-    public ServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
+    public ExtensionServerChannelMethodProcessor getChannelMethodProcessor(int channelId) {
         assertState(ConnectionState.OPEN);
-        ServerChannelMethodProcessor channelMethodProcessor = getChannel(channelId);
+        ExtensionServerChannelMethodProcessor channelMethodProcessor = getChannel(channelId);
         if (channelMethodProcessor == null) {
-            channelMethodProcessor =
-                (ServerChannelMethodProcessor) Proxy.newProxyInstance(ServerMethodDispatcher.class.getClassLoader(),
+            channelMethodProcessor = (ExtensionServerChannelMethodProcessor) Proxy.newProxyInstance(
+                    ServerMethodDispatcher.class.getClassLoader(),
                 new Class[] {ServerChannelMethodProcessor.class}, new InvocationHandler() {
                     @Override
                     public Object invoke(final Object proxy, final Method method, final Object[] args)

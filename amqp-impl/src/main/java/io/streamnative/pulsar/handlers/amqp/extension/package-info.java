@@ -11,24 +11,4 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.impl;
-
-import io.streamnative.pulsar.handlers.amqp.AbstractAmqpMessageRouter;
-import io.streamnative.pulsar.handlers.amqp.utils.ExchangeType;
-import java.util.Map;
-
-/**
- * Fanout message router.
- */
-public class FanoutMessageRouter extends AbstractAmqpMessageRouter {
-
-    public FanoutMessageRouter() {
-        super(ExchangeType.FANOUT);
-    }
-
-    @Override
-    public boolean isMatch(Map<String, Object> properties) {
-        return true;
-    }
-
-}
+package io.streamnative.pulsar.handlers.amqp.extension;

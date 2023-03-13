@@ -41,11 +41,19 @@
 
     <!-- dependencies -->
     <pulsar.version>3.0.0.1-SNAPSHOT</pulsar.version>
-    <spotbugs-annotations.version>3.1.8</spotbugs-annotations.version>
+    <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
+    <rabbitmq.version>5.8.0</rabbitmq.version>
+
+    <!-- test dependencies -->
+    <qpid-client-version>6.4.0</qpid-client-version>
+    <geronimo-jms-version>1.1.1</geronimo-jms-version>
     <testcontainers.version>1.12.5</testcontainers.version>
     <testng.version>6.14.3</testng.version>
     <awaitility.version>4.2.0</awaitility.version>
+    <assertj.version>3.15.0</assertj.version>
+
     <!-- plugin dependencies -->
+    <spotbugs-annotations.version>3.1.8</spotbugs-annotations.version>
     <dockerfile-maven.version>1.4.9</dockerfile-maven.version>
     <license-maven-plugin.version>3.0.rc1</license-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.1.1</maven-checkstyle-plugin.version>
@@ -54,12 +62,6 @@
     <os-maven-plugin.version>1.4.1.Final</os-maven-plugin.version>
     <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
     <spotbugs-maven-plugin.version>4.2.2</spotbugs-maven-plugin.version>
-    <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
-    <rabbitmq.version>5.8.0</rabbitmq.version>
-    <assertj.version>3.15.0</assertj.version>
-    <qpid-client-version>6.4.0</qpid-client-version>
-    <geronimo-jms-version>1.1.1</geronimo-jms-version>
-    <hamcrest-version>2.2</hamcrest-version>
   </properties>
 
   <licenses>
@@ -80,7 +82,7 @@
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
-      <!-- provided dependencies -->
+
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>pulsar</artifactId>
@@ -88,136 +90,92 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
       <dependency>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-annotations</artifactId>
-        <version>${spotbugs-annotations.version}</version>
+        <groupId>io.streamnative</groupId>
+        <artifactId>pulsar-broker</artifactId>
+        <version>${pulsar.version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>io.streamnative</groupId>
+        <artifactId>pulsar-broker</artifactId>
+        <version>${pulsar.version}</version>
+        <type>test-jar</type>
+      </dependency>
+
+      <dependency>
+        <groupId>io.streamnative</groupId>
+        <artifactId>testmocks</artifactId>
+        <version>${pulsar.version}</version>
+      </dependency>
+
       <dependency>
         <groupId>com.rabbitmq</groupId>
         <artifactId>amqp-client</artifactId>
         <version>${rabbitmq.version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>org.apache.qpid</groupId>
+        <artifactId>qpid-client</artifactId>
+        <version>${qpid-client-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.geronimo.specs</groupId>
+        <artifactId>geronimo-jms_1.1_spec</artifactId>
+        <version>${geronimo-jms-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.qpid</groupId>
+        <artifactId>qpid-test-utils</artifactId>
+        <version>${qpid-protocol-plugin.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-annotations</artifactId>
+        <version>${spotbugs-annotations.version}</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 
+  <!-- These dependencies are common to all submodules -->
   <dependencies>
     <!-- provided dependencies (available at compilation and test classpths and *NOT* packaged) -->
+    <dependency>
+      <groupId>io.streamnative</groupId>
+      <artifactId>pulsar-broker</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
     <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
 
+    <!-- dependencies for tests -->
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-broker</artifactId>
-      <version>${pulsar.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-all</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-testing</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-auth</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-all</artifactId>
-      <scope>provided</scope>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>testmocks</artifactId>
-      <version>${pulsar.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative</groupId>
-      <artifactId>pulsar-broker-common</artifactId>
-      <version>${pulsar.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative</groupId>
-      <artifactId>pulsar-client-original</artifactId>
-      <version>${pulsar.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative</groupId>
-      <artifactId>pulsar-client-admin-original</artifactId>
-      <version>${pulsar.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.fasterxml.jackson.dataformat</groupId>
-      <artifactId>jackson-dataformat-yaml</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>com.beust</groupId>
-      <artifactId>jcommander</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.qpid</groupId>
-      <artifactId>qpid-broker-core</artifactId>
-      <version>${qpid-protocol-plugin.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.qpid</groupId>
-      <artifactId>qpid-broker-plugins-amqp-0-8-protocol</artifactId>
-      <version>${qpid-protocol-plugin.version}</version>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
@@ -233,24 +191,22 @@
     </dependency>
 
     <dependency>
-      <groupId>io.streamnative</groupId>
-      <artifactId>pulsar-broker</artifactId>
-      <version>${pulsar.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative</groupId>
-      <artifactId>managed-ledger</artifactId>
-      <version>${pulsar.version}</version>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
       <groupId>org.awaitility</groupId>
       <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- TODO Currently, some tests use junit tool, we can unify the test framework in the future -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
 

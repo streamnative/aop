@@ -30,7 +30,6 @@
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Tests</name>
   <description>Tests for AMQP on Pulsar</description>
 
-  <!-- include the dependencies -->
   <dependencies>
     <!-- test dependencies -->
     <dependency>
@@ -41,69 +40,15 @@
     </dependency>
 
     <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
-      <version>${assertj.version}</version>
+      <groupId>io.streamnative.pulsar.handlers</groupId>
+      <artifactId>amqp-client-auth</artifactId>
+      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>com.rabbitmq</groupId>
       <artifactId>amqp-client</artifactId>
-      <version>${rabbitmq.version}</version>
-    </dependency>
-
-    <!-- jms test -->
-    <dependency>
-      <groupId>org.apache.qpid</groupId>
-      <artifactId>qpid-client</artifactId>
-      <version>${qpid-client-version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.geronimo.specs</groupId>
-      <artifactId>geronimo-jms_1.1_spec</artifactId>
-      <version>${geronimo-jms-version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.qpid</groupId>
-      <artifactId>qpid-test-utils</artifactId>
-      <version>${qpid-protocol-plugin.version}</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>ch.qos.logback</groupId>
-          <artifactId>logback-classic</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest</artifactId>
-      <version>${hamcrest-version}</version>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-core</artifactId>
-      <version>${hamcrest-version}</version>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-library</artifactId>
-      <version>${hamcrest-version}</version>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative.pulsar.handlers</groupId>
-      <artifactId>amqp-client-auth</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
 

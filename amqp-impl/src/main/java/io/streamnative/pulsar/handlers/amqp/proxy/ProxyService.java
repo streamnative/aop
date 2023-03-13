@@ -30,7 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.util.netty.EventLoopUtil;
-import org.apache.pulsar.zookeeper.ZooKeeperClientFactory;
 
 /**
  * This service is used for redirecting AMQP client request to proper AMQP protocol handler Broker.
@@ -53,8 +52,6 @@ public class ProxyService implements Closeable {
     private DefaultThreadFactory acceptorThreadFactory = new DefaultThreadFactory("amqp-redirect-acceptor");
     private DefaultThreadFactory workerThreadFactory = new DefaultThreadFactory("amqp-redirect-io");
     private static final int numThreads = Runtime.getRuntime().availableProcessors();
-
-    private ZooKeeperClientFactory zkClientFactory = null;
 
     @Getter
     private static final Map<String, Pair<String, Integer>> vhostBrokerMap = Maps.newConcurrentMap();

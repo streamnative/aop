@@ -193,6 +193,9 @@ public class QueueContainer {
                                             }
                                         }
                                     });
+                            messageMetadata.clearSequenceId();
+                            messageMetadata.clearPublishTime();
+                            messageMetadata.clearProducerName();
                             MessageImpl<byte[]> message = MessageImpl.create(null, null,
                                     messageMetadata,
                                     entry.getDataBuffer(),

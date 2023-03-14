@@ -20,12 +20,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.AsyncCallbacks;
+import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.lookup.LookupResult;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.AbstractTopic;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.InactiveTopicDeleteMode;
 import org.apache.pulsar.common.policies.data.InactiveTopicPolicies;
@@ -117,7 +120,28 @@ public class AmqpTopicManager {
                     topicName, lookupOp.get().getLookupData().getBrokerUrl());
         }
         if (properties != null) {
-            return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
+            return pulsarService.getBrokerService().getTopicIfExists(topicName).thenCompose(topic -> {
+                if (topic.isPresent()) {
+                    CompletableFuture<Optional<Topic>> future = new CompletableFuture<>();
+                    // TODO The reason for the update is that it is compatible with historical topics and needs to do
+                    //  conflict checking
+                    ((PersistentTopic) topic.get()).getManagedLedger().asyncSetProperties(properties,
+                            new AsyncCallbacks.UpdatePropertiesCallback() {
+                                @Override
+                                public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                                    future.complete(topic);
+                                }
+
+                                @Override
+                                public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                                    future.completeExceptionally(exception);
+                                }
+                            }, null);
+                    return future;
+                } else {
+                    return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
+                }
+            });
         } else {
             return pulsarService.getBrokerService().getTopic(topicName, createIfMissing);
         }

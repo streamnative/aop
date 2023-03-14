@@ -80,7 +80,7 @@ public class TopicNameTest {
         Mockito.when(queueTopic1.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentQueue(
-                    queueName, queueTopic1, 0, false, false);
+                    queueName, queueTopic1, 0, false, false, null);
         } catch (IllegalArgumentException e) {
             fail("Failed to new PersistentExchange. errorMsg: " + e.getMessage());
         }
@@ -90,7 +90,7 @@ public class TopicNameTest {
         Mockito.when(queueTopic2.getManagedLedger()).thenReturn(managedLedger);
         try {
             new PersistentQueue(
-                    queueName, queueTopic2, 0, false, false);
+                    queueName, queueTopic2, 0, false, false, null);
         } catch (IllegalArgumentException e) {
             assertNotNull(e);
             log.info("This is expected behavior.");

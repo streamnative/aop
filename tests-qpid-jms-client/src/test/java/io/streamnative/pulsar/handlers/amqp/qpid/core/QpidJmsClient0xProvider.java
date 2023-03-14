@@ -19,7 +19,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.AccessControlException;
 import java.util.Hashtable;
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
@@ -122,7 +121,7 @@ public class QpidJmsClient0xProvider implements JmsProvider
             Constructor<?> constructor = topicClass.getConstructor(classes);
             return (T) constructor.newInstance(args);
         }
-        catch (IllegalAccessException | AccessControlException | InvocationTargetException | InstantiationException | NoSuchMethodException | ClassNotFoundException e)
+        catch (IllegalAccessException | InvocationTargetException | InstantiationException | NoSuchMethodException | ClassNotFoundException e)
         {
             throw new RuntimeException(e);
         }

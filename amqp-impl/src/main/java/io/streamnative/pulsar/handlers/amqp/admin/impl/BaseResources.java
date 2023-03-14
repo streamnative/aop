@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.core.Context;
@@ -51,7 +52,8 @@ import org.apache.pulsar.metadata.api.MetadataStoreException;
 @Slf4j
 public class BaseResources {
 
-    protected String tenant = "public";
+    @HeaderParam("tenant")
+    protected String tenant;
 
     @Context
     protected ServletContext servletContext;

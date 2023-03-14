@@ -751,6 +751,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (!ackedMessages.isEmpty()) {
             if (requeue) {
                 requeue(ackedMessages);
+            } else {
+                discardMessage(ackedMessages);
             }
         } else {
             closeChannel(ErrorCodes.IN_USE, "deliveryTag not found");
@@ -758,6 +760,17 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (creditManager.hasCredit() && isBlockedOnCredit()) {
             unBlockedOnCredit();
         }
+    }
+
+    private void discardMessage(Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> messages) {
+        Map<UnacknowledgedMessageMap.MessageProcessor, List<PositionImpl>> positionMap = new HashMap<>();
+        messages.forEach(association -> {
+            UnacknowledgedMessageMap.MessageProcessor consumer = association.getConsumer();
+            List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
+                    list -> new ArrayList<>());
+            positions.add((PositionImpl) association.getPosition());
+        });
+        positionMap.forEach(UnacknowledgedMessageMap.MessageProcessor::discardMessage);
     }
 
     @Override

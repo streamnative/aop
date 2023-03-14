@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,8 +25,11 @@ import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueueProperties;
 import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
+import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
+import io.streamnative.pulsar.handlers.amqp.utils.TopicUtil;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,9 +39,11 @@ import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.MessageImpl;
+import org.apache.pulsar.client.impl.ProducerImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -53,6 +57,12 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String QUEUE = "QUEUE";
     public static final String ROUTERS = "ROUTERS";
     public static final String TOPIC_PREFIX = "__amqp_queue__";
+    public static final String DURABLE = "DURABLE";
+    public static final String PASSIVE = "PASSIVE";
+    public static final String AUTO_DELETE = "AUTO_DELETE";
+    public static final String INTERNAL = "INTERNAL";
+    public static final String ARGUMENTS = "ARGUMENTS";
+    public static final String DLE = "x-dead-letter-exchange";
 
     @Getter
     private PersistentTopic indexTopic;
@@ -61,14 +71,53 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private AmqpEntryWriter amqpEntryWriter;
 
+    @Getter
+    private final Map<String, String> properties;
+
+    @Getter
+    private final Map<String, Object> arguments = new HashMap<>();
+    @Getter
+    private ProducerImpl<byte[]> producer;
+    @Getter
+    private String dleExchangeName;
+
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
-                           boolean exclusive, boolean autoDelete) {
+                           boolean exclusive, boolean autoDelete, Map<String, String> properties) {
         super(queueName, true, connectionId, exclusive, autoDelete);
+        this.properties = properties;
         this.indexTopic = indexTopic;
         topicNameValidate();
         this.jsonMapper = new ObjectMapper();
         this.amqpEntryWriter = new AmqpEntryWriter(indexTopic);
+
+        String args = properties.get(ARGUMENTS);
+        if (StringUtils.isNotBlank(args)) {
+            try {
+                arguments.putAll(QueueUtil.covertStringValueAsObjectMap(args));
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+            Object dleExchangeName;
+            String dleName;
+            if ((dleExchangeName = arguments.get(DLE)) != null && StringUtils.isNotBlank(
+                    dleName = dleExchangeName.toString())) {
+                NamespaceName namespaceName = TopicName.get(indexTopic.getName()).getNamespaceObject();
+                String topic = TopicUtil.getTopicName(PersistentExchange.TOPIC_PREFIX,
+                        namespaceName.getTenant(), namespaceName.getLocalName(), dleName);
+                try {
+                    this.dleExchangeName = dleExchangeName.toString();
+                    this.producer = (ProducerImpl<byte[]>) indexTopic.getBrokerService().pulsar()
+                            .getClient()
+                            .newProducer()
+                            .topic(topic)
+                            .enableBatching(false)
+                            .create();
+                } catch (Exception e) {
+                    throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);
+                }
+            }
+        }
     }
 
     @Override
@@ -97,7 +146,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     @Override
     public CompletableFuture<Void> bindExchange(AmqpExchange exchange, AmqpMessageRouter router, String bindingKey,
-                             Map<String, Object> arguments) {
+                                                Map<String, Object> arguments) {
         return super.bindExchange(exchange, router, bindingKey, arguments).thenApply(__ -> {
             updateQueueProperties();
             return null;

@@ -58,7 +58,8 @@ public class QueueServiceImpl implements QueueService {
             finalQueue = AMQShortString.createAMQShortString(queue);
         }
         CompletableFuture<AmqpQueue> future = new CompletableFuture<>();
-        getQueue(namespaceName, finalQueue.toString(), !passive, connectionId)
+        getQueue(namespaceName, finalQueue.toString(), passive, connectionId,
+                durable, exclusive, autoDelete, nowait, arguments)
                 .whenComplete((amqpQueue, throwable) -> {
             if (throwable != null) {
                 log.error("Failed to get topic from queue container", throwable);
@@ -257,6 +258,28 @@ public class QueueServiceImpl implements QueueService {
                                                  long connectionId) {
         CompletableFuture<AmqpQueue> future = new CompletableFuture<>();
         queueContainer.asyncGetQueue(namespaceName, queueName, createIfMissing).whenComplete((queue, throwable) -> {
+            if (throwable != null) {
+                future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR, "Failed to get queue "
+                        + queueName + " in vhost " + namespaceName.getLocalName(), false, true));
+                return;
+            }
+            if (queue != null && queue.isExclusive() && queue.getConnectionId() != connectionId) {
+                future.completeExceptionally(new AoPException(ErrorCodes.ALREADY_EXISTS,
+                        "cannot obtain exclusive access to locked queue '" + queue + "' in vhost '"
+                                + namespaceName.getLocalName() + "'", false, true));
+                return;
+            }
+            future.complete(queue);
+        });
+        return future;
+    }
+    @Override
+    public CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queueName, boolean passive,
+                                                 long connectionId,  boolean durable, boolean exclusive, boolean autoDelete,
+                                                 boolean nowait, Map<String, Object> arguments) {
+        CompletableFuture<AmqpQueue> future = new CompletableFuture<>();
+        queueContainer.asyncGetQueue(namespaceName, queueName, passive, durable, exclusive, autoDelete, nowait,
+                arguments).whenComplete((queue, throwable) -> {
             if (throwable != null) {
                 future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR, "Failed to get queue "
                         + queueName + " in vhost " + namespaceName.getLocalName(), false, true));

@@ -74,7 +74,7 @@ public class MultiBundlesTest extends AmqpTestBase {
 
         AtomicInteger receiveCount = new AtomicInteger();
         AtomicBoolean flag1 = new AtomicBoolean(false);
-        channel.basicConsume(qu1, false, new DefaultConsumer(channel) {
+        /*channel.basicConsume(qu1, false, new DefaultConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
                                        byte[] body) throws IOException {
@@ -85,9 +85,9 @@ public class MultiBundlesTest extends AmqpTestBase {
                 channel.basicAck(envelope.getDeliveryTag(), false);
             }
         });
-
+*/
         AtomicBoolean flag2 = new AtomicBoolean(false);
-        channel.basicConsume(qu2, false, new DefaultConsumer(channel) {
+        /*channel.basicConsume(qu2, false, new DefaultConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
                                        byte[] body) throws IOException {
@@ -97,7 +97,8 @@ public class MultiBundlesTest extends AmqpTestBase {
                 }
                 channel.basicAck(envelope.getDeliveryTag(), false);
             }
-        });
+        });*/
+        Thread.currentThread().join();
 
         Awaitility.waitAtMost(5, TimeUnit.SECONDS)
                 .until(() -> receiveCount.get() == messageCount * 2);

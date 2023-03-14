@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -29,6 +28,7 @@ import io.streamnative.pulsar.handlers.amqp.AopVersion;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.StringTokenizer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Getter;
@@ -42,11 +42,14 @@ import org.apache.pulsar.common.naming.TopicName;
 import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.common.ServerPropertyNames;
+import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQDataBlock;
+import org.apache.qpid.server.protocol.v0_8.transport.AMQFrame;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionTuneBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
@@ -74,8 +77,12 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     private LookupHandler lookupHandler;
     private AMQShortString virtualHost;
     private String vhost;
+    private String tenant;
 
     private List<Object> connectMsgList = new ArrayList<>();
+
+    private volatile int currentClassId;
+    private volatile int currentMethodId;
 
     private enum State {
         Init,
@@ -88,6 +95,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         log.info("ProxyConnection init ...");
         this.proxyService = proxyService;
         this.proxyConfig = proxyService.getProxyConfig();
+        this.tenant = proxyConfig.getAmqpTenant();
         brokerDecoder = new AmqpBrokerDecoder(this);
         protocolVersion = ProtocolVersion.v0_91;
         methodRegistry = new MethodRegistry(protocolVersion);
@@ -230,14 +238,29 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         this.virtualHost = virtualHost;
         state = State.RedirectLookup;
         String virtualHostStr = AMQShortString.toString(virtualHost);
-        if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
-            virtualHostStr = virtualHostStr.substring(1);
-            if (org.apache.commons.lang.StringUtils.isEmpty(virtualHostStr)){
-                virtualHostStr = AmqpConnection.DEFAULT_NAMESPACE;
-            }
+        Pair<String, String> pair;
+        if (virtualHostStr == null || (pair = validateVirtualHost(virtualHostStr)) == null) {
+            sendConnectionClose(ErrorCodes.NOT_ALLOWED, String.format(
+                    "The virtualHost [%s] configuration is incorrect. For example: tenant/namespace or namespace",
+                    virtualHostStr));
+            return;
         }
-        vhost = virtualHostStr;
+        tenant = pair.getLeft();
+        vhost = pair.getRight();
         handleConnect(new AtomicInteger(5));
+    }
+
+    private Pair<String, String> validateVirtualHost(String virtualHostStr){
+        String virtualHost = virtualHostStr.trim();
+        if("/".equals(virtualHost)){
+            return Pair.of(proxyConfig.getAmqpTenant(), AmqpConnection.DEFAULT_NAMESPACE);
+        }
+        StringTokenizer tokenizer = new StringTokenizer(virtualHost, "/", false);
+        return switch (tokenizer.countTokens()) {
+            case 1 -> Pair.of(proxyConfig.getAmqpTenant(), tokenizer.nextToken());
+            case 2 -> Pair.of(tokenizer.nextToken(), tokenizer.nextToken());
+            default -> null;
+        };
     }
 
     public void handleConnect(AtomicInteger retryTimes) {
@@ -248,7 +271,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             return;
         }
         try {
-            NamespaceName namespaceName = NamespaceName.get(proxyConfig.getAmqpTenant(), vhost);
+            NamespaceName namespaceName = NamespaceName.get(tenant, vhost);
 
             String topic = TopicName.get(TopicDomain.persistent.value(),
                     namespaceName, "__lookup__").toString();
@@ -278,7 +301,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             }
 
             AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
-            proxyHandler = new ProxyHandler(vhost, proxyService,
+            proxyHandler = new ProxyHandler(NamespaceName.get(tenant, vhost), proxyService,
                     this, aopBrokerHost, aopBrokerPort, connectMsgList, responseBody);
             state = State.RedirectToBroker;
             log.info("Handle connect complete. aopBrokerHost: {}, aopBrokerPort: {}", aopBrokerHost, aopBrokerPort);
@@ -349,6 +372,8 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         if (log.isDebugEnabled()) {
             log.debug("ProxyConnection - [setCurrentMethod] classId: {}, methodId: {}", classId, methodId);
         }
+        currentClassId = classId;
+        currentMethodId = methodId;
     }
 
     @Override
@@ -357,6 +382,11 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
             log.debug("ProxyConnection - [ignoreAllButCloseOk]");
         }
         return false;
+    }
+
+    public void sendConnectionClose(int errorCode, String message) {
+        writeFrame(new AMQFrame(0, new ConnectionCloseBody(getProtocolVersion(),
+                errorCode, AMQShortString.validValueOf(message), currentClassId, currentMethodId)));
     }
 
     public synchronized void writeFrame(AMQDataBlock frame) {

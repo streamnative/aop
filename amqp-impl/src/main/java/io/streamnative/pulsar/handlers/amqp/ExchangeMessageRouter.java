@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.FALSE;
 import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.TRUE;
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
-
 import com.google.common.collect.Sets;
 import io.netty.util.ReferenceCountUtil;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
@@ -214,9 +213,30 @@ public abstract class ExchangeMessageRouter {
 
             Set<Destination> destinations = getDestinations(
                     props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, ""), getMessageHeaders());
-            initProducerIfNeeded(destinations);
-
             final Position position = entry.getPosition();
+            if (destinations == null) {
+                log.error("[{}] The message routing key [{}] is not bound to a queue or exchange, needs to be removed "
+                                + "[{}]",
+                        exchange.getName(),
+                        props.get(MessageConvertUtils.PROP_ROUTING_KEY), entry.getPosition().toString());
+                entry.release();
+                cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
+                    @Override
+                    public void deleteComplete(Object ctx) {
+                        if (log.isDebugEnabled()) {
+                            log.debug("{} Deleted message at {}", exchange.getName(), ctx);
+                        }
+                    }
+
+                    @Override
+                    public void deleteFailed(ManagedLedgerException exception, Object ctx) {
+                        log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
+                    }
+                }, position);
+                PENDING_SIZE_UPDATER.decrementAndGet(this);
+                continue;
+            }
+            initProducerIfNeeded(destinations);
             List<CompletableFuture<MessageId>> futures = new ArrayList<>();
             if (!destinations.isEmpty()) {
                 final int readerIndex = message.getDataBuffer().readerIndex();
@@ -255,13 +275,15 @@ public abstract class ExchangeMessageRouter {
                         log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
                     }
                 }, position);
-                tryToReadMoreEntries();
+
             });
+            PENDING_SIZE_UPDATER.decrementAndGet(this);
         }
+        tryToReadMoreEntries();
     }
 
     private void tryToReadMoreEntries() {
-        if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
+        if (PENDING_SIZE_UPDATER.get(this) < replicatorQueueSize * 0.5
                 && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
             this.readMoreEntries();
         }

@@ -31,6 +31,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
 import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -47,7 +48,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 @Slf4j
 public class ProxyHandler {
 
-    private String vhost;
+    private NamespaceName vhost;
     private ProxyService proxyService;
     private ProxyConnection proxyConnection;
     private Channel clientChannel;
@@ -56,7 +57,7 @@ public class ProxyHandler {
     private State state;
     private List<Object> connectMsgList;
 
-    ProxyHandler(String vhost, ProxyService proxyService, ProxyConnection proxyConnection,
+    ProxyHandler(NamespaceName vhost, ProxyService proxyService, ProxyConnection proxyConnection,
                  String amqpBrokerHost, int amqpBrokerPort, List<Object> connectMsgList,
                  AMQMethodBody responseBody) throws Exception {
         this.proxyService = proxyService;

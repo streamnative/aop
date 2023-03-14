@@ -19,6 +19,7 @@ import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.utils.HttpUtil;
 import io.streamnative.pulsar.handlers.amqp.utils.JsonUtil;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.pulsar.common.naming.NamespaceName;
 
@@ -33,51 +34,47 @@ public class AmqpAdmin {
         this.baseUrl = "http://" + host + ":" + port + "/api";
     }
 
-    public CompletableFuture<Void> exchangeDeclare(String vhost,
+    public CompletableFuture<Void> exchangeDeclare(NamespaceName namespaceName,
                                                    String exchange,
                                                    ExchangeDeclareParams exchangeDeclareParams) {
-        NamespaceName namespaceName = NamespaceName.get(vhost);
         String url = String.format("%s/exchanges/%s/%s", baseUrl, namespaceName.getLocalName(), exchange);
         try {
-            return HttpUtil.putAsync(url, JsonUtil.toMap(exchangeDeclareParams));
+            return HttpUtil.putAsync(url, JsonUtil.toMap(exchangeDeclareParams), Map.of("tenant", namespaceName.getTenant()));
         } catch (JsonProcessingException e) {
             return  CompletableFuture.failedFuture(e);
         }
     }
 
-    public CompletableFuture<Void> queueDeclare(String vhost,
+    public CompletableFuture<Void> queueDeclare(NamespaceName namespaceName,
                                                 String queue,
                                                 QueueDeclareParams queueDeclareParams) {
-        NamespaceName namespaceName = NamespaceName.get(vhost);
         String url = String.format("%s/queues/%s/%s", baseUrl, namespaceName.getLocalName(), queue);
         try {
-            return HttpUtil.putAsync(url, JsonUtil.toMap(queueDeclareParams));
+            return HttpUtil.putAsync(url, JsonUtil.toMap(queueDeclareParams), Map.of("tenant", namespaceName.getTenant()));
         } catch (JsonProcessingException e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
-    public CompletableFuture<Void> queueBind(String vhost,
+    public CompletableFuture<Void> queueBind(NamespaceName namespaceName,
                                              String exchange,
                                              String queue,
                                              BindingParams bindingParams) {
-        NamespaceName namespaceName = NamespaceName.get(vhost);
         String url = String.format("%s/bindings/%s/e/%s/q/%s", baseUrl, namespaceName.getLocalName(), exchange, queue);
         try {
-            return HttpUtil.postAsync(url, JsonUtil.toMap(bindingParams));
+            return HttpUtil.postAsync(url, JsonUtil.toMap(bindingParams), Map.of("tenant", namespaceName.getTenant()));
         } catch (JsonProcessingException e) {
             return CompletableFuture.failedFuture(e);
         }
     }
 
-    public CompletableFuture<Void> queueUnbind(String vhost,
+    public CompletableFuture<Void> queueUnbind(NamespaceName namespaceName,
                                                String exchange,
                                                String queue,
                                                String props) {
-        NamespaceName namespaceName = NamespaceName.get(vhost);
         String url = String.format("%s/bindings/%s/e/%s/q/%s/%s",
                 baseUrl, namespaceName.getLocalName(), exchange, queue, props);
-        return HttpUtil.deleteAsync(url, null);
+        return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
     }
 
 }

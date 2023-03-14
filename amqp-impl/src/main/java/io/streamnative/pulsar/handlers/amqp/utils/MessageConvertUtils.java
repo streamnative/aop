@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import lombok.Getter;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
@@ -72,7 +73,7 @@ public final class MessageConvertUtils {
     private static final String PROP_PRIORITY_PRIORITY = BASIC_PROP_PRE + "priority";
     private static final String PROP_CORRELATION_ID = BASIC_PROP_PRE + "correlation_id";
     private static final String PROP_REPLY_TO = BASIC_PROP_PRE + "reply_to";
-    private static final String PROP_EXPIRATION = BASIC_PROP_PRE + "expiration";
+    public static final String PROP_EXPIRATION = BASIC_PROP_PRE + "expiration";
     private static final String PROP_MESSAGE_ID = BASIC_PROP_PRE + "message_id";
     private static final String PROP_TIMESTAMP = BASIC_PROP_PRE + "timestamp";
     private static final String PROP_TYPE = BASIC_PROP_PRE + "type";
@@ -81,7 +82,7 @@ public final class MessageConvertUtils {
     private static final String PROP_CLUSTER_ID = BASIC_PROP_PRE + "cluster_id";
     private static final String PROP_PROPERTY_FLAGS = BASIC_PROP_PRE + "property_flags";
 
-    private static final String PROP_EXCHANGE = BASIC_PUBLISH_INFO_PRE + "exchange";
+    public static final String PROP_EXCHANGE = BASIC_PUBLISH_INFO_PRE + "exchange";
     private static final String PROP_IMMEDIATE = BASIC_PUBLISH_INFO_PRE + "immediate";
     private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
     public static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
@@ -119,8 +120,8 @@ public final class MessageConvertUtils {
 
             setProp(builder, PROP_CONTENT_TYPE, props.getContentTypeAsString());
             setProp(builder, PROP_ENCODING, props.getEncodingAsString());
-            setProp(builder, PROP_DELIVERY_MODE, props.getDeliveryMode());
-            setProp(builder, PROP_PRIORITY_PRIORITY, props.getPriority());
+            setProp(builder, PROP_DELIVERY_MODE, ((Byte) props.getDeliveryMode()).intValue());
+            setProp(builder, PROP_PRIORITY_PRIORITY, ((Byte) props.getPriority()).intValue());
             setProp(builder, PROP_CORRELATION_ID, props.getCorrelationIdAsString());
             setProp(builder, PROP_REPLY_TO, props.getReplyToAsString());
             setProp(builder, PROP_EXPIRATION, props.getExpiration());
@@ -415,10 +416,11 @@ public final class MessageConvertUtils {
 
     public static AmqpMessageData messageToAmqpBody(Message<byte[]> message)
             throws UnsupportedEncodingException {
-        AmqpMessageData amqpMessage = null;
-
+        AmqpMessageData amqpMessage;
+        Map<String, String> messageProperties = new HashMap<>(message.getProperties());
+        messageProperties.put(BASIC_PROP_HEADER_PRE + "pulsar_message_position", message.getMessageId().toString());
         Pair<BasicContentHeaderProperties, MessagePublishInfo> metaData =
-                getPropertiesFromMetadata(message.getProperties());
+                getPropertiesFromMetadata(messageProperties);
 
         ContentHeaderBody contentHeaderBody = new ContentHeaderBody(metaData.getLeft());
         contentHeaderBody.setBodySize(message.getData().length);

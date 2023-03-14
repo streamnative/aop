@@ -84,4 +84,7 @@ public interface QueueService {
 
     CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
                                           long connectionId);
+    CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
+                                          long connectionId,  boolean durable, boolean exclusive, boolean autoDelete,
+                                          boolean nowait, Map<String, Object> arguments);
 }

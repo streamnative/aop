@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -36,6 +37,7 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.authentication.AuthenticationProvider;
 import org.apache.pulsar.broker.authentication.AuthenticationState;
 import org.apache.pulsar.broker.namespace.LookupOptions;
@@ -324,18 +326,17 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         assertState(ConnectionState.AWAIT_OPEN);
 
-        boolean isDefaultNamespace = false;
         String virtualHostStr = AMQShortString.toString(virtualHost);
-        if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
-            virtualHostStr = virtualHostStr.substring(1);
-            if (StringUtils.isEmpty(virtualHostStr)){
-                virtualHostStr = DEFAULT_NAMESPACE;
-                isDefaultNamespace = true;
-            }
+        Pair<String, String> pair;
+        if (virtualHostStr == null || (pair = validateVirtualHost(virtualHostStr)) == null){
+            sendConnectionClose(ErrorCodes.NOT_ALLOWED, String.format(
+                    "The virtualHost [%s] configuration is incorrect. For example: tenant/namespace or namespace",
+                    virtualHostStr), 0);
+            return;
         }
 
-        NamespaceName namespaceName = NamespaceName.get(amqpConfig.getAmqpTenant(), virtualHostStr);
-        if (isDefaultNamespace) {
+        NamespaceName namespaceName = NamespaceName.get(pair.getLeft(), pair.getRight());
+        if (AmqpConnection.DEFAULT_NAMESPACE.equals(pair.getRight())) {
             // avoid the namespace public/default is not owned in standalone mode
             TopicName topic = TopicName.get(TopicDomain.persistent.value(),
                     namespaceName, "__lookup__");
@@ -351,10 +352,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
         amqpBrokerService.getConnectionContainer().addConnection(namespaceName, this);
-//        } else {
-//            sendConnectionClose(ErrorCodes.NOT_FOUND,
-//                "Unknown virtual host: '" + virtualHostStr + "'", 0);
-//        }
     }
 
     @Override
@@ -523,6 +520,19 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             sendConnectionClose(ErrorCodes.COMMAND_INVALID, replyText, 0);
             throw new RuntimeException(replyText);
         }
+    }
+
+    private Pair<String, String> validateVirtualHost(String virtualHostStr){
+        String virtualHost = virtualHostStr.trim();
+        if("/".equals(virtualHost)){
+            return Pair.of(amqpConfig.getAmqpTenant(), AmqpConnection.DEFAULT_NAMESPACE);
+        }
+        StringTokenizer tokenizer = new StringTokenizer(virtualHost, "/", false);
+        return switch (tokenizer.countTokens()) {
+            case 1 -> Pair.of(amqpConfig.getAmqpTenant(), tokenizer.nextToken());
+            case 2 -> Pair.of(tokenizer.nextToken(), tokenizer.nextToken());
+            default -> null;
+        };
     }
 
 

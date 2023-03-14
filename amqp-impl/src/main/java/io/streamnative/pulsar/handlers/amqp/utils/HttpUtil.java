@@ -14,11 +14,13 @@
 package io.streamnative.pulsar.handlers.amqp.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import okhttp3.Call;
 import okhttp3.Callback;
+import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -36,6 +38,10 @@ public class HttpUtil {
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     public static CompletableFuture<Void> putAsync(String url, Map<String, Object> params) {
+        return putAsync(url, params, Maps.newHashMap());
+    }
+
+    public static CompletableFuture<Void> putAsync(String url, Map<String, Object> params, Map<String, String> headers) {
         RequestBody requestBody;
         try {
             requestBody = RequestBody.create(JsonUtil.toString(params), JSON);
@@ -44,6 +50,7 @@ public class HttpUtil {
         }
         Request request = new Request.Builder()
                 .url(url)
+                .headers(Headers.of(headers))
                 .put(requestBody)
                 .build();
 
@@ -66,7 +73,11 @@ public class HttpUtil {
         return future;
     }
 
-    public static CompletableFuture<Void> postAsync(String url, Map<String, Object> params) {
+    public static CompletableFuture<Void> postAsync(String url, Map<String, Object> params){
+        return postAsync(url, params, Maps.newHashMap());
+    }
+
+    public static CompletableFuture<Void> postAsync(String url, Map<String, Object> params, Map<String, String> headers) {
         RequestBody requestBody;
         try {
             requestBody = RequestBody.create(JsonUtil.toString(params), JSON);
@@ -75,6 +86,7 @@ public class HttpUtil {
         }
         Request request = new Request.Builder()
                 .url(url)
+                .headers(Headers.of(headers))
                 .post(requestBody)
                 .build();
 
@@ -96,8 +108,10 @@ public class HttpUtil {
         });
         return future;
     }
-
-    public static CompletableFuture<Void> deleteAsync(String url, Map<String, Object> params) {
+    public static CompletableFuture<Void> deleteAsync(String url, Map<String, Object> params){
+        return deleteAsync(url, params, Maps.newHashMap());
+    }
+    public static CompletableFuture<Void> deleteAsync(String url, Map<String, Object> params, Map<String, String> headers) {
         RequestBody requestBody;
         try {
             requestBody = RequestBody.create(JsonUtil.toString(params), JSON);
@@ -106,6 +120,7 @@ public class HttpUtil {
         }
         Request request = new Request.Builder()
                 .url(url)
+                .headers(Headers.of(headers))
                 .delete(requestBody)
                 .build();
 

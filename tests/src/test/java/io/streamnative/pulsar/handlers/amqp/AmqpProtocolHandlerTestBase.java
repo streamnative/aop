@@ -122,7 +122,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setAuthenticationEnabled(false);
         amqpConfig.setAuthorizationEnabled(false);
         amqpConfig.setAllowAutoTopicCreation(true);
-        amqpConfig.setAllowAutoTopicCreationType(TopicType.PARTITIONED);
+        amqpConfig.setAllowAutoTopicCreationType(TopicType.PARTITIONED.toString());
         amqpConfig.setBrokerDeleteInactiveTopicsEnabled(false);
         amqpConfig.setBrokerEntryMetadataInterceptors(
                 Sets.newHashSet("org.apache.pulsar.common.intercept.AppendIndexMetadataInterceptor"));

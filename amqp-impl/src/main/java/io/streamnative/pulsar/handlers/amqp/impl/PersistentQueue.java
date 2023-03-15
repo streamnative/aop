@@ -34,20 +34,33 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.bookkeeper.mledger.ManagedCursor;
+import org.apache.bookkeeper.mledger.ManagedLedgerException;
+import org.apache.bookkeeper.mledger.Position;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
+import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.client.impl.ProducerImpl;
+import org.apache.pulsar.common.api.proto.KeyValue;
+import org.apache.pulsar.common.api.proto.MessageMetadata;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
+import org.apache.pulsar.common.protocol.Commands;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Persistent queue.
@@ -62,7 +75,14 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String AUTO_DELETE = "AUTO_DELETE";
     public static final String INTERNAL = "INTERNAL";
     public static final String ARGUMENTS = "ARGUMENTS";
-    public static final String DLE = "x-dead-letter-exchange";
+    public static final String X_DEAD_LETTER_EXCHANGE = "x-dead-letter-exchange";
+    public static final String X_MESSAGE_TTL = "x-message-ttl";
+    public static final String X_DEAD_LETTER_ROUTING_KEY = "x-dead-letter-routing-key";
+    public static final String DEFAULT_SUBSCRIPTION = "AMQP_DEFAULT";
+    public static final long DELAY_3000 = 3000;
+    public static final long DELAY_2000 = 2000;
+    public static final long DELAY_1000 = 1000;
+    public static final long DELAY_500 = 500;
 
     @Getter
     private PersistentTopic indexTopic;
@@ -71,15 +91,16 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private AmqpEntryWriter amqpEntryWriter;
 
-    @Getter
-    private final Map<String, String> properties;
+    private Map<String, String> properties;
 
-    @Getter
     private final Map<String, Object> arguments = new HashMap<>();
-    @Getter
     private ProducerImpl<byte[]> producer;
-    @Getter
-    private String dleExchangeName;
+    private String deadLetterExchange;
+    private int queueMessageTtl;
+    private String deadLetterRoutingKey;
+    private final PersistentSubscription defaultSubscription;
+
+    private final ScheduledExecutorService scheduledExecutor;
 
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
@@ -87,10 +108,11 @@ public class PersistentQueue extends AbstractAmqpQueue {
         super(queueName, true, connectionId, exclusive, autoDelete);
         this.properties = properties;
         this.indexTopic = indexTopic;
+        this.scheduledExecutor = indexTopic.getBrokerService().executor();
         topicNameValidate();
         this.jsonMapper = new ObjectMapper();
         this.amqpEntryWriter = new AmqpEntryWriter(indexTopic);
-
+        this.defaultSubscription = indexTopic.getSubscriptions().get(DEFAULT_SUBSCRIPTION);
         String args = properties.get(ARGUMENTS);
         if (StringUtils.isNotBlank(args)) {
             try {
@@ -98,25 +120,159 @@ public class PersistentQueue extends AbstractAmqpQueue {
             } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
-            Object dleExchangeName;
-            String dleName;
-            if ((dleExchangeName = arguments.get(DLE)) != null && StringUtils.isNotBlank(
-                    dleName = dleExchangeName.toString())) {
+            this.deadLetterExchange = (String) arguments.get(X_DEAD_LETTER_EXCHANGE);
+            this.queueMessageTtl = (Integer) arguments.get(X_MESSAGE_TTL);
+            this.deadLetterRoutingKey = (String) arguments.get(X_DEAD_LETTER_ROUTING_KEY);
+
+            if (StringUtils.isNotBlank(deadLetterExchange)
+                    && StringUtils.isNotBlank(deadLetterRoutingKey)) {
+                // init producer
                 NamespaceName namespaceName = TopicName.get(indexTopic.getName()).getNamespaceObject();
                 String topic = TopicUtil.getTopicName(PersistentExchange.TOPIC_PREFIX,
-                        namespaceName.getTenant(), namespaceName.getLocalName(), dleName);
+                        namespaceName.getTenant(), namespaceName.getLocalName(), deadLetterExchange);
+                initDeadLetterProducer(indexTopic, topic);
+            }
+        }
+        // start check expired
+        scheduledExecutor.execute(this::readEntries);
+    }
+
+    public void readEntries() {
+        if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0
+                || (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
+                .isConsumerConnected())) {
+            scheduledExecutor.schedule(this::readEntries, DELAY_3000, TimeUnit.MILLISECONDS);
+            return;
+        }
+        ManagedCursor cursor = defaultSubscription.getCursor();
+        cursor.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
+            @Override
+            public void readEntriesComplete(List<Entry> entries, Object ctx) {
+                if (entries.size() == 0) {
+                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_1000, TimeUnit.MILLISECONDS);
+                    return;
+                }
+                Entry entry = entries.get(0);
                 try {
-                    this.dleExchangeName = dleExchangeName.toString();
-                    this.producer = (ProducerImpl<byte[]>) indexTopic.getBrokerService().pulsar()
-                            .getClient()
-                            .newProducer()
-                            .topic(topic)
-                            .enableBatching(false)
-                            .create();
-                } catch (Exception e) {
-                    throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);
+                    Position position = entry.getPosition();
+                    MessageMetadata messageMetadata = Commands.parseMessageMetadata(entry.getDataBuffer());
+                    // queue ttl
+                    int expireTime = 0;
+                    // message ttl
+                    KeyValue keyValue = messageMetadata.getPropertiesList().stream()
+                            .filter(kv -> MessageConvertUtils.PROP_EXPIRATION.equals(kv.getKey()))
+                            .findFirst()
+                            .orElse(null);
+                    int messageTtl;
+                    int localQueueTtl = queueMessageTtl;
+                    if (localQueueTtl > 0 && keyValue != null
+                            && (messageTtl = Integer.parseInt(keyValue.getValue())) > 0) {
+                        expireTime = Math.min(localQueueTtl, messageTtl);
+                    }
+                    // no config
+                    if (expireTime == 0) {
+                        // It is possible to mix expired messages with non-expired messages
+                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                                TimeUnit.MILLISECONDS);
+                        return;
+                    }
+                    long expireMillis;
+                    // no expire
+                    if ((expireMillis = entryExpired(expireTime, messageMetadata.getPublishTime())) < 0) {
+                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, Math.abs(expireMillis),
+                                TimeUnit.MILLISECONDS);
+                        return;
+                    }
+                    // expire but no dead letter queue
+                    if (producer == null) {
+                        log.warn("Message expired, no dead-letter-producer, [{}] message auto ack [{}]", queueName, position);
+                        // ack
+                        makeAck(position, cursor).thenRun(
+                                        () -> scheduledExecutor.execute(PersistentQueue.this::readEntries))
+                                .exceptionally(throwable -> {
+                                    log.error("no dead-letter-producer ack fail", throwable);
+                                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                                            TimeUnit.MILLISECONDS);
+                                    return null;
+                                });
+                        return;
+                    }
+                    messageMetadata.clearSequenceId();
+                    messageMetadata.clearPublishTime();
+                    messageMetadata.clearProducerName();
+                    messageMetadata.getPropertiesList()
+                            .forEach(kv -> {
+                                switch (kv.getKey()) {
+                                    case MessageConvertUtils.PROP_ROUTING_KEY -> kv.setValue(deadLetterRoutingKey);
+                                    case MessageConvertUtils.PROP_EXPIRATION -> kv.setValue("0");
+                                    case MessageConvertUtils.PROP_EXCHANGE -> kv.setValue(deadLetterExchange);
+                                    default -> {
+                                    }
+                                }
+                            });
+                    MessageImpl<byte[]> message = MessageImpl.create(null, null,
+                            messageMetadata,
+                            entry.getDataBuffer(),
+                            Optional.empty(), null, Schema.BYTES,
+                            0, true, -1L);
+                    producer.sendAsync(message)
+                            .thenCompose(messageId -> makeAck(position, cursor))
+                            .thenRun(() -> scheduledExecutor.execute(PersistentQueue.this::readEntries))
+                            .exceptionally((throwable) -> {
+                                log.error("dead-letter queue [{}] send fail", queueName, throwable);
+                                scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                                        TimeUnit.MILLISECONDS);
+                                return null;
+                            });
+                } finally {
+                    entry.release();
                 }
             }
+
+            @Override
+            public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
+                log.error("read entries failed", exception);
+                scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                        TimeUnit.MILLISECONDS);
+            }
+        }, null, null);
+    }
+
+    @NotNull
+    private CompletableFuture<Void> makeAck(Position position, ManagedCursor cursor) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
+            @Override
+            public void deleteComplete(Object ctx) {
+                future.complete(null);
+            }
+
+            @Override
+            public void deleteFailed(ManagedLedgerException exception,
+                                     Object ctx) {
+                log.error("[{}] Message expired to delete exception, position {}", queueName,
+                        position, exception);
+                future.completeExceptionally(exception);
+            }
+        }, position);
+        return future;
+    }
+
+    public static long entryExpired(int expireMillis, long entryTimestamp) {
+        return System.currentTimeMillis() - entryTimestamp + expireMillis;
+    }
+
+    private void initDeadLetterProducer(PersistentTopic indexTopic, String topic) {
+        try {
+            this.producer = (ProducerImpl<byte[]>) indexTopic.getBrokerService().pulsar()
+                    .getClient()
+                    .newProducer()
+                    .topic(topic)
+                    .enableBatching(false)
+                    .create();
+        } catch (Exception e) {
+            log.error("init dead letter producer fail", e);
+            throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);
         }
     }
 

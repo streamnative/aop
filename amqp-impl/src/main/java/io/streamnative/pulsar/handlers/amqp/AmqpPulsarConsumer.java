@@ -86,7 +86,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
             Object dleExchangeName;
             String dleName;
             this.routingKey = (String) arguments.get("x-dead-letter-routing-key");
-            if ((dleExchangeName = arguments.get(PersistentQueue.DLE)) != null
+            if ((dleExchangeName = arguments.get(PersistentQueue.X_DEAD_LETTER_EXCHANGE)) != null
                     && StringUtils.isNotBlank(dleName = dleExchangeName.toString())
                     && StringUtils.isNotBlank(routingKey)) {
                 NamespaceName namespaceName = TopicName.get(consumer.getTopic()).getNamespaceObject();

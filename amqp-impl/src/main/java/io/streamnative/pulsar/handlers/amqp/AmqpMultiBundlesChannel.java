@@ -116,7 +116,23 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         params.setExclusive(exclusive);
         params.setAutoDelete(autoDelete);
         params.setArguments(FieldTable.convertToMap(arguments));
-
+        try {
+            connection.getPulsarService().getClient()
+                    .newConsumer()
+                    .topic(getTopicName(PersistentQueue.TOPIC_PREFIX, queue.toString()))
+                    .subscriptionType(SubscriptionType.Shared)
+                    .subscriptionName("AMQP_DEFAULT")
+                    .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                    .consumerName(UUID.randomUUID().toString())
+                    .receiverQueueSize(getConnection().getAmqpConfig().getAmqpPulsarConsumerQueueSize())
+                    .negativeAckRedeliveryDelay(0, TimeUnit.MILLISECONDS)
+                    .subscribe()
+                    .close();
+        } catch (Exception e) {
+            log.error("init default subscription fail", e);
+            handleAoPException(e);
+            return;
+        }
         getAmqpAdmin().queueDeclare(
                 connection.getNamespaceName(), queue.toString(), params).thenAccept(amqpQueue -> {
 //            setDefaultQueue(amqpQueue);
@@ -179,7 +195,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
     public void receiveBasicQos(long prefetchSize, int prefetchCount, boolean global) {
         if (log.isDebugEnabled()) {
             log.debug("RECV[{}] BasicQos[prefetchSize: {} prefetchCount: {} global: {}]",
-                channelId, prefetchSize, prefetchCount, global);
+                    channelId, prefetchSize, prefetchCount, global);
         }
 
         // ignored this method first
@@ -289,21 +305,21 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                     .value(message.getData())
                     .properties(message.getProperties())
                     .sendAsync()
-            .thenAccept(position -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("Publish message success, position {}", position);
-                }
-                if (confirmOnPublish) {
-                    confirmedMessageCounter++;
-                    BasicAckBody body = connection.getMethodRegistry().
-                            createBasicAckBody(confirmedMessageCounter, false);
-                    connection.writeFrame(body.generateFrame(channelId));
-                }
-            })
-            .exceptionally(throwable -> {
-                log.error("Failed to write message to exchange", throwable);
-                return null;
-            });
+                    .thenAccept(position -> {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Publish message success, position {}", position);
+                        }
+                        if (confirmOnPublish) {
+                            confirmedMessageCounter++;
+                            BasicAckBody body = connection.getMethodRegistry().
+                                    createBasicAckBody(confirmedMessageCounter, false);
+                            connection.writeFrame(body.generateFrame(channelId));
+                        }
+                    })
+                    .exceptionally(throwable -> {
+                        log.error("Failed to write message to exchange", throwable);
+                        return null;
+                    });
         }
     }
 
@@ -394,7 +410,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 .receiverQueueSize(getConnection().getAmqpConfig().getAmqpPulsarConsumerQueueSize())
                 .negativeAckRedeliveryDelay(0, TimeUnit.MILLISECONDS)
                 .subscribeAsync()
-                .thenAccept(consumer-> {
+                .thenAccept(consumer -> {
                     AmqpPulsarConsumer amqpPulsarConsumer;
                     try {
                         amqpPulsarConsumer = new AmqpPulsarConsumer(consumerTag, consumer, autoAck,

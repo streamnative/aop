@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
@@ -74,6 +75,9 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String ARGUMENTS = "ARGUMENTS";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
     private static final String BINDINGS = "BINDINGS";
+    public static final String X_DELAYED_TYPE = "x-delayed-type";
+    @Getter
+    private final boolean existDelayedType;
 
     private PersistentTopic persistentTopic;
     private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
@@ -100,6 +104,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             throws JsonProcessingException {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
+        this.existDelayedType = arguments != null && arguments.containsKey(X_DELAYED_TYPE);
         topicNameValidate();
         cursors = new ConcurrentOpenHashMap<>(16, 1);
         for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {

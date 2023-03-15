@@ -20,6 +20,7 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInE
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -55,9 +56,12 @@ public class ExchangeServiceImpl implements ExchangeService {
 
         boolean createIfMissing = !passive;
         String exchangeType;
+        String delayedExchange;
         if (isBuildInExchange(exchange)) {
             createIfMissing = true;
             exchangeType = getExchangeType(exchange);
+        } else if (StringUtils.isNotBlank(delayedExchange = (String)arguments.get(PersistentExchange.X_DELAYED_TYPE))) {
+            exchangeType = delayedExchange;
         } else {
             exchangeType = type;
         }

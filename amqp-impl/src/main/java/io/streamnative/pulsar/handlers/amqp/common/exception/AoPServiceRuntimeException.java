@@ -47,4 +47,10 @@ public class AoPServiceRuntimeException extends RuntimeException {
         }
     }
 
+    public static class NotSupportedExchangeTypeException extends AoPServiceRuntimeException{
+        public NotSupportedExchangeTypeException(String message) {
+            super(message);
+        }
+    }
+
 }

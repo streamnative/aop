@@ -45,6 +45,8 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
+import org.apache.commons.lang.math.NumberUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.MessageId;
@@ -250,6 +252,14 @@ public abstract class ExchangeMessageRouter {
                     message.getMessageBuilder().clearProducerName();
                     message.getMessageBuilder().clearPublishTime();
                     message.getDataBuffer().readerIndex(readerIndex);
+                    String xDelay;
+                    int delay;
+                    if (exchange.isExistDelayedType()
+                            && StringUtils.isNotBlank(xDelay = props.get(MessageConvertUtils.BASIC_PROP_HEADER_X_DELAY))
+                            && NumberUtils.isNumber(xDelay)
+                            && (delay = Integer.parseInt(xDelay)) > 0) {
+                        message.getMessageBuilder().setDeliverAtTime(System.currentTimeMillis() + delay);
+                    }
                     futures.add(producer.sendAsync(message));
                 }
             }
@@ -322,6 +332,7 @@ public abstract class ExchangeMessageRouter {
             case Direct -> new DirectExchangeMessageRouter(exchange, routeExecutor);
             case Topic -> new TopicExchangeMessageRouter(exchange, routeExecutor);
             case Headers -> new HeadersExchangeMessageRouter(exchange, routeExecutor);
+            default -> throw new AoPServiceRuntimeException.NotSupportedExchangeTypeException(exchange.getType() + " not support");
         };
     }
 

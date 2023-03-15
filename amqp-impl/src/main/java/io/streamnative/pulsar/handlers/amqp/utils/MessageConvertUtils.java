@@ -86,6 +86,7 @@ public final class MessageConvertUtils {
     private static final String PROP_IMMEDIATE = BASIC_PUBLISH_INFO_PRE + "immediate";
     private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
     public static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
+    public static final String BASIC_PROP_HEADER_X_DELAY = BASIC_PROP_HEADER_PRE + "x-delay";
 
     private static final Clock clock = Clock.systemDefaultZone();
 

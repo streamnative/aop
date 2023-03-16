@@ -140,15 +140,15 @@ public class PersistentQueue extends AbstractAmqpQueue {
         if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0
                 || (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
                 .isConsumerConnected())) {
-            scheduledExecutor.schedule(this::readEntries, DELAY_5000, TimeUnit.MILLISECONDS);
+            scheduledExecutor.schedule(this::readEntries, DELAY_5000 * 2, TimeUnit.MILLISECONDS);
             return;
         }
         ManagedCursor cursor = defaultSubscription.getCursor();
-        cursor.rewind();
         cursor.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
             @Override
             public void readEntriesComplete(List<Entry> entries, Object ctx) {
                 if (entries.size() == 0) {
+                    cursor.rewind();
                     scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_2000, TimeUnit.MILLISECONDS);
                     return;
                 }
@@ -183,7 +183,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     }
                     // expire but no dead letter queue
                     if (producer == null) {
-                        log.warn("Message expired, no dead-letter-producer, [{}] message auto ack [{}]", queueName, position);
+                        log.warn("Message expired, no dead-letter-producer, [{}] message auto ack [{}]", queueName,
+                                position);
                         // ack
                         makeAck(position, cursor).thenRun(
                                         () -> scheduledExecutor.execute(PersistentQueue.this::readEntries))

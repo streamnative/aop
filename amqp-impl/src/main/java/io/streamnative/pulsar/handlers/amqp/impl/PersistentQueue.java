@@ -79,9 +79,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String X_MESSAGE_TTL = "x-message-ttl";
     public static final String X_DEAD_LETTER_ROUTING_KEY = "x-dead-letter-routing-key";
     public static final String DEFAULT_SUBSCRIPTION = "AMQP_DEFAULT";
-    public static final long DELAY_5000 = 5000;
-    public static final long DELAY_3000 = 3000;
-    public static final long DELAY_2000 = 2000;
+    public static final long DELAY_1000 = 1000;
 
     @Getter
     private PersistentTopic indexTopic;
@@ -140,16 +138,18 @@ public class PersistentQueue extends AbstractAmqpQueue {
         if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0
                 || (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
                 .isConsumerConnected())) {
-            scheduledExecutor.schedule(this::readEntries, DELAY_5000 * 2, TimeUnit.MILLISECONDS);
+
+            scheduledExecutor.schedule(this::readEntries, DELAY_1000, TimeUnit.MILLISECONDS);
             return;
         }
         ManagedCursor cursor = defaultSubscription.getCursor();
+        // TODO To send a message to the topic, the cursor is not read from the first, need to reset
+        cursor.rewind();
         cursor.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
             @Override
             public void readEntriesComplete(List<Entry> entries, Object ctx) {
                 if (entries.size() == 0) {
-                    cursor.rewind();
-                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_2000, TimeUnit.MILLISECONDS);
+                    scheduledExecutor.execute(PersistentQueue.this::readEntries);
                     return;
                 }
                 Entry entry = entries.get(0);
@@ -170,7 +170,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     // no config
                     if (expireTime == 0) {
                         // It is possible to mix expired messages with non-expired messages
-                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, 3 * DELAY_1000,
                                 TimeUnit.MILLISECONDS);
                         return;
                     }
@@ -190,7 +190,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                                         () -> scheduledExecutor.execute(PersistentQueue.this::readEntries))
                                 .exceptionally(throwable -> {
                                     log.error("no dead-letter-producer ack fail", throwable);
-                                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, 5 * DELAY_1000,
                                             TimeUnit.MILLISECONDS);
                                     return null;
                                 });
@@ -219,7 +219,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                             .thenRun(() -> scheduledExecutor.execute(PersistentQueue.this::readEntries))
                             .exceptionally((throwable) -> {
                                 log.error("dead-letter queue [{}] send fail", queueName, throwable);
-                                scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                                scheduledExecutor.schedule(PersistentQueue.this::readEntries, 5 * DELAY_1000,
                                         TimeUnit.MILLISECONDS);
                                 return null;
                             });
@@ -231,7 +231,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
             @Override
             public void readEntriesFailed(ManagedLedgerException exception, Object ctx) {
                 log.error("read entries failed", exception);
-                scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_3000,
+                scheduledExecutor.schedule(PersistentQueue.this::readEntries, 5 * DELAY_1000,
                         TimeUnit.MILLISECONDS);
             }
         }, null, null);

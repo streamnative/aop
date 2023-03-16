@@ -79,10 +79,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String X_MESSAGE_TTL = "x-message-ttl";
     public static final String X_DEAD_LETTER_ROUTING_KEY = "x-dead-letter-routing-key";
     public static final String DEFAULT_SUBSCRIPTION = "AMQP_DEFAULT";
+    public static final long DELAY_5000 = 5000;
     public static final long DELAY_3000 = 3000;
     public static final long DELAY_2000 = 2000;
-    public static final long DELAY_1000 = 1000;
-    public static final long DELAY_500 = 500;
 
     @Getter
     private PersistentTopic indexTopic;
@@ -141,15 +140,16 @@ public class PersistentQueue extends AbstractAmqpQueue {
         if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0
                 || (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
                 .isConsumerConnected())) {
-            scheduledExecutor.schedule(this::readEntries, DELAY_3000, TimeUnit.MILLISECONDS);
+            scheduledExecutor.schedule(this::readEntries, DELAY_5000, TimeUnit.MILLISECONDS);
             return;
         }
         ManagedCursor cursor = defaultSubscription.getCursor();
+        cursor.rewind();
         cursor.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
             @Override
             public void readEntriesComplete(List<Entry> entries, Object ctx) {
                 if (entries.size() == 0) {
-                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_1000, TimeUnit.MILLISECONDS);
+                    scheduledExecutor.schedule(PersistentQueue.this::readEntries, DELAY_2000, TimeUnit.MILLISECONDS);
                     return;
                 }
                 Entry entry = entries.get(0);
@@ -157,17 +157,15 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     Position position = entry.getPosition();
                     MessageMetadata messageMetadata = Commands.parseMessageMetadata(entry.getDataBuffer());
                     // queue ttl
-                    int expireTime = 0;
+                    int expireTime = queueMessageTtl;
                     // message ttl
                     KeyValue keyValue = messageMetadata.getPropertiesList().stream()
                             .filter(kv -> MessageConvertUtils.PROP_EXPIRATION.equals(kv.getKey()))
                             .findFirst()
                             .orElse(null);
                     int messageTtl;
-                    int localQueueTtl = queueMessageTtl;
-                    if (localQueueTtl > 0 && keyValue != null
-                            && (messageTtl = Integer.parseInt(keyValue.getValue())) > 0) {
-                        expireTime = Math.min(localQueueTtl, messageTtl);
+                    if (keyValue != null && (messageTtl = Integer.parseInt(keyValue.getValue())) > 0) {
+                        expireTime = expireTime == 0 ? messageTtl : Math.min(expireTime, messageTtl);
                     }
                     // no config
                     if (expireTime == 0) {
@@ -178,8 +176,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     }
                     long expireMillis;
                     // no expire
-                    if ((expireMillis = entryExpired(expireTime, messageMetadata.getPublishTime())) < 0) {
-                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, Math.abs(expireMillis),
+                    if ((expireMillis = entryExpired(expireTime, messageMetadata.getPublishTime())) > 0) {
+                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, expireMillis,
                                 TimeUnit.MILLISECONDS);
                         return;
                     }
@@ -259,7 +257,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
     public static long entryExpired(int expireMillis, long entryTimestamp) {
-        return System.currentTimeMillis() - entryTimestamp + expireMillis;
+        return (entryTimestamp + expireMillis) - System.currentTimeMillis();
     }
 
     private void initDeadLetterProducer(PersistentTopic indexTopic, String topic) {

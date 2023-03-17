@@ -201,6 +201,7 @@ public class QueueContainer {
             }).exceptionally(throwable -> {
                 log.error("[{}][{}] Failed to create persistent queue.", namespaceName, queueName, throwable);
                 queueCompletableFuture.completeExceptionally(throwable);
+                removeQueueFuture(namespaceName, queueName);
                 return null;
             });
         }

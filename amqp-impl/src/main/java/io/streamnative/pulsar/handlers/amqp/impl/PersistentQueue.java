@@ -47,9 +47,11 @@ import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
+import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.Schema;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.client.impl.ProducerImpl;
@@ -91,9 +93,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
     private Map<String, String> properties;
 
     private final Map<String, Object> arguments = new HashMap<>();
-    private ProducerImpl<byte[]> producer;
+    private CompletableFuture<Producer<byte[]>> deadLetterProducer;
     private String deadLetterExchange;
-    private int queueMessageTtl;
+    private long queueMessageTtl;
     private String deadLetterRoutingKey;
     private final PersistentSubscription defaultSubscription;
 
@@ -118,7 +120,10 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 throw new RuntimeException(e);
             }
             this.deadLetterExchange = (String) arguments.get(X_DEAD_LETTER_EXCHANGE);
-            this.queueMessageTtl = (Integer) arguments.get(X_MESSAGE_TTL);
+            Object messageTtl = arguments.get(X_MESSAGE_TTL);
+            if (messageTtl != null && NumberUtils.isCreatable(messageTtl.toString())) {
+                this.queueMessageTtl = NumberUtils.createLong(messageTtl.toString());
+            }
             this.deadLetterRoutingKey = (String) arguments.get(X_DEAD_LETTER_ROUTING_KEY);
 
             if (StringUtils.isNotBlank(deadLetterExchange)
@@ -127,7 +132,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 NamespaceName namespaceName = TopicName.get(indexTopic.getName()).getNamespaceObject();
                 String topic = TopicUtil.getTopicName(PersistentExchange.TOPIC_PREFIX,
                         namespaceName.getTenant(), namespaceName.getLocalName(), deadLetterExchange);
-                initDeadLetterProducer(indexTopic, topic);
+                this.deadLetterProducer = initDeadLetterProducer(indexTopic, topic);
             }
         }
         // start check expired
@@ -149,6 +154,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
             @Override
             public void readEntriesComplete(List<Entry> entries, Object ctx) {
                 if (entries.size() == 0) {
+                    log.warn("[{}] read entries is 0, need retry", queueName);
                     scheduledExecutor.execute(PersistentQueue.this::readEntries);
                     return;
                 }
@@ -157,7 +163,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     Position position = entry.getPosition();
                     MessageMetadata messageMetadata = Commands.parseMessageMetadata(entry.getDataBuffer());
                     // queue ttl
-                    int expireTime = queueMessageTtl;
+                    long expireTime = queueMessageTtl;
                     // message ttl
                     KeyValue keyValue = messageMetadata.getPropertiesList().stream()
                             .filter(kv -> MessageConvertUtils.PROP_EXPIRATION.equals(kv.getKey()))
@@ -170,8 +176,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     // no config
                     if (expireTime == 0) {
                         // It is possible to mix expired messages with non-expired messages
-                        scheduledExecutor.schedule(PersistentQueue.this::readEntries, 3 * DELAY_1000,
-                                TimeUnit.MILLISECONDS);
+                        // stop check
                         return;
                     }
                     long expireMillis;
@@ -182,7 +187,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
                         return;
                     }
                     // expire but no dead letter queue
-                    if (producer == null) {
+                    if (deadLetterProducer == null) {
                         log.warn("Message expired, no dead-letter-producer, [{}] message auto ack [{}]", queueName,
                                 position);
                         // ack
@@ -199,23 +204,22 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     messageMetadata.clearSequenceId();
                     messageMetadata.clearPublishTime();
                     messageMetadata.clearProducerName();
-                    messageMetadata.getPropertiesList()
-                            .forEach(kv -> {
-                                switch (kv.getKey()) {
-                                    case MessageConvertUtils.PROP_ROUTING_KEY -> kv.setValue(deadLetterRoutingKey);
-                                    case MessageConvertUtils.PROP_EXPIRATION -> kv.setValue("0");
-                                    case MessageConvertUtils.PROP_EXCHANGE -> kv.setValue(deadLetterExchange);
-                                    default -> {
-                                    }
-                                }
-                            });
+                    messageMetadata.getPropertiesList().forEach(kv -> {
+                        switch (kv.getKey()) {
+                            case MessageConvertUtils.PROP_ROUTING_KEY -> kv.setValue(deadLetterRoutingKey);
+                            case MessageConvertUtils.PROP_EXPIRATION -> kv.setValue("0");
+                            case MessageConvertUtils.PROP_EXCHANGE -> kv.setValue(deadLetterExchange);
+                            default -> {
+                            }
+                        }
+                    });
                     MessageImpl<byte[]> message = MessageImpl.create(null, null,
                             messageMetadata,
                             entry.getDataBuffer(),
                             Optional.empty(), null, Schema.BYTES,
                             0, true, -1L);
-                    producer.sendAsync(message)
-                            .thenCompose(messageId -> makeAck(position, cursor))
+                    deadLetterProducer.thenAccept(producer -> ((ProducerImpl<byte[]>) producer).sendAsync(message))
+                            .thenCompose(__ -> makeAck(position, cursor))
                             .thenRun(() -> scheduledExecutor.execute(PersistentQueue.this::readEntries))
                             .exceptionally((throwable) -> {
                                 log.error("dead-letter queue [{}] send fail", queueName, throwable);
@@ -257,18 +261,18 @@ public class PersistentQueue extends AbstractAmqpQueue {
         return future;
     }
 
-    public static long entryExpired(int expireMillis, long entryTimestamp) {
+    public static long entryExpired(long expireMillis, long entryTimestamp) {
         return (entryTimestamp + expireMillis) - System.currentTimeMillis();
     }
 
-    private void initDeadLetterProducer(PersistentTopic indexTopic, String topic) {
+    private CompletableFuture<Producer<byte[]>> initDeadLetterProducer(PersistentTopic indexTopic, String topic) {
         try {
-            this.producer = (ProducerImpl<byte[]>) indexTopic.getBrokerService().pulsar()
+            return indexTopic.getBrokerService().pulsar()
                     .getClient()
                     .newProducer()
                     .topic(topic)
                     .enableBatching(false)
-                    .create();
+                    .createAsync();
         } catch (Exception e) {
             log.error("init dead letter producer fail", e);
             throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);

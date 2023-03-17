@@ -156,7 +156,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         }
 
         BindingParams params = new BindingParams();
-        params.setRoutingKey(bindingKey != null ? bindingKey.toString() : null);
+        params.setRoutingKey(bindingKey != null ? bindingKey.toString() : "");
         params.setArguments(FieldTable.convertToMap(argumentsTable));
 
         getAmqpAdmin().queueBind(connection.getNamespaceName(),
@@ -232,6 +232,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
             log.debug("RECV[{}] BasicPublish[exchange: {} routingKey: {} mandatory: {} immediate: {}]", channelId,
                     exchange, routingKey, mandatory, immediate);
         }
+        AMQShortString routingKeyLocal = routingKey == null ? AMQShortString.valueOf("") : routingKey;
         if (isDefaultExchange(exchange)) {
             ExchangeDeclareParams exchangeParams = new ExchangeDeclareParams();
             exchangeParams.setType(ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
@@ -246,26 +247,26 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 queueParams.setDurable(true);
                 queueParams.setExclusive(false);
                 queueParams.setAutoDelete(false);
-                return getAmqpAdmin().queueDeclare(connection.getNamespaceName(), routingKey.toString(),
+                return getAmqpAdmin().queueDeclare(connection.getNamespaceName(), routingKeyLocal.toString(),
                         queueParams);
             }).thenCompose(__ -> {
                 BindingParams bindingParams = new BindingParams();
-                bindingParams.setRoutingKey(routingKey.toString());
+                bindingParams.setRoutingKey(routingKeyLocal.toString());
                 return getAmqpAdmin().queueBind(connection.getNamespaceName(),
-                        AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, routingKey.toString(), bindingParams);
+                        AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, routingKeyLocal.toString(), bindingParams);
             }).thenRun(() -> {
                 MessagePublishInfo info =
                         new MessagePublishInfo(AMQShortString.valueOf(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE),
-                                immediate, mandatory, routingKey);
+                                immediate, mandatory, routingKeyLocal);
                 setPublishFrame(info, null);
             }).exceptionally(t -> {
-                log.error("Failed to bind queue {} to exchange {}", routingKey,
+                log.error("Failed to bind queue {} to exchange {}", routingKeyLocal,
                         AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, t);
                 handleAoPException(t);
                 return null;
             }).join();
         } else {
-            MessagePublishInfo info = new MessagePublishInfo(exchange, immediate, mandatory, routingKey);
+            MessagePublishInfo info = new MessagePublishInfo(exchange, immediate, mandatory, routingKeyLocal);
             setPublishFrame(info, null);
         }
     }

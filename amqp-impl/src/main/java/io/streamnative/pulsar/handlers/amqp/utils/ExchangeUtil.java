@@ -29,6 +29,7 @@ import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeEx
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -43,27 +44,20 @@ public class ExchangeUtil {
     public static boolean isBuildInExchange(final String exchangeName) {
         return exchangeName.equals(ExchangeDefaults.DIRECT_EXCHANGE_NAME)
                 || (exchangeName.equals(ExchangeDefaults.FANOUT_EXCHANGE_NAME))
-                || (exchangeName.equals(ExchangeDefaults.TOPIC_EXCHANGE_NAME));
+                || (exchangeName.equals(ExchangeDefaults.TOPIC_EXCHANGE_NAME))
+                || (exchangeName.equals(ExchangeDefaults.HEADERS_EXCHANGE_NAME))
+                || ("amq.headers".equals(exchangeName));
     }
 
     public static String getExchangeType(String exchangeName) {
-        String ex;
-        if (exchangeName == null) {
-            ex = "";
-        } else {
-            ex = exchangeName;
-        }
-        switch (ex) {
-            case "":
-            case ExchangeDefaults.DIRECT_EXCHANGE_NAME:
-                return ExchangeDefaults.DIRECT_EXCHANGE_CLASS;
-            case ExchangeDefaults.FANOUT_EXCHANGE_NAME:
-                return ExchangeDefaults.FANOUT_EXCHANGE_CLASS;
-            case ExchangeDefaults.TOPIC_EXCHANGE_NAME:
-                return ExchangeDefaults.TOPIC_EXCHANGE_CLASS;
-            default:
-                return "";
-        }
+        String ex = Objects.requireNonNullElse(exchangeName, "");
+        return switch (ex) {
+            case "", ExchangeDefaults.DIRECT_EXCHANGE_NAME -> ExchangeDefaults.DIRECT_EXCHANGE_CLASS;
+            case ExchangeDefaults.FANOUT_EXCHANGE_NAME -> ExchangeDefaults.FANOUT_EXCHANGE_CLASS;
+            case ExchangeDefaults.TOPIC_EXCHANGE_NAME -> ExchangeDefaults.TOPIC_EXCHANGE_CLASS;
+            case ExchangeDefaults.HEADERS_EXCHANGE_NAME, "amq.headers" -> ExchangeDefaults.HEADERS_EXCHANGE_CLASS;
+            default -> "";
+        };
     }
 
     public static String formatExchangeName(String s) {

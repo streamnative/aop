@@ -21,6 +21,7 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultE
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -196,6 +197,11 @@ public class ExchangeServiceImpl implements ExchangeService {
     @Override
     public CompletableFuture<Void> queueBind(NamespaceName namespaceName, String exchange, String queue,
                                              String routingKey, Map<String, Object> arguments) {
+        if (ExchangeUtil.isBuildInExchange(exchange)) {
+            return exchangeContainer.asyncGetExchange(namespaceName, exchange, true,
+                            ExchangeUtil.getExchangeType(exchange))
+                    .thenCompose(amqpExchange -> amqpExchange.queueBind(queue, routingKey, arguments));
+        }
         return exchangeContainer.asyncGetExchange(namespaceName, exchange, false, null)
                 .thenCompose(amqpExchange -> amqpExchange.queueBind(queue, routingKey, arguments));
     }

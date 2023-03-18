@@ -146,6 +146,9 @@ public class QueueContainer {
         CompletableFuture<AmqpQueue> existingAmqpExchangeFuture = queueMap.get(namespaceName).
                 putIfAbsent(queueName, queueCompletableFuture);
         if (existingAmqpExchangeFuture != null) {
+            if (passive) {
+                return existingAmqpExchangeFuture;
+            }
             return existingAmqpExchangeFuture.thenCompose(amqpQueue -> {
                 if (amqpQueue instanceof PersistentQueue persistentQueue) {
                     Map<String, Object> queueArguments = persistentQueue.getArguments();

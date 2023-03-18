@@ -94,4 +94,7 @@ public interface AmqpQueue {
     boolean isAutoDelete();
 
     Topic getTopic();
+
+    default void close(){
+    }
 }

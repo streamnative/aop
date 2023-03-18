@@ -92,6 +92,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private Map<String, String> properties;
 
+    @Getter
     private final Map<String, Object> arguments = new HashMap<>();
     private CompletableFuture<Producer<byte[]>> deadLetterProducer;
     private String deadLetterExchange;
@@ -100,6 +101,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
     private final PersistentSubscription defaultSubscription;
 
     private final ScheduledExecutorService scheduledExecutor;
+
+    private boolean isActive;
 
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
@@ -135,15 +138,18 @@ public class PersistentQueue extends AbstractAmqpQueue {
                 this.deadLetterProducer = initDeadLetterProducer(indexTopic, topic);
             }
         }
+        this.isActive = true;
         // start check expired
         scheduledExecutor.execute(this::readEntries);
     }
 
     public void readEntries() {
+        if (!isActive) {
+            return;
+        }
         if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0
                 || (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
                 .isConsumerConnected())) {
-
             scheduledExecutor.schedule(this::readEntries, DELAY_1000, TimeUnit.MILLISECONDS);
             return;
         }
@@ -173,10 +179,12 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     if (keyValue != null && (messageTtl = Integer.parseInt(keyValue.getValue())) > 0) {
                         expireTime = expireTime == 0 ? messageTtl : Math.min(expireTime, messageTtl);
                     }
-                    // no config
+                    // In most cases, the TTL is not available and the check task needs to be stopped.
                     if (expireTime == 0) {
                         // It is possible to mix expired messages with non-expired messages
-                        // stop check
+                        // Stop check
+                        // Sending a non-TTL message requires the presence of a consumer message. When a consumer
+                        // exists, the current task will not be executed here.
                         return;
                     }
                     long expireMillis;
@@ -213,13 +221,15 @@ public class PersistentQueue extends AbstractAmqpQueue {
                             }
                         }
                     });
-                    MessageImpl<byte[]> message = MessageImpl.create(null, null,
-                            messageMetadata,
-                            entry.getDataBuffer(),
-                            Optional.empty(), null, Schema.BYTES,
-                            0, true, -1L);
-                    deadLetterProducer.thenAccept(producer -> ((ProducerImpl<byte[]>) producer).sendAsync(message))
-                            .thenCompose(__ -> makeAck(position, cursor))
+                    deadLetterProducer.thenCompose(producer -> {
+                                MessageImpl<byte[]> message = MessageImpl.create(null, null,
+                                        messageMetadata,
+                                        entry.getDataBuffer(),
+                                        Optional.empty(), null, Schema.BYTES,
+                                        0, true, -1L);
+                                return ((ProducerImpl<byte[]>) producer).sendAsync(message);
+                            })
+                            .thenAccept(__ -> makeAck(position, cursor))
                             .thenRun(() -> scheduledExecutor.execute(PersistentQueue.this::readEntries))
                             .exceptionally((throwable) -> {
                                 log.error("dead-letter queue [{}] send fail", queueName, throwable);
@@ -392,6 +402,14 @@ public class PersistentQueue extends AbstractAmqpQueue {
         checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + queueName),
                 "The queue topic name does not conform to the rules(%s%s).",
                 TOPIC_PREFIX, "exchangeName");
+    }
+
+    @Override
+    public void close(){
+        this.isActive = false;
+        if (deadLetterProducer != null){
+            deadLetterProducer.thenAccept(Producer::closeAsync);
+        }
     }
 
 }

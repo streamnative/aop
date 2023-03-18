@@ -77,7 +77,7 @@ public class HeadersMessageRouter extends AbstractAmqpMessageRouter {
             Object value = entry.getValue();
             if (isSpecial(propertyName)) {
                 processSpecial(propertyName, value);
-            } else if (value == null || value.equals("")) {
+            } else if (value == null || "".equals(value)) {
                 required.add(propertyName);
             } else {
                 matches.put(propertyName, value);

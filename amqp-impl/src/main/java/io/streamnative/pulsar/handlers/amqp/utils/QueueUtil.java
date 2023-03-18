@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
 public class QueueUtil {
@@ -43,9 +44,8 @@ public class QueueUtil {
         props.put(DURABLE, "" + durable);
         props.put(AUTO_DELETE, "" + autoDelete);
         props.put(PASSIVE, "" + passive);
-        if (arguments != null && !arguments.isEmpty()) {
-            props.put(ARGUMENTS, covertObjectValueAsString(arguments));
-        }
+        props.put(ARGUMENTS,
+                covertObjectValueAsString(Objects.requireNonNullElseGet(arguments, () -> new HashMap<>(1))));
         return props;
     }
 

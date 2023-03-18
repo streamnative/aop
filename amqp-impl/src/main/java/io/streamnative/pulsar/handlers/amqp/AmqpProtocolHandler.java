@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
@@ -126,6 +125,13 @@ public class AmqpProtocolHandler implements ProtocolHandler {
             AopVersion.getBuildTime());
     }
 
+    // You can use this to test the interface provided by the admin service
+    public static void main(String[] args) throws InterruptedException {
+        AmqpProtocolHandler handler = new AmqpProtocolHandler();
+        handler.startAdminResource(15672);
+        Thread.currentThread().join();
+    }
+
     private void startAdminResource(int port) {
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/api");
@@ -139,6 +145,9 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
         jerseyServlet.setInitParameter(
                 "jersey.config.server.provider.packages", "io.streamnative.pulsar.handlers.amqp.admin");
+        jerseyServlet.setInitParameter(
+                "javax.ws.rs.container.ContainerResponseFilter",
+                "io.streamnative.pulsar.handlers.amqp.admin.filter.HeadersReponseFilter");
 
         try {
             webServer.start();

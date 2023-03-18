@@ -103,7 +103,7 @@ public class QueueServiceImpl implements QueueService {
                             amqpQueue.unbindExchange(router.getExchange());
                         }
                     }
-                    amqpQueue.getTopic().delete().thenAccept(__ -> {
+                    amqpQueue.getTopic().deleteForcefully().thenAccept(__ -> {
                         queueContainer.deleteQueue(namespaceName, amqpQueue.getName());
                         future.complete(null);
                     }).exceptionally(t -> {

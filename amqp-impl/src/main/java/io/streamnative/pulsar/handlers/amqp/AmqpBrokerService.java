@@ -52,7 +52,7 @@ public class AmqpBrokerService {
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
-        this.amqpAdmin = new AmqpAdmin("localhost", config.getAmqpAdminPort());
+        this.amqpAdmin = new AmqpAdmin(config.getAdvertisedAddress(), config.getAmqpAdminPort());
     }
 
     private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {

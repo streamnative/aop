@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -145,66 +146,78 @@ public class QueueContainer {
         CompletableFuture<AmqpQueue> existingAmqpExchangeFuture = queueMap.get(namespaceName).
                 putIfAbsent(queueName, queueCompletableFuture);
         if (existingAmqpExchangeFuture != null) {
-            return existingAmqpExchangeFuture;
-        } else {
-            String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
-
-            Map<String, String> initProperties = new HashMap<>();
-            if (!passive) {
-                try {
-                    initProperties = QueueUtil.generateTopicProperties(queueName, durable,
-                            autoDelete, passive, arguments);
-                } catch (Exception e) {
-                    log.error("Failed to generate topic properties for exchange {} in vhost {}.",
-                            queueName, namespaceName, e);
-                    queueCompletableFuture.completeExceptionally(e);
-                    removeQueueFuture(namespaceName, queueName);
-                    return queueCompletableFuture;
-                }
-            }
-
-            CompletableFuture<Topic> topicCompletableFuture =
-                    amqpTopicManager.getTopic(topicName, !passive, initProperties);
-            topicCompletableFuture.whenComplete((topic, throwable) -> {
-                if (throwable != null) {
-                    log.error("[{}][{}] Failed to get queue topic.", namespaceName, queueName, throwable);
-                    queueCompletableFuture.completeExceptionally(throwable);
-                    removeQueueFuture(namespaceName, queueName);
-                } else {
-                    if (null == topic) {
-                        log.warn("[{}][{}] Queue topic did not exist.", namespaceName, queueName);
-                        queueCompletableFuture.complete(null);
-                        removeQueueFuture(namespaceName, queueName);
-                    } else {
-                        // recover metadata if existed
-                        PersistentTopic persistentTopic = (PersistentTopic) topic;
-                        Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
-
-                        // TODO: reset connectionId, exclusive and autoDelete
-                        PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
-                                0, false, false, properties);
-                        if (!config.isAmqpMultiBundleEnable()) {
-                            try {
-                                amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
-                                        namespaceName);
-                            } catch (Exception e) {
-                                log.error("[{}][{}] Failed to recover routers for queue from properties.",
-                                        namespaceName, queueName, e);
-                                queueCompletableFuture.completeExceptionally(e);
-                                removeQueueFuture(namespaceName, queueName);
-                                return;
-                            }
-                        }
-                        queueCompletableFuture.complete(amqpQueue);
+            return existingAmqpExchangeFuture.thenCompose(amqpQueue -> {
+                if (amqpQueue instanceof PersistentQueue persistentQueue) {
+                    Map<String, Object> queueArguments = persistentQueue.getArguments();
+                    if (queueArguments.equals(arguments)
+                            || (MapUtils.isEmpty(queueArguments) && MapUtils.isEmpty(arguments))) {
+                        return existingAmqpExchangeFuture;
                     }
+                    log.warn("Queue [{}] parameter change old [{}] new [{}]", queueName, queueArguments, arguments);
+                    amqpQueue.close();
+                    queueMap.get(namespaceName).remove(queueName);
+                    return asyncGetQueue(namespaceName, queueName, passive, durable, exclusive, autoDelete, nowait, arguments);
                 }
-            }).exceptionally(throwable -> {
-                log.error("[{}][{}] Failed to create persistent queue.", namespaceName, queueName, throwable);
-                queueCompletableFuture.completeExceptionally(throwable);
-                removeQueueFuture(namespaceName, queueName);
-                return null;
+                return CompletableFuture.failedFuture(new PulsarServerException("Unsupported queue type"));
             });
         }
+        String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
+
+        Map<String, String> initProperties = new HashMap<>();
+        if (!passive) {
+            try {
+                initProperties = QueueUtil.generateTopicProperties(queueName, durable,
+                        autoDelete, passive, arguments);
+            } catch (Exception e) {
+                log.error("Failed to generate topic properties for exchange {} in vhost {}.",
+                        queueName, namespaceName, e);
+                queueCompletableFuture.completeExceptionally(e);
+                removeQueueFuture(namespaceName, queueName);
+                return queueCompletableFuture;
+            }
+        }
+
+        CompletableFuture<Topic> topicCompletableFuture =
+                amqpTopicManager.getTopic(topicName, !passive, initProperties);
+        topicCompletableFuture.whenComplete((topic, throwable) -> {
+            if (throwable != null) {
+                log.error("[{}][{}] Failed to get queue topic.", namespaceName, queueName, throwable);
+                queueCompletableFuture.completeExceptionally(throwable);
+                removeQueueFuture(namespaceName, queueName);
+            } else {
+                if (null == topic) {
+                    log.warn("[{}][{}] Queue topic did not exist.", namespaceName, queueName);
+                    queueCompletableFuture.complete(null);
+                    removeQueueFuture(namespaceName, queueName);
+                } else {
+                    // recover metadata if existed
+                    PersistentTopic persistentTopic = (PersistentTopic) topic;
+                    Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
+
+                    // TODO: reset connectionId, exclusive and autoDelete
+                    PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
+                            0, false, false, properties);
+                    if (!config.isAmqpMultiBundleEnable()) {
+                        try {
+                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
+                                    namespaceName);
+                        } catch (Exception e) {
+                            log.error("[{}][{}] Failed to recover routers for queue from properties.",
+                                    namespaceName, queueName, e);
+                            queueCompletableFuture.completeExceptionally(e);
+                            removeQueueFuture(namespaceName, queueName);
+                            return;
+                        }
+                    }
+                    queueCompletableFuture.complete(amqpQueue);
+                }
+            }
+        }).exceptionally(throwable -> {
+            log.error("[{}][{}] Failed to create persistent queue.", namespaceName, queueName, throwable);
+            queueCompletableFuture.completeExceptionally(throwable);
+            removeQueueFuture(namespaceName, queueName);
+            return null;
+        });
         return queueCompletableFuture;
     }
 
@@ -223,7 +236,7 @@ public class QueueContainer {
 
     private void removeQueueFuture(NamespaceName namespaceName, String queueName) {
         if (queueMap.containsKey(namespaceName)) {
-            queueMap.get(namespaceName).remove(queueName);
+            queueMap.get(namespaceName).remove(queueName).thenAccept(AmqpQueue::close);
         }
     }
 

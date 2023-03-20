@@ -97,13 +97,12 @@ public class Bindings extends BindingBase {
 
     @DELETE
     @Path("/{vhost}/e/{exchange}/q/{queue}/{props}")
-    public void queuUnbind(@Suspended final AsyncResponse response,
-                                @PathParam("vhost") String vhost,
-                                @PathParam("exchange") String exchange,
-                                @PathParam("queue") String queue,
-                                @PathParam("props") String propsKey,
-                                QueueDeclareParams params,
-                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+    public void queueUnbind(@Suspended final AsyncResponse response,
+                            @PathParam("vhost") String vhost,
+                            @PathParam("exchange") String exchange,
+                            @PathParam("queue") String queue,
+                            @PathParam("props") String propsKey,
+                            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)

@@ -450,13 +450,7 @@ public abstract class ExchangeMessageRouter {
         @Override
         public synchronized void removeBinding(String des, String desType, String routingKey,
                                                Map<String, Object> arguments) {
-            messageRouterMap.computeIfPresent(new Destination(des, desType), (k, v) -> {
-                v.getArguments().putAll(arguments);
-                if (v.getArguments().isEmpty()) {
-                    return null;
-                }
-                return v;
-            });
+            messageRouterMap.remove(new Destination(des, desType));
         }
 
         @Override
@@ -469,6 +463,7 @@ public abstract class ExchangeMessageRouter {
             }
             return destinations;
         }
+
     }
 
 }

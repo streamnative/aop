@@ -50,7 +50,7 @@ import org.apache.qpid.server.protocol.v0_8.AMQShortString;
  * Amqp consumer Used to forward messages.
  */
 @Slf4j
-public class AmqpConsumer extends Consumer {
+public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.MessageProcessor {
 
     private final AmqpChannel channel;
 
@@ -184,7 +184,7 @@ public class AmqpConsumer extends Consumer {
                         }
 
                         if (autoAck) {
-                            messagesAck(index.getPosition());
+                            messageAck(index.getPosition());
                         }
                     } finally {
                         index.release();
@@ -225,11 +225,13 @@ public class AmqpConsumer extends Consumer {
         }
     }
 
-    public void messagesAck(Position position) {
+    @Override
+    public void messageAck(Position position) {
         messagesAck(Collections.singletonList(position));
     }
 
-    public void redeliverAmqpMessages(List<PositionImpl> positions) {
+    @Override
+    public void requeue(List<PositionImpl> positions) {
         getSubscription().getDispatcher().redeliverUnacknowledgedMessages(this, positions);
     }
 

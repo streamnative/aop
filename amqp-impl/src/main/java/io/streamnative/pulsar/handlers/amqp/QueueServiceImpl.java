@@ -50,7 +50,7 @@ public class QueueServiceImpl implements QueueService {
     @Override
     public CompletableFuture<AmqpQueue> queueDeclare(NamespaceName namespaceName, String queue, boolean passive,
                                                      boolean durable, boolean exclusive, boolean autoDelete,
-                                                     boolean nowait, FieldTable arguments, long connectionId) {
+                                                     boolean nowait, Map<String, Object> arguments, long connectionId) {
         final AMQShortString finalQueue;
         if ((queue == null) || (queue.length() == 0)) {
             finalQueue = AMQShortString.createAMQShortString("tmp_" + UUID.randomUUID());

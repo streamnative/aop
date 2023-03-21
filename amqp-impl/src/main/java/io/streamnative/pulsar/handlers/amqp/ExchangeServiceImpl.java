@@ -15,7 +15,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.formatExchangeName;
-import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
 
@@ -53,16 +52,8 @@ public class ExchangeServiceImpl implements ExchangeService {
             return FutureUtil.failedFuture(new AoPException(ErrorCodes.ACCESS_REFUSED, sb, true, false));
         }
 
-        boolean createIfMissing = !passive;
-        String exchangeType;
-        if (isBuildInExchange(exchange)) {
-            createIfMissing = true;
-            exchangeType = getExchangeType(exchange);
-        } else {
-            exchangeType = type;
-        }
         CompletableFuture<AmqpExchange> future = new CompletableFuture<>();
-        exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), createIfMissing, exchangeType,
+        exchangeContainer.asyncGetExchange(namespaceName, formatExchangeName(exchange), !passive, type,
                         durable, autoDelete, internal, arguments)
                 .whenComplete((ex, throwable) -> {
                     if (throwable != null) {
@@ -86,9 +77,9 @@ public class ExchangeServiceImpl implements ExchangeService {
 
                     String replyTextFormat = "PRECONDITION_FAILED - inequivalent arg '%s' for exchange '" + exchange
                             + "' in vhost '" + namespaceName.getLocalName() + "': received '%s' but current is '%s'";
-                    if (ex.getType() == null || !StringUtils.equalsIgnoreCase(exchangeType, ex.getType().toString())) {
+                    if (ex.getType() == null || !StringUtils.equalsIgnoreCase(type, ex.getType().toString())) {
                         String replyText = String.format(
-                                replyTextFormat, "type", exchangeType, ex.getType());
+                                replyTextFormat, "type", type, ex.getType());
                         future.completeExceptionally(new AoPException(ErrorCodes.IN_USE, replyText, true, false));
                         return;
                     }
@@ -189,4 +180,17 @@ public class ExchangeServiceImpl implements ExchangeService {
         return future;
     }
 
+    @Override
+    public CompletableFuture<Void> queueBind(NamespaceName namespaceName, String exchange, String queue,
+                                             String routingKey, Map<String, Object> arguments) {
+        return exchangeContainer.asyncGetExchange(namespaceName, exchange, false, null)
+                .thenCompose(amqpExchange -> amqpExchange.queueBind(queue, routingKey, arguments));
+    }
+
+    @Override
+    public CompletableFuture<Void> queueUnBind(NamespaceName namespaceName, String exchange, String queue,
+                                               String routingKey, Map<String, Object> arguments) {
+        return exchangeContainer.asyncGetExchange(namespaceName, exchange, false, null)
+                .thenCompose(amqpExchange -> amqpExchange.queueUnBind(queue, routingKey, arguments));
+    }
 }

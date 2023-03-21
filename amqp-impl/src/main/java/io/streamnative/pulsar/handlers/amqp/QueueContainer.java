@@ -36,12 +36,14 @@ public class QueueContainer {
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
     private ExchangeContainer exchangeContainer;
+    private AmqpServiceConfiguration config;
 
     protected QueueContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                             ExchangeContainer exchangeContainer) {
+                             ExchangeContainer exchangeContainer, AmqpServiceConfiguration config) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.exchangeContainer = exchangeContainer;
+        this.config = config;
     }
 
     @Getter
@@ -97,15 +99,17 @@ public class QueueContainer {
                         // TODO: reset connectionId, exclusive and autoDelete
                         PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
                                 0, false, false);
-                        try {
-                            amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
-                                    namespaceName);
-                        } catch (Exception e) {
-                            log.error("[{}][{}] Failed to recover routers for queue from properties.",
-                                    namespaceName, queueName, e);
-                            queueCompletableFuture.completeExceptionally(e);
-                            removeQueueFuture(namespaceName, queueName);
-                            return;
+                        if (!config.isAmqpMultiBundleEnable()) {
+                            try {
+                                amqpQueue.recoverRoutersFromQueueProperties(properties, exchangeContainer,
+                                        namespaceName);
+                            } catch (Exception e) {
+                                log.error("[{}][{}] Failed to recover routers for queue from properties.",
+                                        namespaceName, queueName, e);
+                                queueCompletableFuture.completeExceptionally(e);
+                                removeQueueFuture(namespaceName, queueName);
+                                return;
+                            }
                         }
                         queueCompletableFuture.complete(amqpQueue);
                     }

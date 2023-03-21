@@ -13,12 +13,14 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException.NotSupportedOperationException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.common.util.FutureUtil;
 
 /**
  * Interface of the AMQP exchange.
@@ -152,5 +154,15 @@ public interface AmqpExchange {
     void removeQueue(AmqpQueue queue);
 
     int getQueueSize();
+
+    default CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
+        return FutureUtil.failedFuture(
+                new NotSupportedOperationException("Amqp exchange queue bind operation is not supported."));
+    }
+
+    default CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
+        return FutureUtil.failedFuture(
+                new NotSupportedOperationException("Amqp exchange queue unbind operation is not supported."));
+    }
 
 }

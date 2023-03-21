@@ -49,7 +49,7 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
 
     @Override
     public CompletableFuture<Pair<String, Integer>> findBroker(TopicName topicName,
-                                                              String protocolHandlerName) throws Exception  {
+                                                              String protocolHandlerName) {
         CompletableFuture<Pair<String, Integer>> lookupResult = new CompletableFuture<>();
 
         // lookup the broker for the given topic

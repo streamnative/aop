@@ -37,6 +37,7 @@ import org.awaitility.Awaitility;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
+
 /**
  * Base test class for RabbitMQ Client.
  */
@@ -73,7 +74,11 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         for (String vhost : vhostList) {
             String ns = "public/" + vhost;
             if (!admin.namespaces().getNamespaces("public").contains(ns)) {
-                admin.namespaces().createNamespace(ns, 1);
+                if (conf.isAmqpMultiBundleEnable()) {
+                    admin.namespaces().createNamespace(ns, 16);
+                } else {
+                    admin.namespaces().createNamespace(ns, 1);
+                }
                 admin.lookups().lookupTopicAsync(TopicName.get(TopicDomain.persistent.value(),
                         NamespaceName.get(ns), "__lookup__").toString());
             }
@@ -114,7 +119,7 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
         String routingKey = "test.key";
         String queueName = randQuName();
 
-        Connection conn = getConnection(vhost, false);
+        Connection conn = getConnection(vhost, true);
         Channel channel = conn.createChannel();
 
         channel.exchangeDeclare(exchangeName, "direct", true);

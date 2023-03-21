@@ -125,4 +125,16 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpExchangeRouteExecutorThreads = Runtime.getRuntime().availableProcessors();
 
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false
+    )
+    private boolean amqpMultiBundleEnable = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = false
+    )
+    private int amqpPulsarConsumerQueueSize = 10000;
+
 }

@@ -15,18 +15,23 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.BindingBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
-import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
+import org.apache.pulsar.common.naming.TopicName;
 
 @Slf4j
 @Path("/bindings")
@@ -55,12 +60,18 @@ public class Bindings extends BindingBase {
                                 @PathParam("vhost") String vhost,
                                 @PathParam("exchange") String exchange,
                                 @PathParam("queue") String queue,
-                                BindingParams params) {
-        queueBindAsync(vhost, exchange, queue, params)
+                                BindingParams params,
+                          @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> queueBindAsync(vhost, exchange, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
-                    log.error("Failed to bind queue {} to exchange {} with key {} in vhost {}",
-                            queue, exchange, params.getRoutingKey(), vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to bind queue {} to exchange {} with key {} in vhost {}",
+                                queue, exchange, params.getRoutingKey(), vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -85,13 +96,16 @@ public class Bindings extends BindingBase {
 
     @DELETE
     @Path("/{vhost}/e/{exchange}/q/{queue}/{props}")
-    public void queuUnbind(@Suspended final AsyncResponse response,
-                                @PathParam("vhost") String vhost,
-                                @PathParam("exchange") String exchange,
-                                @PathParam("queue") String queue,
-                                @PathParam("props") String propsKey,
-                                QueueDeclareParams params) {
-        queueUnbindAsync(vhost, exchange, queue, propsKey)
+    public void queueUnbind(@Suspended final AsyncResponse response,
+                            @PathParam("vhost") String vhost,
+                            @PathParam("exchange") String exchange,
+                            @PathParam("queue") String queue,
+                            @PathParam("props") String propsKey,
+                            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> queueUnbindAsync(vhost, exchange, queue, propsKey))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",

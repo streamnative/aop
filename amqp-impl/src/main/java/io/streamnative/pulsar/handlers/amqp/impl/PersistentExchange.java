@@ -17,22 +17,29 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPE
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Sets;
 import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
+import io.streamnative.pulsar.handlers.amqp.ExchangeMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
@@ -66,15 +73,31 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String INTERNAL = "INTERNAL";
     public static final String ARGUMENTS = "ARGUMENTS";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
+    private static final String BINDINGS = "BINDINGS";
 
     private PersistentTopic persistentTopic;
     private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
 
+    private ExchangeMessageRouter exchangeMessageRouter;
+    private Set<Binding> bindings;
+
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @EqualsAndHashCode
+    @Data
+    static class Binding implements Serializable {
+        private String des;
+        private String desType;
+        private String key;
+        private Map<String, Object> arguments;
+    }
+
     public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              Executor routeExecutor, int routeQueueSize) {
+                              ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
+            throws JsonProcessingException {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
@@ -83,6 +106,21 @@ public class PersistentExchange extends AbstractAmqpExchange {
             cursors.put(cursor.getName(), CompletableFuture.completedFuture(cursor));
             log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());
             cursor.setInactive();
+        }
+
+        if (amqpMultiBundleEnable) {
+            bindings = Sets.newConcurrentHashSet();
+            if (persistentTopic.getManagedLedger().getProperties().containsKey(BINDINGS)) {
+                List<Binding> amqpQueueProperties = JSON_MAPPER.readValue(
+                        persistentTopic.getManagedLedger().getProperties().get(BINDINGS), new TypeReference<>() {});
+                this.bindings.addAll(amqpQueueProperties);
+            }
+            this.exchangeMessageRouter = ExchangeMessageRouter.getInstance(this, routeExecutor);
+            for (Binding binding : this.bindings) {
+                this.exchangeMessageRouter.addBinding(binding.des, binding.desType, binding.key, binding.arguments);
+            }
+            this.exchangeMessageRouter.start();
+            return;
         }
 
         if (messageReplicator == null) {
@@ -355,6 +393,63 @@ public class PersistentExchange extends AbstractAmqpExchange {
         String[] nameArr = this.persistentTopic.getName().split("/");
         checkArgument(nameArr[nameArr.length - 1].equals(TOPIC_PREFIX + exchangeName),
                 "The exchange topic name does not conform to the rules(__amqp_exchange__exchangeName).");
+    }
+
+    @Override
+    public CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
+        this.bindings.add(new Binding(queue, "queue", routingKey, arguments));
+        String bindingsJson;
+        try {
+            bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to bind queue {} to exchange {}", queue, exchangeName, e);
+            return FutureUtil.failedFuture(e);
+        }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        this.persistentTopic.getManagedLedger().asyncSetProperty(BINDINGS, bindingsJson,
+                new AsyncCallbacks.UpdatePropertiesCallback() {
+            @Override
+            public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                PersistentExchange.this.exchangeMessageRouter.addBinding(queue, "queue", routingKey, arguments);
+                future.complete(null);
+            }
+
+            @Override
+            public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                log.error("Failed to save binding metadata for bind operation.", exception);
+                future.completeExceptionally(exception);
+            }
+        }, null);
+        return future;
+    }
+
+    @Override
+    public CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
+        this.bindings.remove(new Binding(queue, "queue", routingKey, arguments));
+        String bindingsJson;
+        try {
+            bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to unbind queue {} to exchange {}", queue, exchangeName, e);
+            return FutureUtil.failedFuture(e);
+        }
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        this.persistentTopic.getManagedLedger().asyncSetProperty("BINDINGS", bindingsJson,
+                new AsyncCallbacks.UpdatePropertiesCallback() {
+                    @Override
+                    public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                        PersistentExchange.this.exchangeMessageRouter.removeBinding(queue, "queue",
+                                routingKey, arguments);
+                        future.complete(null);
+                    }
+
+                    @Override
+                    public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                        log.error("Failed to save binding metadata for unbind operation.", exception);
+                        future.completeExceptionally(exception);
+                    }
+                }, null);
+        return future;
     }
 
 }

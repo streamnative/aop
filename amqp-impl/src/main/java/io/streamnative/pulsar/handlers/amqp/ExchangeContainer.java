@@ -19,6 +19,8 @@ import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.AUTO_
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURABLE;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
@@ -28,7 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -47,15 +49,15 @@ public class ExchangeContainer {
 
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
-    private final Executor routeExecutor;
-    private final int routeQueueSize;
+    private final ExecutorService routeExecutor;
+    private final AmqpServiceConfiguration config;
 
     protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                                Executor routeExecutor, int routeQueueSize) {
+                                ExecutorService routeExecutor, AmqpServiceConfiguration config) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.routeExecutor = routeExecutor;
-        this.routeQueueSize = routeQueueSize;
+        this.config = config;
     }
 
     @Getter
@@ -88,8 +90,17 @@ public class ExchangeContainer {
                                                             boolean autoDelete,
                                                             boolean internal,
                                                             Map<String, Object> arguments) {
+        final boolean finalCreateIfMissing;
+        final String finalExchangeType;
+        if (isBuildInExchange(exchangeName)) {
+            finalCreateIfMissing = true;
+            finalExchangeType = getExchangeType(exchangeName);
+        } else {
+            finalCreateIfMissing = createIfMissing;
+            finalExchangeType = exchangeType;
+        }
         CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture = new CompletableFuture<>();
-        if (StringUtils.isEmpty(exchangeType) && createIfMissing) {
+        if (StringUtils.isEmpty(finalExchangeType) && finalCreateIfMissing) {
             log.error("[{}][{}] ExchangeType should be set when createIfMissing is true.", namespaceName, exchangeName);
             amqpExchangeCompletableFuture.completeExceptionally(
                     new IllegalArgumentException("exchangeType should be set when createIfMissing is true"));
@@ -114,10 +125,10 @@ public class ExchangeContainer {
         } else {
             String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
             Map<String, String> initProperties = new HashMap<>();
-            if (createIfMissing) {
+            if (finalCreateIfMissing) {
                 // if first create the exchange, try to set properties for exchange
                 try {
-                    initProperties = ExchangeUtil.generateTopicProperties(exchangeName, exchangeType, durable,
+                    initProperties = ExchangeUtil.generateTopicProperties(exchangeName, finalExchangeType, durable,
                             autoDelete, internal, arguments, Collections.EMPTY_LIST);
                 } catch (Exception e) {
                     log.error("Failed to generate topic properties for exchange {} in vhost {}.",
@@ -129,7 +140,7 @@ public class ExchangeContainer {
             }
 
             CompletableFuture<Topic> topicCompletableFuture = amqpTopicManager.getTopic(
-                    topicName, createIfMissing, initProperties);
+                    topicName, finalCreateIfMissing, initProperties);
             topicCompletableFuture.whenComplete((topic, throwable) -> {
                 if (throwable != null) {
                     log.error("[{}][{}] Failed to get exchange topic.", namespaceName, exchangeName, throwable);
@@ -144,9 +155,9 @@ public class ExchangeContainer {
                         // recover metadata if existed
                         PersistentTopic persistentTopic = (PersistentTopic) topic;
                         Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
-                        if (createIfMissing && !exchangeDeclareCheck(
+                        if (finalCreateIfMissing && !exchangeDeclareCheck(
                                 amqpExchangeCompletableFuture, namespaceName.getLocalName(),
-                                exchangeName, exchangeType, durable, autoDelete, properties)) {
+                                exchangeName, finalExchangeType, durable, autoDelete, properties)) {
                             return;
                         }
 
@@ -162,9 +173,9 @@ public class ExchangeContainer {
                             boolean currentInternal = Boolean.parseBoolean(
                                     properties.getOrDefault(INTERNAL, "false"));
                             amqpExchange = new PersistentExchange(exchangeName,
-                                    AmqpExchange.Type.value(currentType),
-                                    persistentTopic, currentDurable, currentAutoDelete, currentInternal,
-                                    currentArguments, routeExecutor, routeQueueSize);
+                                    AmqpExchange.Type.value(currentType), persistentTopic, currentDurable,
+                                    currentAutoDelete, currentInternal, currentArguments, routeExecutor,
+                                    config.getAmqpExchangeRouteQueueSize(), config.isAmqpMultiBundleEnable());
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
                                     exchangeName, namespaceName.getLocalName(), e);

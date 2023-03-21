@@ -15,7 +15,8 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
-import java.util.concurrent.Executor;
+import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
@@ -39,19 +40,22 @@ public class AmqpBrokerService {
     private ConnectionContainer connectionContainer;
     @Getter
     private PulsarService pulsarService;
+    @Getter
+    private AmqpAdmin amqpAdmin;
 
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
-        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService, initRouteExecutor(config),
-                config.getAmqpExchangeRouteQueueSize());
-        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer);
+        this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService,
+                initRouteExecutor(config), config);
+        this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, config);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
+        this.amqpAdmin = new AmqpAdmin("localhost", config.getAmqpAdminPort());
     }
 
-    private Executor initRouteExecutor(AmqpServiceConfiguration config) {
+    private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {
         return Executors.newFixedThreadPool(config.getAmqpExchangeRouteExecutorThreads(),
                 new DefaultThreadFactory("exchange-route"));
     }

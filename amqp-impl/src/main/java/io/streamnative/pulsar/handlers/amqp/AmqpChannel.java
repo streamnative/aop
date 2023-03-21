@@ -83,56 +83,56 @@ import org.apache.qpid.server.txn.ServerTransaction;
 @Log4j2
 public class AmqpChannel implements ServerChannelMethodProcessor {
 
-    private final int channelId;
-    private final AmqpConnection connection;
+    protected final int channelId;
+    protected final AmqpConnection connection;
     private final AtomicBoolean blocking = new AtomicBoolean(false);
-    private final AtomicBoolean closing = new AtomicBoolean(false);
+    protected final AtomicBoolean closing = new AtomicBoolean(false);
     private final java.util.Queue<AsyncCommand> unfinishedCommandsQueue = new ConcurrentLinkedQueue<>();
-    private long confirmedMessageCounter;
+    protected long confirmedMessageCounter;
     private volatile ServerTransaction transaction;
-    private boolean confirmOnPublish;
+    protected boolean confirmOnPublish;
     /** A channel has a default queue (the last declared) that is used when no queue name is explicitly set. */
-    private volatile AmqpQueue defaultQueue;
+    protected volatile AmqpQueue defaultQueue;
 
-    private final UnacknowledgedMessageMap unacknowledgedMessageMap;
+    protected final UnacknowledgedMessageMap unacknowledgedMessageMap;
 
     /** Maps from consumer tag to consumers instance. */
-    private final Map<String, Consumer> tag2ConsumersMap = new ConcurrentHashMap<>();
+    protected final Map<String, Consumer> tag2ConsumersMap = new ConcurrentHashMap<>();
 
-    private final Map<String, AmqpConsumer> fetchConsumerMap = new ConcurrentHashMap<>();
+    protected final Map<String, AmqpConsumer> fetchConsumerMap = new ConcurrentHashMap<>();
 
     /**
      * The current message - which may be partial in the sense that not all frames have been received yet - which has
      * been received by this channel. As the frames are received the message gets updated and once all frames have been
      * received the message can then be routed.
      */
-    private IncomingMessage currentMessage;
+    protected IncomingMessage currentMessage;
 
-    private final String defaultSubscription = "defaultSubscription";
+    protected final String defaultSubscription = "defaultSubscription";
     public static final AMQShortString EMPTY_STRING = AMQShortString.createAMQShortString((String) null);
     /**
      * ConsumerTag prefix, the tag is unique per subscription to a queue.
      * The server returns this in response to a basic.consume request.
      */
-    private static final String CONSUMER_TAG_PREFIX = "aop.ctag-";
+    protected static final String CONSUMER_TAG_PREFIX = "aop.ctag-";
 
     /**
      * The consumer ID.
      */
-    private static final AtomicLong CONSUMER_ID = new AtomicLong(0);
+    protected static final AtomicLong CONSUMER_ID = new AtomicLong(0);
 
     /**
      * The delivery tag is unique per channel. This is pre-incremented before putting into the deliver frame so that
      * value of this represents the <b>last</b> tag sent out.
      */
-    private volatile long deliveryTag = 0;
-    private final AmqpFlowCreditManager creditManager;
-    private final AtomicBoolean blockedOnCredit = new AtomicBoolean(false);
+    protected volatile long deliveryTag = 0;
+    protected final AmqpFlowCreditManager creditManager;
+    protected final AtomicBoolean blockedOnCredit = new AtomicBoolean(false);
     public static final int DEFAULT_CONSUMER_PERMIT = 1000;
-    private ExchangeService exchangeService;
-    private QueueService queueService;
-    private ExchangeContainer exchangeContainer;
-    private QueueContainer queueContainer;
+    protected ExchangeService exchangeService;
+    protected QueueService queueService;
+    protected ExchangeContainer exchangeContainer;
+    protected QueueContainer queueContainer;
 
     public AmqpChannel(int channelId, AmqpConnection connection, AmqpBrokerService amqpBrokerService) {
         this.channelId = channelId;
@@ -253,7 +253,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }
         queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
-                autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
+                autoDelete, nowait, FieldTable.convertToMap(arguments), connection.getConnectionId())
+                .thenAccept(amqpQueue -> {
             setDefaultQueue(amqpQueue);
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(
@@ -401,7 +402,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         });
     }
 
-    private String getConsumerTag(AMQShortString consumerTag) {
+    protected String getConsumerTag(AMQShortString consumerTag) {
         if (consumerTag == null) {
             return CONSUMER_TAG_PREFIX + connection.remoteAddress + "-" + UUID.randomUUID();
         } else {
@@ -411,7 +412,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private synchronized void subscribe(String consumerTag, String queueName, Topic topic,
-                           boolean ack, boolean exclusive, boolean nowait){
+                           boolean ack, boolean exclusive, boolean nowait) {
 
         CompletableFuture<Void> future = new CompletableFuture<>();
         future.whenComplete((ignored, e) -> {
@@ -685,7 +686,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         deliverCurrentMessageIfComplete();
     }
 
-    private void deliverCurrentMessageIfComplete() {
+    protected void deliverCurrentMessageIfComplete() {
         if (currentMessage.allContentReceived()) {
             MessagePublishInfo info = currentMessage.getMessagePublishInfo();
             String routingKey = AMQShortString.toString(info.getRoutingKey());
@@ -777,15 +778,15 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private void requeue(Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> messages) {
-        Map<AmqpConsumer, List<PositionImpl>> positionMap = new HashMap<>();
+        Map<UnacknowledgedMessageMap.MessageProcessor, List<PositionImpl>> positionMap = new HashMap<>();
         messages.stream().forEach(association -> {
-            AmqpConsumer consumer = association.getConsumer();
+            UnacknowledgedMessageMap.MessageProcessor consumer = association.getConsumer();
             List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
                 list -> new ArrayList<>());
             positions.add((PositionImpl) association.getPosition());
         });
         positionMap.entrySet().stream().forEach(entry -> {
-            entry.getKey().redeliverAmqpMessages(entry.getValue());
+            entry.getKey().requeue(entry.getValue());
         });
     }
 
@@ -799,10 +800,10 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
 
     private void messageAck(long deliveryTag, boolean multiple) {
         Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> ackedMessages =
-            unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
+                unacknowledgedMessageMap.acknowledge(deliveryTag, multiple);
         if (!ackedMessages.isEmpty()) {
             ackedMessages.stream().forEach(entry -> {
-                entry.getConsumer().messagesAck(entry.getPosition());
+                entry.getConsumer().messageAck(entry.getPosition());
             });
         } else {
             closeChannel(ErrorCodes.IN_USE, "deliveryTag not found");
@@ -1012,7 +1013,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         return creditManager;
     }
 
-    private void handleAoPException(Throwable t) {
+    protected void handleAoPException(Throwable t) {
         Throwable cause = FutureUtil.unwrapCompletionException(t);
         if (!(cause instanceof AoPException)) {
             connection.sendConnectionClose(INTERNAL_ERROR, t.getMessage(), channelId);

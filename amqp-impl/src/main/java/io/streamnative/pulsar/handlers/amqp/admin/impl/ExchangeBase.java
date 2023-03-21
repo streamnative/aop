@@ -82,8 +82,8 @@ public class ExchangeBase extends BaseResources {
     protected CompletableFuture<AmqpExchange> declareExchange(String vhost, String exchangeName,
                                                               ExchangeDeclareParams declareParams) {
         return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName,
-                declareParams.getType(), false, declareParams.isDurable(), declareParams.isAutoDelete(),
-                declareParams.isInternal(), declareParams.getArguments());
+                declareParams.getType(), declareParams.isPassive(), declareParams.isDurable(),
+                declareParams.isAutoDelete(), declareParams.isInternal(), declareParams.getArguments());
     }
 
     protected CompletableFuture<Void> deleteExchange(String vhost, String exchangeName, boolean ifUnused) {

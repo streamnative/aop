@@ -108,8 +108,8 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                     "plaintext must be configured on internal listener");
             proxyConfig.setBrokerServiceURL(internalListener.getBrokerServiceUrl().toString());
 
-            ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
             try {
+                ProxyService proxyService = new ProxyService(proxyConfig, service.getPulsar());
                 proxyService.start();
                 log.info("Start amqp proxy service at port: {}", proxyConfig.getAmqpProxyPort());
             } catch (Exception e) {

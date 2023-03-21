@@ -20,10 +20,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.impl.PositionImpl;
 
 
 /**
@@ -31,15 +33,20 @@ import org.apache.bookkeeper.mledger.Position;
  */
 public class UnacknowledgedMessageMap {
 
+    public interface MessageProcessor {
+        void messageAck(Position position);
+        void requeue(List<PositionImpl> positions);
+    }
+
     /**
      * unAck positionInfo.
      */
     public static final class MessageConsumerAssociation {
         private final Position position;
-        private final AmqpConsumer consumer;
+        private final MessageProcessor consumer;
         private final int size;
 
-        private MessageConsumerAssociation(Position position, AmqpConsumer consumer, int size) {
+        private MessageConsumerAssociation(Position position, MessageProcessor consumer, int size) {
             this.position = position;
             this.consumer = consumer;
             this.size = size;
@@ -49,7 +56,7 @@ public class UnacknowledgedMessageMap {
             return position;
         }
 
-        public AmqpConsumer getConsumer() {
+        public MessageProcessor getConsumer() {
             return consumer;
         }
 
@@ -90,7 +97,7 @@ public class UnacknowledgedMessageMap {
         return associations;
     }
 
-    public void add(long deliveryTag, Position position, AmqpConsumer consumer, int size) {
+    public void add(long deliveryTag, Position position, MessageProcessor consumer, int size) {
         checkNotNull(position);
         checkNotNull(consumer);
         map.put(deliveryTag, new MessageConsumerAssociation(position, consumer, size));

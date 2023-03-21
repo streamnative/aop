@@ -328,7 +328,7 @@ public class AdminTest extends AmqpTestBase{
     }
 
     private String api(String path) {
-        return "http://localhost:" + new AmqpServiceConfiguration().getAmqpAdminPort() + "/api/" + path;
+        return "http://localhost:" + getAopAdminPortList().get(0) + "/api/" + path;
     }
 
     @Test

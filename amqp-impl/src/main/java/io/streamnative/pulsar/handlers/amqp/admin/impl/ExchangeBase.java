@@ -100,7 +100,7 @@ public class ExchangeBase extends BaseResources {
     }
 
     protected CompletableFuture<List<ExchangesList.ItemsBean>> getExchangeListByNamespaceAsync(String vhost) {
-        NamespaceName namespaceName = NamespaceName.get(vhost);
+        NamespaceName namespaceName = getNamespaceName(vhost);
         return getExchangeListAsync(namespaceName.getTenant(), namespaceName.getLocalName())
                 .thenCompose(exList -> {
                     List<ExchangesList.ItemsBean> itemsBeans = new CopyOnWriteArrayList<>();
@@ -108,7 +108,7 @@ public class ExchangeBase extends BaseResources {
                             exList.stream().map(topic -> {
                                 String exchangeName = TopicName.get(topic).getLocalName()
                                         .substring(PersistentExchange.TOPIC_PREFIX.length());
-                                return getTopicProperties(vhost, PersistentExchange.TOPIC_PREFIX,
+                                return getTopicProperties(namespaceName.toString(), PersistentExchange.TOPIC_PREFIX,
                                         exchangeName).thenApply(properties -> {
                                     ExchangeDeclareParams exchangeDeclareParams =
                                             ExchangeUtil.covertMapAsParams(properties);
@@ -175,7 +175,7 @@ public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<ExchangeDetail> getExchangeDetailAsync(String vhost, String exchangeName) {
         return exchangeContainer().asyncGetExchange(
-                NamespaceName.get(vhost), exchangeName, false, null).thenApply(ex -> {
+                getNamespaceName(vhost), exchangeName, false, null).thenApply(ex -> {
             ExchangeDetail exchangeBean = new ExchangeDetail();
             Topic exchangeTopic = ex.getTopic();
             TopicStatsImpl stats = exchangeTopic.getStats(false, false, false);
@@ -218,7 +218,7 @@ public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<List<ExchangeSource>> getExchangeSourceAsync(String vhost, String exchangeName) {
         return exchangeContainer().asyncGetExchange(
-                NamespaceName.get(vhost), exchangeName, false, null).thenApply(ex -> {
+                getNamespaceName(vhost), exchangeName, false, null).thenApply(ex -> {
             List<ExchangeSource> exchangeSources = new ArrayList<>();
             if (ex instanceof PersistentExchange persistentExchange) {
                 ExchangeSource exchangeBean = new ExchangeSource();

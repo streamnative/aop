@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.admin;
 
+import io.streamnative.pulsar.handlers.amqp.admin.impl.BaseResources;
 import io.streamnative.pulsar.handlers.amqp.admin.impl.ExchangeBase;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -32,7 +33,7 @@ public class Vhosts extends ExchangeBase {
 
     @GET
     public void getList(@Suspended final AsyncResponse response) {
-        getAllVhostListAsync()
+        getVhostListAsync()
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
                     log.error("Failed to get vhost list for tenant {}", tenant, t);

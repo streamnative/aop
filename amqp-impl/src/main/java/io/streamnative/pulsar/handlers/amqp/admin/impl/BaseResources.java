@@ -19,6 +19,7 @@ import io.streamnative.pulsar.handlers.amqp.ExchangeService;
 import io.streamnative.pulsar.handlers.amqp.QueueContainer;
 import io.streamnative.pulsar.handlers.amqp.QueueService;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.TenantBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import java.math.BigDecimal;
@@ -31,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
@@ -46,6 +48,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerFactoryImpl;
 import org.apache.bookkeeper.mledger.impl.MetaStore;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.LookupOptions;
@@ -165,7 +168,12 @@ public class BaseResources {
         return queueContainer;
     }
 
+    protected NamespaceName getNamespaceName() {
+        return getNamespaceName(null);
+    }
+
     protected NamespaceName getNamespaceName(String vhost) {
+        vhost = StringUtils.isNotBlank(vhost) ? vhost : this.xVhost;
         NamespaceName namespaceName;
         if (tenant == null) {
             namespaceName = NamespaceName.get(vhost);
@@ -188,7 +196,8 @@ public class BaseResources {
                 });
     }
 
-    protected CompletableFuture<Map<String, String>> getTopicProperties(String namespaceName, String topicPrefix, String topic) {
+    protected CompletableFuture<Map<String, String>> getTopicProperties(String namespaceName, String topicPrefix,
+                                                                        String topic) {
         CompletableFuture<Map<String, String>> future = new CompletableFuture<>();
         // amqp/default/persistent/__amqp_exchange__direct_E2
         String path = namespaceName + "/persistent/" + topicPrefix + topic;
@@ -223,7 +232,7 @@ public class BaseResources {
                                 List<VhostBean> vhostBeanList = new ArrayList<>();
                                 nsList.forEach(ns -> {
                                     VhostBean bean = new VhostBean();
-                                    bean.setName(s + "/" + ns);
+                                    bean.setName(ns);
                                     vhostBeanList.add(bean);
                                 });
                                 return vhostBeanList;
@@ -233,6 +242,17 @@ public class BaseResources {
                 return vhostBeans;
             });
         });
+    }
+
+    protected CompletableFuture<List<TenantBean>> getAllTenantListAsync() {
+        return tenantResources().listTenantsAsync()
+                .thenApply(tenantList -> tenantList.stream()
+                        .map(s -> {
+                            TenantBean bean = new TenantBean();
+                            bean.setName(s);
+                            return bean;
+                        }).sorted(Comparator.comparing(TenantBean::getName))
+                        .collect(Collectors.toList()));
     }
 
     private PulsarService pulsar() {
@@ -321,8 +341,8 @@ public class BaseResources {
             asyncResponse.resume(new RestException(Response.Status.CONFLICT, "Concurrent modification"));
         } else if (realCause instanceof PulsarAdminException) {
             asyncResponse.resume(new RestException(((PulsarAdminException) realCause)));
-        } else if(realCause instanceof AoPServiceRuntimeException.NoSuchQueueException
-                || realCause instanceof AoPServiceRuntimeException.NoSuchExchangeException){
+        } else if (realCause instanceof AoPServiceRuntimeException.NoSuchQueueException
+                || realCause instanceof AoPServiceRuntimeException.NoSuchExchangeException) {
             asyncResponse.resume(new RestException(500, realCause.getMessage()));
         } else {
             asyncResponse.resume(new RestException(realCause));

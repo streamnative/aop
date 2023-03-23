@@ -31,7 +31,7 @@ public class Channels extends ChannelBase {
                         @QueryParam("page_size") int pageSize,
                         @QueryParam("name") String name,
                         @QueryParam("pagination") boolean pagination) {
-        NamespaceName namespaceName = NamespaceName.get(xVhost);
+        NamespaceName namespaceName = getNamespaceName();
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 namespaceName, "__lookup__");
         validateTopicOwnershipAsync(topicName, authoritative)

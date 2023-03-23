@@ -26,7 +26,7 @@ public class HeadersReponseFilter implements ContainerResponseFilter {
         response.getHeaders().putSingle("Access-Control-Allow-Origin", "*");
         response.getHeaders().putSingle("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT, OPTIONS");
         response.getHeaders().putSingle("Access-Control-Allow-Headers", "x-requested-with, "
-                + "content-type, authorization, x-vhost");
+                + "content-type, authorization, x-vhost, tenant");
         response.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");
     }
 }

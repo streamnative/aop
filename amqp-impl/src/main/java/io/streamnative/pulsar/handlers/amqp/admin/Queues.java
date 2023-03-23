@@ -97,7 +97,7 @@ public class Queues extends QueueBase {
                          @PathParam("queue") String queue,
                          @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get(vhost), PersistentQueue.TOPIC_PREFIX + queue);
+                getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> getQueueDetailAsync(vhost, queue))
                 .thenAccept(response::resume)
@@ -115,7 +115,7 @@ public class Queues extends QueueBase {
     public void getQueueBindings(@Suspended final AsyncResponse response,
                                  @PathParam("vhost") String vhost,
                                  @PathParam("queue") String queue) {
-        getQueueBindings(vhost, queue)
+        getQueueBindings(getNamespaceName(vhost).toString(), queue)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
                     log.error("Failed to get queue {} in vhost {}", queue, vhost, t);

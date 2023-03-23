@@ -90,7 +90,7 @@ public class QueueBase extends BaseResources {
     }
 
     protected CompletableFuture<List<QueuesList.ItemsBean>> getQueueListByNamespaceAsync(String vhost) {
-        NamespaceName namespaceName = NamespaceName.get(vhost);
+        NamespaceName namespaceName = getNamespaceName(vhost);
         return getQueueListAsync(namespaceName.getTenant(), namespaceName.getLocalName())
                 .thenCompose(exList -> {
                     Collection<CompletableFuture<Void>> futureList = new ArrayList<>();
@@ -98,7 +98,7 @@ public class QueueBase extends BaseResources {
                     exList.forEach(topic -> {
                         String queue = TopicName.get(topic).getLocalName()
                                 .substring(PersistentQueue.TOPIC_PREFIX.length());
-                        futureList.add(getQueueBeanByNamespaceAsync(vhost, queue).thenAccept(
+                        futureList.add(getQueueBeanByNamespaceAsync(namespaceName, queue).thenAccept(
                                 beanList::add));
                     });
                     return FutureUtil.waitForAll(futureList).thenApply(__ -> {
@@ -121,13 +121,13 @@ public class QueueBase extends BaseResources {
         });
     }
 
-    protected CompletableFuture<QueuesList.ItemsBean> getQueueBeanByNamespaceAsync(String namespaceName,
+    protected CompletableFuture<QueuesList.ItemsBean> getQueueBeanByNamespaceAsync(NamespaceName namespaceName,
                                                                                    String queue) {
-        return getTopicProperties(namespaceName, PersistentQueue.TOPIC_PREFIX, queue).thenApply(properties -> {
+        return getTopicProperties(namespaceName.toString(), PersistentQueue.TOPIC_PREFIX, queue).thenApply(properties -> {
             QueueDeclareParams declareParams = QueueUtil.covertMapAsParams(properties);
             QueuesList.ItemsBean itemsBean = new QueuesList.ItemsBean();
             itemsBean.setName(queue);
-            itemsBean.setVhost(namespaceName);
+            itemsBean.setVhost(namespaceName.getLocalName());
             itemsBean.setDurable(true);
             itemsBean.setExclusive(declareParams.isExclusive());
             itemsBean.setAuto_delete(declareParams.isAutoDelete());
@@ -159,8 +159,8 @@ public class QueueBase extends BaseResources {
         });
     }
 
-    protected CompletableFuture<List<QueueBinds>> getQueueBindings(String vhost, String queue) {
-        return getTopicProperties(vhost, PersistentQueue.TOPIC_PREFIX, queue).thenCompose(properties -> {
+    protected CompletableFuture<List<QueueBinds>> getQueueBindings(String namespace, String queue) {
+        return getTopicProperties(namespace, PersistentQueue.TOPIC_PREFIX, queue).thenCompose(properties -> {
             Set<PersistentExchange.Binding> bindings = Sets.newHashSet();
             try {
                 if (properties.containsKey("BINDINGS")) {
@@ -179,7 +179,7 @@ public class QueueBase extends BaseResources {
                         queueBinds.setDestination(binding.getDes());
                         queueBinds.setRouting_key(binding.getKey());
                         queueBinds.setProperties_key(binding.getKey());
-                        queueBinds.setVhost(vhost);
+                        queueBinds.setVhost(namespace);
                         queueBinds.setDestination_type(binding.getDesType());
                         return queueBinds;
                     }).collect(Collectors.toList());
@@ -191,7 +191,7 @@ public class QueueBase extends BaseResources {
     }
 
     protected CompletableFuture<QueueDetail> getQueueDetailAsync(String vhost, String queue) {
-        return queueContainer().asyncGetQueue(NamespaceName.get(vhost), queue, false)
+        return queueContainer().asyncGetQueue(getNamespaceName(vhost), queue, false)
                 .thenApply(qu -> {
                     if (qu == null) {
                         throw new AoPServiceRuntimeException.NoSuchQueueException("Queue [" + queue + "] not created");

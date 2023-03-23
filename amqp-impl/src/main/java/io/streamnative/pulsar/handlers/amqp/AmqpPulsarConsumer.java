@@ -13,7 +13,6 @@
  */
 package io.streamnative.pulsar.handlers.amqp;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;

@@ -15,15 +15,12 @@ package io.streamnative.pulsar.handlers.amqp.admin.impl;
 
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageRouter;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingBean;
-import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.pulsar.broker.web.RestException;
-import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
 /**
  * BindingBase.

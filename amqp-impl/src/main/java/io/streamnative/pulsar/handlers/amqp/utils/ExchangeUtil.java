@@ -20,15 +20,12 @@ import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.EXCHA
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.QUEUES;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
-import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.EXCLUSIVE;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.PASSIVE;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
-import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException.ExchangeParameterException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.HashMap;

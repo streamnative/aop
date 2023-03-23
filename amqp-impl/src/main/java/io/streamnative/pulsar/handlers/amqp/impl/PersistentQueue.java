@@ -97,7 +97,6 @@ public class PersistentQueue extends AbstractAmqpQueue {
     private AmqpEntryWriter amqpEntryWriter;
 
     private CompletableFuture<Producer<byte[]>> deadLetterProducer;
-    private CompletableFuture<Void> initDefaultSubscription;
     private String deadLetterExchange;
     private long queueMessageTtl;
     private String deadLetterRoutingKey;

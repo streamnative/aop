@@ -22,7 +22,6 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-@SuppressWarnings("all")
 public class VhostBean {
 
     private ClusterStateBean cluster_state;

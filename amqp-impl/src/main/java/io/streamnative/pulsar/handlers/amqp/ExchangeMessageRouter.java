@@ -217,50 +217,30 @@ public abstract class ExchangeMessageRouter {
             Set<Destination> destinations = getDestinations(
                     props.getOrDefault(MessageConvertUtils.PROP_ROUTING_KEY, ""), getMessageHeaders());
             final Position position = entry.getPosition();
-            if (destinations == null || destinations.isEmpty()) {
-                log.error("[{}] The message routing key [{}] is not bound to a queue or exchange, needs to be removed "
-                                + "[{}]",
-                        exchange.getName(),
-                        props.get(MessageConvertUtils.PROP_ROUTING_KEY), entry.getPosition().toString());
-                entry.release();
-                cursor.asyncDelete(position, new AsyncCallbacks.DeleteCallback() {
-                    @Override
-                    public void deleteComplete(Object ctx) {
-                        if (log.isDebugEnabled()) {
-                            log.debug("{} Deleted message at {}", exchange.getName(), ctx);
-                        }
-                    }
-
-                    @Override
-                    public void deleteFailed(ManagedLedgerException exception, Object ctx) {
-                        log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
-                    }
-                }, position);
-                PENDING_SIZE_UPDATER.decrementAndGet(this);
-                continue;
-            }
-            initProducerIfNeeded(destinations);
             List<CompletableFuture<MessageId>> futures = new ArrayList<>();
-            final int readerIndex = message.getDataBuffer().readerIndex();
-            for (Destination des : destinations) {
-                ProducerImpl<byte[]> producer = producerMap.get(des.name);
-                if (producer == null) {
-                    log.error("Failed to get producer for des {}.", des.name);
-                    throw new AoPServiceRuntimeException.MessageRouteException(
-                            "Failed to get producer for des " + des.name + ".");
+            if (destinations != null && !destinations.isEmpty()) {
+                initProducerIfNeeded(destinations);
+                final int readerIndex = message.getDataBuffer().readerIndex();
+                for (Destination des : destinations) {
+                    ProducerImpl<byte[]> producer = producerMap.get(des.name);
+                    if (producer == null) {
+                        log.error("Failed to get producer for des {}.", des.name);
+                        throw new AoPServiceRuntimeException.MessageRouteException(
+                                "Failed to get producer for des " + des.name + ".");
+                    }
+                    message.getMessageBuilder().clearProducerName();
+                    message.getMessageBuilder().clearPublishTime();
+                    message.getDataBuffer().readerIndex(readerIndex);
+                    String xDelay;
+                    int delay;
+                    if (exchange.isExistDelayedType()
+                            && StringUtils.isNotBlank(xDelay = props.get(MessageConvertUtils.BASIC_PROP_HEADER_X_DELAY))
+                            && NumberUtils.isNumber(xDelay)
+                            && (delay = Integer.parseInt(xDelay)) > 0) {
+                        message.getMessageBuilder().setDeliverAtTime(System.currentTimeMillis() + delay);
+                    }
+                    futures.add(producer.sendAsync(message));
                 }
-                message.getMessageBuilder().clearProducerName();
-                message.getMessageBuilder().clearPublishTime();
-                message.getDataBuffer().readerIndex(readerIndex);
-                String xDelay;
-                int delay;
-                if (exchange.isExistDelayedType()
-                        && StringUtils.isNotBlank(xDelay = props.get(MessageConvertUtils.BASIC_PROP_HEADER_X_DELAY))
-                        && NumberUtils.isNumber(xDelay)
-                        && (delay = Integer.parseInt(xDelay)) > 0) {
-                    message.getMessageBuilder().setDeliverAtTime(System.currentTimeMillis() + delay);
-                }
-                futures.add(producer.sendAsync(message));
             }
             entry.release();
 

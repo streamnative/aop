@@ -17,12 +17,14 @@ package io.streamnative.pulsar.handlers.amqp.utils;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.ARGUMENTS;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.AUTO_DELETE;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.DURABLE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.EXCLUSIVE;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.PASSIVE;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.QUEUE;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,14 +51,32 @@ public class QueueUtil {
         return props;
     }
 
+    public static QueueDeclareParams covertMapAsParams(Map<String, String> map) {
+        String durable = map.get(DURABLE);
+        String autoDelete = map.get(AUTO_DELETE);
+        String exclusive = map.get(EXCLUSIVE);
+        String arguments = map.get(ARGUMENTS);
+        QueueDeclareParams params = new QueueDeclareParams();
+        params.setArguments(covertStringValueAsObjectMap(arguments));
+        params.setNode("");
+        params.setDurable(Boolean.parseBoolean(durable));
+        params.setExclusive(Boolean.parseBoolean(exclusive));
+        params.setAutoDelete(Boolean.parseBoolean(autoDelete));
+        return params;
+    }
+
     public static String covertObjectValueAsString(Object obj) throws JsonProcessingException {
         return JSON_MAPPER.writeValueAsString(obj);
     }
 
-    public static Map<String, Object> covertStringValueAsObjectMap(String value) throws JsonProcessingException {
+    public static Map<String, Object> covertStringValueAsObjectMap(String value) {
         if (value == null || value.trim().isEmpty()) {
-            return null;
+            return new HashMap<>();
         }
-        return JSON_MAPPER.readValue(value, new TypeReference<>() {});
+        try {
+            return JSON_MAPPER.readValue(value, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

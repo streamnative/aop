@@ -25,5 +25,10 @@ public class BindingParams {
     @JsonProperty("routing_key")
     private String routingKey;
     private Map<String, Object> arguments;
+    private String destination;
+    @JsonProperty("destination_type")
+    private String destinationType;
+    private String source;
+    private String vhost;
 
 }

@@ -15,18 +15,33 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static io.streamnative.pulsar.handlers.amqp.utils.ExceptionUtils.getAoPException;
+import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.JSON_MAPPER;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchangeType;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.collect.Sets;
+import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.mledger.AsyncCallbacks;
+import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.qpid.server.protocol.ErrorCodes;
@@ -40,11 +55,13 @@ import org.apache.qpid.server.protocol.v0_8.FieldTable;
 public class QueueServiceImpl implements QueueService {
     private ExchangeContainer exchangeContainer;
     private QueueContainer queueContainer;
+    private AmqpTopicManager amqpTopicManager;
 
     public QueueServiceImpl(ExchangeContainer exchangeContainer,
-                            QueueContainer queueContainer) {
+                            QueueContainer queueContainer, AmqpTopicManager amqpTopicManager) {
         this.exchangeContainer = exchangeContainer;
         this.queueContainer = queueContainer;
+        this.amqpTopicManager = amqpTopicManager;
     }
 
     @Override
@@ -103,6 +120,7 @@ public class QueueServiceImpl implements QueueService {
                             amqpQueue.unbindExchange(router.getExchange());
                         }
                     }
+                    amqpQueue.close();
                     amqpQueue.getTopic().deleteForcefully().thenAccept(__ -> {
                         queueContainer.deleteQueue(namespaceName, amqpQueue.getName());
                         future.complete(null);
@@ -294,6 +312,109 @@ public class QueueServiceImpl implements QueueService {
             future.complete(queue);
         });
         return future;
+    }
+
+    /**
+     * Query the list of exchanges bound to the queue
+     *
+     * @param namespaceName
+     * @param queue
+     * @param exchange
+     * @param params
+     * @return
+     */
+    @Override
+    public CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange,
+                                           BindingParams params) {
+        String topicName = PersistentQueue.getQueueTopicName(namespaceName, queue);
+        return amqpTopicManager.getTopic(topicName, false, null)
+                .thenCompose(topic -> {
+                    if (topic == null) {
+                        throw new AoPServiceRuntimeException.NoSuchQueueException("Queue [" + queue + "] not created");
+                    }
+                    PersistentTopic persistentTopic = (PersistentTopic) topic;
+                    Set<PersistentExchange.Binding> bindings = Sets.newHashSet();
+                    String bindingsJson;
+                    try {
+                        if (persistentTopic.getManagedLedger().getProperties().containsKey("BINDINGS")) {
+                            List<PersistentExchange.Binding> amqpQueueProperties = JSON_MAPPER.readValue(
+                                    persistentTopic.getManagedLedger().getProperties().get("BINDINGS"),
+                                    new TypeReference<>() {
+                                    });
+                            bindings.addAll(amqpQueueProperties);
+                        }
+                        bindings.add(new PersistentExchange.Binding(queue, "queue", params.getRoutingKey(), exchange,
+                                params.getArguments()));
+                        bindingsJson = JSON_MAPPER.writeValueAsString(bindings);
+                    } catch (JsonProcessingException e) {
+                        log.error("Failed to bind queue {} to exchange {}", queue, exchange, e);
+                        return FutureUtil.failedFuture(e);
+                    }
+                    CompletableFuture<Void> future = new CompletableFuture<>();
+                    persistentTopic.getManagedLedger().asyncSetProperty("BINDINGS", bindingsJson,
+                            new AsyncCallbacks.UpdatePropertiesCallback() {
+                                @Override
+                                public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                                    future.complete(null);
+                                }
+
+                                @Override
+                                public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                                    log.error("Failed to save binding metadata for bind operation.", exception);
+                                    future.completeExceptionally(exception);
+                                }
+                            }, null);
+                    return future;
+                });
+    }
+
+    @Override
+    public CompletableFuture<Void> queueUnBind(NamespaceName namespaceName, String queue, String exchange,
+                                           String propsKey) {
+        String topicName = PersistentQueue.getQueueTopicName(namespaceName, queue);
+        return amqpTopicManager.getTopic(topicName, false, null)
+                .thenCompose(topic -> {
+                    if (topic == null) {
+                        throw new AoPServiceRuntimeException.NoSuchQueueException("Queue [" + queue + "] not created");
+                    }
+                    PersistentTopic persistentTopic = (PersistentTopic) topic;
+                    Set<PersistentExchange.Binding> bindings = Sets.newHashSet();
+                    String bindingsJson;
+                    try {
+                        if (persistentTopic.getManagedLedger().getProperties().containsKey("BINDINGS")) {
+                            List<PersistentExchange.Binding> amqpQueueProperties = JSON_MAPPER.readValue(
+                                    persistentTopic.getManagedLedger().getProperties().get("BINDINGS"),
+                                    new TypeReference<>() {
+                                    });
+                            bindings.addAll(amqpQueueProperties);
+                        }
+                        bindings.removeIf(binding -> exchange.equals(binding.getSource())
+                                && queue.equals(binding.getDes())
+                                && propsKey.equals(binding.getKey()));
+                        bindingsJson = JSON_MAPPER.writeValueAsString(bindings);
+                    } catch (JsonProcessingException e) {
+                        log.error("Failed to bind queue {} to exchange {}", queue, exchange, e);
+                        return FutureUtil.failedFuture(e);
+                    }
+                    CompletableFuture<Void> future = new CompletableFuture<>();
+                    persistentTopic.getManagedLedger().asyncSetProperty("BINDINGS", bindingsJson,
+                            new AsyncCallbacks.UpdatePropertiesCallback() {
+                                @Override
+                                public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                                    future.complete(null);
+                                }
+
+                                @Override
+                                public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                                    log.error("Failed to save binding metadata for bind operation.", exception);
+                                    future.completeExceptionally(exception);
+                                }
+                            }, null);
+                    return future;
+                }).exceptionally(throwable -> {
+                    log.error("Failed to save binding metadata for bind operation.", throwable);
+                    return null;
+                });
     }
 
 }

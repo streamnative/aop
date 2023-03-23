@@ -61,7 +61,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         if (isBuildInExchange(exchange)) {
             createIfMissing = true;
             exchangeType = getExchangeType(exchange);
-        } else if (StringUtils.isNotBlank(delayedExchange = (String)arguments.get(PersistentExchange.X_DELAYED_TYPE))) {
+        } else if (arguments != null && StringUtils.isNotBlank(delayedExchange = (String)arguments.get(PersistentExchange.X_DELAYED_TYPE))) {
             exchangeType = delayedExchange;
         } else {
             exchangeType = type;

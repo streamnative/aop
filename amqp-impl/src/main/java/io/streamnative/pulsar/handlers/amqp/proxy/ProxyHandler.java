@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,7 +28,9 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -40,6 +42,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientChannelMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ClientMethodProcessor;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ConnectionStartOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 
 /**
@@ -182,6 +185,13 @@ public class ProxyHandler {
             if (log.isDebugEnabled()) {
                 log.debug("ProxyBackendHandler [receiveConnectionStart]");
             }
+            Map<String, Object> map = new HashMap<>(2);
+            map.put("client_ip", proxyConnection.getCnx().channel().remoteAddress().toString());
+            ConnectionStartOkBody startOkBody =
+                    proxyConnection.getMethodRegistry()
+                            .createConnectionStartOkBody(FieldTable.convertToFieldTable(map),
+                                    AMQShortString.EMPTY_STRING, new byte[0], AMQShortString.EMPTY_STRING);
+            brokerChannel.writeAndFlush(startOkBody.generateFrame(0));
         }
 
         @Override

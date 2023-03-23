@@ -14,8 +14,10 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
@@ -87,4 +89,7 @@ public interface QueueService {
     CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
                                           long connectionId,  boolean durable, boolean exclusive, boolean autoDelete,
                                           boolean nowait, Map<String, Object> arguments);
+
+    CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange, BindingParams params);
+    CompletableFuture<Void> queueUnBind(NamespaceName namespaceName, String queue, String exchange, String params);
 }

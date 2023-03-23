@@ -14,6 +14,7 @@
 
 package io.streamnative.pulsar.handlers.amqp.utils;
 
+import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 
 public class TopicUtil {
@@ -22,6 +23,13 @@ public class TopicUtil {
         return TopicDomain.persistent + "://"
                 + tenant + "/"
                 + namespace + "/"
+                + topicPrefix + name;
+    }
+
+    public static String getTopicName(String topicPrefix, NamespaceName namespaceName, String name) {
+        return TopicDomain.persistent + "://"
+                + namespaceName.getTenant() + "/"
+                + namespaceName.getLocalName() + "/"
                 + topicPrefix + name;
     }
 }

@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.FALSE;
 import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.TRUE;
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.netty.util.ReferenceCountUtil;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;

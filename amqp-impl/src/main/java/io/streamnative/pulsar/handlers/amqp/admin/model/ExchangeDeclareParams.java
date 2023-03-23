@@ -32,5 +32,6 @@ public class ExchangeDeclareParams {
     private boolean internal;
     private boolean passive;
     private Map<String, Object> arguments;
-
+    private String vhost;
+    private String name;
 }

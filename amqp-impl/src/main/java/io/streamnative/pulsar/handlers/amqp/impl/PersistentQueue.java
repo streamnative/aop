@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.impl;
 
+import static io.streamnative.pulsar.handlers.amqp.utils.TopicUtil.getTopicName;
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -29,13 +30,13 @@ import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeEx
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
-import io.streamnative.pulsar.handlers.amqp.utils.TopicUtil;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -48,11 +49,15 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
+import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.Schema;
+import org.apache.pulsar.client.api.SubscriptionInitialPosition;
+import org.apache.pulsar.client.api.SubscriptionType;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.client.impl.ProducerImpl;
 import org.apache.pulsar.common.api.proto.KeyValue;
@@ -74,6 +79,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public static final String TOPIC_PREFIX = "__amqp_queue__";
     public static final String DURABLE = "DURABLE";
     public static final String PASSIVE = "PASSIVE";
+    public static final String EXCLUSIVE = "EXCLUSIVE";
     public static final String AUTO_DELETE = "AUTO_DELETE";
     public static final String INTERNAL = "INTERNAL";
     public static final String ARGUMENTS = "ARGUMENTS";
@@ -90,15 +96,12 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private AmqpEntryWriter amqpEntryWriter;
 
-    private Map<String, String> properties;
-
-    @Getter
-    private final Map<String, Object> arguments = new HashMap<>();
     private CompletableFuture<Producer<byte[]>> deadLetterProducer;
+    private CompletableFuture<Void> initDefaultSubscription;
     private String deadLetterExchange;
     private long queueMessageTtl;
     private String deadLetterRoutingKey;
-    private final PersistentSubscription defaultSubscription;
+    private PersistentSubscription defaultSubscription;
 
     private final ScheduledExecutorService scheduledExecutor;
 
@@ -107,21 +110,18 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
                            boolean exclusive, boolean autoDelete, Map<String, String> properties) {
-        super(queueName, true, connectionId, exclusive, autoDelete);
-        this.properties = properties;
+        super(queueName, true, connectionId, exclusive, autoDelete, properties);
         this.indexTopic = indexTopic;
         this.scheduledExecutor = indexTopic.getBrokerService().executor();
         topicNameValidate();
         this.jsonMapper = new ObjectMapper();
         this.amqpEntryWriter = new AmqpEntryWriter(indexTopic);
-        this.defaultSubscription = indexTopic.getSubscriptions().get(DEFAULT_SUBSCRIPTION);
+    }
+
+    private void initMessageExpire() {
         String args = properties.get(ARGUMENTS);
         if (StringUtils.isNotBlank(args)) {
-            try {
-                arguments.putAll(QueueUtil.covertStringValueAsObjectMap(args));
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
+            arguments.putAll(QueueUtil.covertStringValueAsObjectMap(args));
             this.deadLetterExchange = (String) arguments.get(X_DEAD_LETTER_EXCHANGE);
             Object messageTtl = arguments.get(X_MESSAGE_TTL);
             if (messageTtl != null && NumberUtils.isCreatable(messageTtl.toString())) {
@@ -133,14 +133,42 @@ public class PersistentQueue extends AbstractAmqpQueue {
                     && StringUtils.isNotBlank(deadLetterRoutingKey)) {
                 // init producer
                 NamespaceName namespaceName = TopicName.get(indexTopic.getName()).getNamespaceObject();
-                String topic = TopicUtil.getTopicName(PersistentExchange.TOPIC_PREFIX,
+                String topic = getTopicName(PersistentExchange.TOPIC_PREFIX,
                         namespaceName.getTenant(), namespaceName.getLocalName(), deadLetterExchange);
                 this.deadLetterProducer = initDeadLetterProducer(indexTopic, topic);
             }
         }
-        this.isActive = true;
-        // start check expired
-        scheduledExecutor.execute(this::readEntries);
+    }
+
+    public void startMessageExpireChecker(int queueSize){
+        initDefaultSubscription(queueSize)
+                .thenRun(() -> {
+                    initMessageExpire();
+                    this.defaultSubscription = indexTopic.getSubscriptions().get(DEFAULT_SUBSCRIPTION);
+                    // start check expired
+                    this.isActive = true;
+                    scheduledExecutor.execute(this::readEntries);
+                    log.info("[{}] Message expiration checker started successfully", indexTopic.getName());
+                });
+    }
+
+    public CompletableFuture<Void> initDefaultSubscription(int queueSize){
+        try {
+            return indexTopic.getBrokerService().pulsar()
+                    .getClient()
+                    .newConsumer()
+                    .topic(indexTopic.getName())
+                    .subscriptionType(SubscriptionType.Shared)
+                    .subscriptionName(DEFAULT_SUBSCRIPTION)
+                    .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
+                    .consumerName(UUID.randomUUID().toString())
+                    .receiverQueueSize(queueSize)
+                    .negativeAckRedeliveryDelay(0, TimeUnit.MILLISECONDS)
+                    .subscribeAsync()
+                    .thenCompose(Consumer::closeAsync);
+        } catch (PulsarServerException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public void readEntries() {
@@ -408,7 +436,7 @@ public class PersistentQueue extends AbstractAmqpQueue {
     public void close(){
         this.isActive = false;
         if (deadLetterProducer != null){
-            deadLetterProducer.thenAccept(Producer::closeAsync);
+            deadLetterProducer.thenAcceptAsync(Producer::closeAsync);
         }
     }
 

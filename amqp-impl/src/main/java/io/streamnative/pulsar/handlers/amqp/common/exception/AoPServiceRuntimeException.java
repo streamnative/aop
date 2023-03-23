@@ -53,4 +53,15 @@ public class AoPServiceRuntimeException extends RuntimeException {
         }
     }
 
+    public static class NoSuchQueueException extends AoPServiceRuntimeException{
+        public NoSuchQueueException(String message) {
+            super(message);
+        }
+    }
+
+    public static class NoSuchExchangeException extends AoPServiceRuntimeException{
+        public NoSuchExchangeException(String message) {
+            super(message);
+        }
+    }
 }

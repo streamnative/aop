@@ -77,4 +77,34 @@ public class AmqpAdmin {
         return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
     }
 
+    /**
+     * Query the list of exchanges bound to the queue
+     *
+     * @param namespaceName
+     * @param exchange
+     * @param queue
+     * @param bindingParams
+     * @return
+     */
+    public CompletableFuture<Void> queueBindings(NamespaceName namespaceName,
+                                             String exchange,
+                                             String queue,
+                                             BindingParams bindingParams) {
+        String url = String.format("%s/queues/%s/e/%s/q/%s", baseUrl, namespaceName.getLocalName(), exchange, queue);
+        try {
+            return HttpUtil.postAsync(url, JsonUtil.toMap(bindingParams), Map.of("tenant", namespaceName.getTenant()));
+        } catch (JsonProcessingException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    public CompletableFuture<Void> queueUnbindings(NamespaceName namespaceName,
+                                               String exchange,
+                                               String queue,
+                                               String props) {
+        String url = String.format("%s/queues/%s/e/%s/q/%s/%s",
+                baseUrl, namespaceName.getLocalName(), exchange, queue, props);
+        return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
+    }
+
 }

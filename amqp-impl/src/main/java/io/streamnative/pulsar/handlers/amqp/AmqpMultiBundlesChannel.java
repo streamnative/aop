@@ -116,23 +116,6 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         params.setExclusive(exclusive);
         params.setAutoDelete(autoDelete);
         params.setArguments(FieldTable.convertToMap(arguments));
-        try {
-            connection.getPulsarService().getClient()
-                    .newConsumer()
-                    .topic(getTopicName(PersistentQueue.TOPIC_PREFIX, queue.toString()))
-                    .subscriptionType(SubscriptionType.Shared)
-                    .subscriptionName("AMQP_DEFAULT")
-                    .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
-                    .consumerName(UUID.randomUUID().toString())
-                    .receiverQueueSize(getConnection().getAmqpConfig().getAmqpPulsarConsumerQueueSize())
-                    .negativeAckRedeliveryDelay(0, TimeUnit.MILLISECONDS)
-                    .subscribe()
-                    .close();
-        } catch (Exception e) {
-            log.error("init default subscription fail", e);
-            handleAoPException(e);
-            return;
-        }
         getAmqpAdmin().queueDeclare(
                 connection.getNamespaceName(), queue.toString(), params).thenAccept(amqpQueue -> {
 //            setDefaultQueue(amqpQueue);
@@ -160,7 +143,11 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         params.setArguments(FieldTable.convertToMap(argumentsTable));
 
         getAmqpAdmin().queueBind(connection.getNamespaceName(),
-                exchange.toString(), queue.toString(), params).thenAccept(__ -> {
+                        exchange.toString(), queue.toString(), params)
+                .thenRun(() -> {
+                    getAmqpAdmin().queueBindings(connection.getNamespaceName(),
+                            exchange.toString(), queue.toString(), params);
+                }).thenAccept(__ -> {
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
@@ -180,7 +167,12 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         }
 
         getAmqpAdmin().queueUnbind(connection.getNamespaceName(), exchange.toString(),
-                queue.toString(), bindingKey.toString()).thenAccept(__ -> {
+                queue.toString(), bindingKey.toString())
+                .thenRun(() -> {
+                    getAmqpAdmin().queueUnbindings(connection.getNamespaceName(), exchange.toString(),
+                            queue.toString(), bindingKey.toString());
+                })
+                .thenAccept(__ -> {
             AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
             connection.writeFrame(responseBody.generateFrame(channelId));
         }).exceptionally(t -> {
@@ -405,6 +397,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         client.newConsumer()
                 .topic(getTopicName(PersistentQueue.TOPIC_PREFIX, queue))
                 .subscriptionType(SubscriptionType.Shared)
+                .property("client_ip", connection.getClientIp())
                 .subscriptionName("AMQP_DEFAULT")
                 .subscriptionInitialPosition(SubscriptionInitialPosition.Earliest)
                 .consumerName(UUID.randomUUID().toString())

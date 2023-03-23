@@ -22,7 +22,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -36,6 +35,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class QueueContainer {
 
+    @Getter
     private AmqpTopicManager amqpTopicManager;
     private PulsarService pulsarService;
     private ExchangeContainer exchangeContainer;
@@ -146,23 +146,7 @@ public class QueueContainer {
         CompletableFuture<AmqpQueue> existingAmqpExchangeFuture = queueMap.get(namespaceName).
                 putIfAbsent(queueName, queueCompletableFuture);
         if (existingAmqpExchangeFuture != null) {
-            if (passive) {
-                return existingAmqpExchangeFuture;
-            }
-            return existingAmqpExchangeFuture.thenCompose(amqpQueue -> {
-                if (amqpQueue instanceof PersistentQueue persistentQueue) {
-                    Map<String, Object> queueArguments = persistentQueue.getArguments();
-                    if (queueArguments.equals(arguments)
-                            || (MapUtils.isEmpty(queueArguments) && MapUtils.isEmpty(arguments))) {
-                        return existingAmqpExchangeFuture;
-                    }
-                    log.warn("Queue [{}] parameter change old [{}] new [{}]", queueName, queueArguments, arguments);
-                    amqpQueue.close();
-                    queueMap.get(namespaceName).remove(queueName);
-                    return asyncGetQueue(namespaceName, queueName, passive, durable, exclusive, autoDelete, nowait, arguments);
-                }
-                return CompletableFuture.failedFuture(new PulsarServerException("Unsupported queue type"));
-            });
+            return existingAmqpExchangeFuture;
         }
         String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
 
@@ -211,6 +195,8 @@ public class QueueContainer {
                             removeQueueFuture(namespaceName, queueName);
                             return;
                         }
+                    } else {
+                        amqpQueue.startMessageExpireChecker(config.getAmqpPulsarConsumerQueueSize());
                     }
                     queueCompletableFuture.complete(amqpQueue);
                 }

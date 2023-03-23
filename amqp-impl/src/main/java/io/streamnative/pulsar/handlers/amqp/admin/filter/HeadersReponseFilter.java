@@ -24,7 +24,7 @@ public class HeadersReponseFilter implements ContainerResponseFilter {
     @Override
     public void filter(ContainerRequestContext request, ContainerResponseContext response) {
         response.getHeaders().putSingle("Access-Control-Allow-Origin", "*");
-        response.getHeaders().putSingle("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT");
+        response.getHeaders().putSingle("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT, OPTIONS");
         response.getHeaders().putSingle("Access-Control-Allow-Headers", "x-requested-with, "
                 + "content-type, authorization, x-vhost");
         response.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");

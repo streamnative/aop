@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp.flow;
 
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import lombok.Getter;
 import org.apache.qpid.server.flow.FlowCreditManager;
 
 /**
@@ -22,6 +23,7 @@ import org.apache.qpid.server.flow.FlowCreditManager;
 public class AmqpFlowCreditManager implements FlowCreditManager {
 
     private volatile long bytesCreditLimit;
+    @Getter
     private volatile long messageCreditLimit;
 
     private volatile long bytesCredit;

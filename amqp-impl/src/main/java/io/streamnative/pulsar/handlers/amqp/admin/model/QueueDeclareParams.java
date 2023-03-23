@@ -31,5 +31,6 @@ public class QueueDeclareParams {
     private boolean exclusive;
     private String node;
     private Map<String, Object> arguments;
-
+    private String vhost;
+    private String name;
 }

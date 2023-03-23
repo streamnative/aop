@@ -20,12 +20,17 @@ import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.EXCHA
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.QUEUES;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.EXCLUSIVE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue.PASSIVE;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException.ExchangeParameterException;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,11 +78,32 @@ public class ExchangeUtil {
         return JSON_MAPPER.writeValueAsString(obj);
     }
 
-    public static Map<String, Object> covertStringValueAsObjectMap(String value) throws JsonProcessingException {
+    public static Map<String, Object> covertStringValueAsObjectMap(String value) {
         if (value == null || value.trim().isEmpty()) {
-            return null;
+            return new HashMap<>();
         }
-        return JSON_MAPPER.readValue(value, new TypeReference<>() {});
+        try {
+            return JSON_MAPPER.readValue(value, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static ExchangeDeclareParams covertMapAsParams(Map<String, String> map) {
+        String durable = map.get(PersistentQueue.DURABLE);
+        String autoDelete = map.get(PersistentQueue.AUTO_DELETE);
+        String internal = map.get(INTERNAL);
+        String type = map.get(TYPE);
+        String passive = map.get(PASSIVE);
+        String arguments = map.get(PersistentQueue.ARGUMENTS);
+        ExchangeDeclareParams params = new ExchangeDeclareParams();
+        params.setArguments(covertStringValueAsObjectMap(arguments));
+        params.setInternal(Boolean.parseBoolean(internal));
+        params.setType(type);
+        params.setPassive(Boolean.parseBoolean(passive));
+        params.setDurable(Boolean.parseBoolean(durable));
+        params.setAutoDelete(Boolean.parseBoolean(autoDelete));
+        return params;
     }
 
     public static Map<String, String> generateTopicProperties(String exchangeName,

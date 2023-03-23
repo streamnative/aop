@@ -85,16 +85,18 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private AmqpEntryWriter amqpEntryWriter;
 
     private ExchangeMessageRouter exchangeMessageRouter;
+    @Getter
     private Set<Binding> bindings;
 
     @NoArgsConstructor
     @AllArgsConstructor
-    @EqualsAndHashCode
+    @EqualsAndHashCode(exclude = {"source", "arguments"})
     @Data
-    static class Binding implements Serializable {
+    public static class Binding implements Serializable {
         private String des;
         private String desType;
         private String key;
+        private String source;
         private Map<String, Object> arguments;
     }
 
@@ -402,7 +404,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
-        this.bindings.add(new Binding(queue, "queue", routingKey, arguments));
+        this.bindings.add(new Binding(queue, "queue", routingKey, exchangeName, arguments));
         String bindingsJson;
         try {
             bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
@@ -430,7 +432,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
-        this.bindings.remove(new Binding(queue, "queue", routingKey, arguments));
+        this.bindings.remove(new Binding(queue, "queue", routingKey, exchangeName, arguments));
         String bindingsJson;
         try {
             bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);

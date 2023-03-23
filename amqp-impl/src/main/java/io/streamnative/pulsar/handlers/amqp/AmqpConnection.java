@@ -88,6 +88,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 
     private long connectionId;
+    @Getter
     private final ConcurrentLongHashMap<AmqpChannel> channels;
     private final ConcurrentLongLongHashMap closingChannelsList = new ConcurrentLongLongHashMap();
     @Getter
@@ -111,6 +112,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     @Getter
     private AmqpBrokerService amqpBrokerService;
     private AuthenticationState authenticationState;
+    @Getter
+    private String clientIp;
+    @Getter
+    private long connectedAt;
 
     public AmqpConnection(AmqpServiceConfiguration amqpConfig,
                           AmqpBrokerService amqpBrokerService) {
@@ -187,6 +192,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         if (log.isDebugEnabled()) {
             log.debug("RECV ConnectionStartOk[clientProperties: {}, mechanism: {}, locale: {}]",
                     clientProperties, mechanism, locale);
+        }
+        if (clientProperties != null) {
+            String clientIp = (String) clientProperties.get("client_ip");
+            if (clientIp != null) {
+                log.info("RECV Client Ip:{}", clientIp);
+                this.clientIp = clientIp.replace("/", "");
+                return;
+            }
         }
         assertState(ConnectionState.AWAIT_START_OK);
         // TODO clientProperties
@@ -351,6 +364,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
+        connectedAt = System.currentTimeMillis();
         amqpBrokerService.getConnectionContainer().addConnection(namespaceName, this);
     }
 

@@ -32,7 +32,7 @@ public class Vhosts extends ExchangeBase {
 
     @GET
     public void getList(@Suspended final AsyncResponse response) {
-        getVhostListAsync()
+        getAllVhostListAsync()
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
                     log.error("Failed to get vhost list for tenant {}", tenant, t);

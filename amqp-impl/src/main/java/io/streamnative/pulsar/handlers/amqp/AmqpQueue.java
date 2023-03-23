@@ -33,7 +33,9 @@ public interface AmqpQueue {
     String getName();
 
     boolean getDurable();
-
+    boolean getExclusive();
+    boolean getAutoDelete();
+    Map<String, Object> getArguments();
     /**
      * Write the index message into the queue.
      */

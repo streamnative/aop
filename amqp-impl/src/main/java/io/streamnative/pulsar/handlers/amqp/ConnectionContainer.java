@@ -18,6 +18,7 @@ import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.NamespaceBundleOwnershipListener;
@@ -30,6 +31,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 @Slf4j
 public class ConnectionContainer {
 
+    @Getter
     private Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     protected ConnectionContainer(PulsarService pulsarService,

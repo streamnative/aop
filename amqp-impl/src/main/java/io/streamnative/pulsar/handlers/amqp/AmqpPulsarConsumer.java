@@ -77,12 +77,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         Map<String, String> properties = pulsarAdmin.topics().getProperties(consumer.getTopic());
         String args = properties.get(PersistentQueue.ARGUMENTS);
         if (StringUtils.isNotBlank(args)) {
-            Map<String, Object> arguments;
-            try {
-                arguments = QueueUtil.covertStringValueAsObjectMap(args);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
+            Map<String, Object> arguments = QueueUtil.covertStringValueAsObjectMap(args);
             Object dleExchangeName;
             String dleName;
             this.routingKey = (String) arguments.get("x-dead-letter-routing-key");

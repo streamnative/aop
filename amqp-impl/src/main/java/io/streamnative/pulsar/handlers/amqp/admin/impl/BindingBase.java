@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.pulsar.broker.web.RestException;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
 
@@ -65,28 +66,6 @@ public class BindingBase extends BaseResources {
                         beans.add(bean);
                     }
                 }).thenApply(__ -> beans);
-    }
-
-    protected CompletableFuture<Void> queueBindAsync(String vhost, String exchange, String queue,
-                                                     BindingParams params) {
-        if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
-            return exchangeService().queueBind(NamespaceName.get(tenant, vhost), exchange, queue,
-                    params.getRoutingKey(), params.getArguments());
-        } else {
-            return queueService().queueBind(NamespaceName.get(tenant, vhost), queue, exchange, params.getRoutingKey(),
-                    false, FieldTable.convertToFieldTable(params.getArguments()), -1);
-        }
-    }
-
-    protected CompletableFuture<Void> queueUnbindAsync(String vhost, String exchange, String queue,
-                                                       String propertiesKey) {
-        if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
-            return exchangeService().queueUnBind(NamespaceName.get(tenant, vhost), exchange, queue,
-                    propertiesKey, null);
-        } else {
-            return queueService().queueUnbind(NamespaceName.get(tenant, vhost), queue, exchange, propertiesKey,
-                    null, -1);
-        }
     }
 
 }

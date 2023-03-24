@@ -252,8 +252,8 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                             + "exclusive:{}, autoDelete:{}, nowait:{}, arguments:{} ]",
                     channelId, queue, passive, durable, exclusive, autoDelete, nowait, arguments);
         }
-        queueService.queueDeclare(connection.getNamespaceName(), queue.toString(), passive, durable, exclusive,
-                autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
+        queueService.queueDeclare(connection.getNamespaceName(), queue == null ? null : queue.toString(), passive,
+                durable, exclusive, autoDelete, nowait, arguments, connection.getConnectionId()).thenAccept(amqpQueue -> {
             setDefaultQueue(amqpQueue);
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(

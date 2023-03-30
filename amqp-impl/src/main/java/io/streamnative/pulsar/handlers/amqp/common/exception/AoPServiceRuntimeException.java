@@ -64,4 +64,14 @@ public class AoPServiceRuntimeException extends RuntimeException {
             super(message);
         }
     }
+
+    public static class GetMessageException extends AoPServiceRuntimeException{
+        public GetMessageException(String message) {
+            super(message);
+        }
+
+        public GetMessageException(Exception e) {
+            super(e);
+        }
+    }
 }

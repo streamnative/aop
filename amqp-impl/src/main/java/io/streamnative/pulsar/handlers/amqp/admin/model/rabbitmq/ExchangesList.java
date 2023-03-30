@@ -25,6 +25,7 @@ public class ExchangesList {
         private boolean durable;
         private boolean internal;
         private String name;
+        private String fullName;
         private String type;
         private String user_who_performed_action;
         private String vhost;
@@ -32,15 +33,10 @@ public class ExchangesList {
 
         @NoArgsConstructor
         @Data
-        public static class ArgumentsBean {
-        }
-
-        @NoArgsConstructor
-        @Data
         public static class MessageStatsBean {
-            private int publish_in;
+            private long publish_in;
             private PublishInDetailsBean publish_in_details;
-            private int publish_out;
+            private long publish_out;
             private PublishOutDetailsBean publish_out_details;
 
             @NoArgsConstructor

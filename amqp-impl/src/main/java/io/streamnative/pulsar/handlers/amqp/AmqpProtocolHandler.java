@@ -116,7 +116,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
                 log.error("Failed to start amqp proxy service.");
             }
         }
-        startAdminResource(amqpConfig.getAmqpAdminPort());
+        startAdminResource(amqpConfig.getAdvertisedAddress(), amqpConfig.getAmqpAdminPort());
         log.info("Starting AmqpProtocolHandler, listener: {}, aop version is: '{}'",
                 getAppliedAmqpListeners(amqpConfig), AopVersion.getVersion());
         log.info("Git Revision {}", AopVersion.getGitSha());
@@ -129,16 +129,16 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     // You can use this to test the interface provided by the admin service
     public static void main(String[] args) throws InterruptedException {
         AmqpProtocolHandler handler = new AmqpProtocolHandler();
-        handler.startAdminResource(15672);
+        handler.startAdminResource("192.168.0.105", 15672);
         Thread.currentThread().join();
     }
 
-    private void startAdminResource(int port) {
+    private void startAdminResource(String bindAddress, int port) {
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/api");
         context.setAttribute("aop", this);
 
-        webServer = new Server(port);
+        webServer = new Server(InetSocketAddress.createUnresolved(bindAddress, port));
         webServer.setHandler(context);
 
         ServletHolder jerseyServlet = context.addServlet(ServletContainer.class, "/*");

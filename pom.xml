@@ -149,7 +149,7 @@
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-broker</artifactId>
-      <scope>provided</scope>
+<!--      <scope>provided</scope>-->
     </dependency>
 
     <dependency>

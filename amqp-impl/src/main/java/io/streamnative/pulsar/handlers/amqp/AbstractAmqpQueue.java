@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Getter;
 
 /**
  * Base class for AMQP queue.
@@ -33,6 +34,7 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     protected boolean autoDelete;
     protected final Map<String, AmqpMessageRouter> routers = new ConcurrentHashMap<>();
     protected final Map<String, Object> arguments = new HashMap<>();
+    @Getter
     protected Map<String, String> properties;
 
     protected AbstractAmqpQueue(String queueName, boolean durable, long connectionId) {

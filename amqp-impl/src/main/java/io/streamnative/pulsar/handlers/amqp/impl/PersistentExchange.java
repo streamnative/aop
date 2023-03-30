@@ -100,11 +100,11 @@ public class PersistentExchange extends AbstractAmqpExchange {
         private Map<String, Object> arguments;
     }
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
+    public PersistentExchange(String exchangeName, Map<String, String> properties, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
                               ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
             throws JsonProcessingException {
-        super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
+        super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments, properties);
         this.persistentTopic = persistentTopic;
         this.existDelayedType = arguments != null && arguments.containsKey(X_DELAYED_TYPE);
         topicNameValidate();

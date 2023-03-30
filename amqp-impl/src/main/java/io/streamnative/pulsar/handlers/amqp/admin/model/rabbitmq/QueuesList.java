@@ -21,13 +21,14 @@ public class QueuesList {
     @NoArgsConstructor
     @Data
     public static class ItemsBean {
+        private String fullName;
         private Map<String, Object> arguments;
         private boolean auto_delete;
-        private BackingQueueStatusBean backing_queue_status;
+        private Map<String, Object> backing_queue_status;
         private Object consumer_utilisation;
         private int consumers;
         private boolean durable;
-        private EffectivePolicyDefinitionBean effective_policy_definition;
+        private Map<String, Object> effective_policy_definition;
         private boolean exclusive;
         private Object exclusive_consumer_tag;
         private GarbageCollectionBean garbage_collection;
@@ -41,15 +42,15 @@ public class QueuesList {
         private int message_bytes_ready;
         private int message_bytes_unacknowledged;
         private long messages;
-        private MessagesDetailsBean messages_details;
+        private RateBean messages_details;
         private int messages_paged_out;
         private int messages_persistent;
         private int messages_ram;
         private long messages_ready;
-        private MessagesReadyDetailsBean messages_ready_details;
+        private RateBean messages_ready_details;
         private int messages_ready_ram;
         private long messages_unacknowledged;
-        private MessagesUnacknowledgedDetailsBean messages_unacknowledged_details;
+        private RateBean messages_unacknowledged_details;
         private int messages_unacknowledged_ram;
         private String name;
         private String node;
@@ -57,25 +58,10 @@ public class QueuesList {
         private Object policy;
         private Object recoverable_slaves;
         private long reductions;
-        private ReductionsDetailsBean reductions_details;
+        private RateBean reductions_details;
         private String state;
         private String vhost;
         private MessageStatsBean message_stats;
-
-        @NoArgsConstructor
-        @Data
-        public static class ArgumentsBean {
-        }
-
-        @NoArgsConstructor
-        @Data
-        public static class BackingQueueStatusBean {
-        }
-
-        @NoArgsConstructor
-        @Data
-        public static class EffectivePolicyDefinitionBean {
-        }
 
         @NoArgsConstructor
         @Data
@@ -89,95 +75,28 @@ public class QueuesList {
 
         @NoArgsConstructor
         @Data
-        public static class MessagesDetailsBean {
-            private double rate;
-        }
-
-        @NoArgsConstructor
-        @Data
-        public static class MessagesReadyDetailsBean {
-            private double rate;
-        }
-
-        @NoArgsConstructor
-        @Data
-        public static class MessagesUnacknowledgedDetailsBean {
-            private double rate;
-        }
-
-        @NoArgsConstructor
-        @Data
-        public static class ReductionsDetailsBean {
-            private double rate;
-        }
-
-        @NoArgsConstructor
-        @Data
         public static class MessageStatsBean {
             private int ack;
-            private AckDetailsBean ack_details;
+            private RateBean ack_details;
             private int deliver;
-            private DeliverDetailsBean deliver_details;
+            private RateBean deliver_details;
             private int deliver_get;
-            private DeliverGetDetailsBean deliver_get_details;
+            private RateBean deliver_get_details;
             private int deliver_no_ack;
-            private DeliverNoAckDetailsBean deliver_no_ack_details;
+            private RateBean deliver_no_ack_details;
             private int get;
-            private GetDetailsBean get_details;
+            private RateBean get_details;
             private int get_no_ack;
-            private GetNoAckDetailsBean get_no_ack_details;
+            private RateBean get_no_ack_details;
             private int redeliver;
-            private RedeliverDetailsBean redeliver_details;
+            private RateBean redeliver_details;
             private long publish;
-            private PublishDetailsBean publish_details;
-
-            @NoArgsConstructor
-            @Data
-            public static class PublishDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class AckDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class DeliverDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class DeliverGetDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class DeliverNoAckDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class GetDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class GetNoAckDetailsBean {
-                private double rate;
-            }
-
-            @NoArgsConstructor
-            @Data
-            public static class RedeliverDetailsBean {
-                private double rate;
-            }
+            private RateBean publish_details;
         }
+    }
+    @NoArgsConstructor
+    @Data
+    public static class RateBean {
+        private double rate;
     }
 }

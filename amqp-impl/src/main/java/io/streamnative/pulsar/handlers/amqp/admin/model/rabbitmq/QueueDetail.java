@@ -1,10 +1,13 @@
 package io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq;
 
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 
 @NoArgsConstructor
 @Data
@@ -42,6 +45,7 @@ public class QueueDetail {
     private RateBean messages_unacknowledged_details;
     private int messages_unacknowledged_ram;
     private String name;
+    private String fullName;
     private String node;
     private Object operator_policy;
     private Object policy;
@@ -62,13 +66,6 @@ public class QueueDetail {
         private int min_bin_vheap_size;
         private int min_heap_size;
         private int minor_gcs;
-    }
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Data
-    public static class SamplesBean {
-        private int sample;
-        private long timestamp;
     }
     @NoArgsConstructor
     @Data
@@ -98,7 +95,14 @@ public class QueueDetail {
         private double avg;
         private double avg_rate;
         private double rate;
-        private List<SamplesBean> samples;
+        private List<SamplesBean> samples = Lists.newArrayList();
+
+        public void setSamples(List<SamplesBean> samples) {
+            if (samples == null || samples.isEmpty()) {
+                return;
+            }
+            this.samples = samples;
+        }
     }
 
     @NoArgsConstructor

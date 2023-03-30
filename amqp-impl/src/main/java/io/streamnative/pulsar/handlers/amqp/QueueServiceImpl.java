@@ -299,8 +299,7 @@ public class QueueServiceImpl implements QueueService {
         queueContainer.asyncGetQueue(namespaceName, queueName, passive, durable, exclusive, autoDelete, nowait,
                 arguments).whenComplete((queue, throwable) -> {
             if (throwable != null) {
-                future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR, "Failed to get queue "
-                        + queueName + " in vhost " + namespaceName.getLocalName(), false, true));
+                future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR, throwable.getMessage(), false, true));
                 return;
             }
             if (queue != null && queue.isExclusive() && queue.getConnectionId() != connectionId) {

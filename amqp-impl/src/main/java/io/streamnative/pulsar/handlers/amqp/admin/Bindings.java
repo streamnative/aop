@@ -67,6 +67,7 @@ public class Bindings extends BindingBase {
                 namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> queueBindAsync(namespaceName, exchange, queue, params))
+                .thenCompose(__ -> amqpAdmin().queueBindExchange(namespaceName, exchange, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
@@ -108,10 +109,13 @@ public class Bindings extends BindingBase {
                 namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> queueUnbindAsync(namespaceName, exchange, queue, propsKey))
+                .thenCompose(__ -> amqpAdmin().queueUnBindExchange(namespaceName, exchange, queue, propsKey))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
-                    log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",
-                            queue, exchange, propsKey, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",
+                                queue, exchange, propsKey, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

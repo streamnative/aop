@@ -120,7 +120,8 @@ public class AmqpTopicManager {
                     topicName, lookupOp.get().getLookupData().getBrokerUrl());
         }
         if (properties != null) {
-            return pulsarService.getBrokerService().getTopicIfExists(topicName).thenCompose(topic -> {
+            return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
+            /*return pulsarService.getBrokerService().getTopicIfExists(topicName).thenCompose(topic -> {
                 if (topic.isPresent()) {
                     CompletableFuture<Optional<Topic>> future = new CompletableFuture<>();
                     // TODO The reason for the update is that it is compatible with historical topics and needs to do
@@ -141,7 +142,7 @@ public class AmqpTopicManager {
                 } else {
                     return pulsarService.getBrokerService().getTopic(topicName, createIfMissing, properties);
                 }
-            });
+            });*/
         } else {
             return pulsarService.getBrokerService().getTopic(topicName, createIfMissing);
         }

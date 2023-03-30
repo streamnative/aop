@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@ import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.utils.HttpUtil;
 import io.streamnative.pulsar.handlers.amqp.utils.JsonUtil;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -39,9 +40,10 @@ public class AmqpAdmin {
                                                    ExchangeDeclareParams exchangeDeclareParams) {
         String url = String.format("%s/exchanges/%s/%s", baseUrl, namespaceName.getLocalName(), exchange);
         try {
-            return HttpUtil.putAsync(url, JsonUtil.toMap(exchangeDeclareParams), Map.of("tenant", namespaceName.getTenant()));
+            return HttpUtil.putAsync(url, JsonUtil.toMap(exchangeDeclareParams),
+                    Map.of("tenant", namespaceName.getTenant()));
         } catch (JsonProcessingException e) {
-            return  CompletableFuture.failedFuture(e);
+            return CompletableFuture.failedFuture(e);
         }
     }
 
@@ -50,10 +52,16 @@ public class AmqpAdmin {
                                                 QueueDeclareParams queueDeclareParams) {
         String url = String.format("%s/queues/%s/%s", baseUrl, namespaceName.getLocalName(), queue);
         try {
-            return HttpUtil.putAsync(url, JsonUtil.toMap(queueDeclareParams), Map.of("tenant", namespaceName.getTenant()));
+            return HttpUtil.putAsync(url, JsonUtil.toMap(queueDeclareParams),
+                    Map.of("tenant", namespaceName.getTenant()));
         } catch (JsonProcessingException e) {
             return CompletableFuture.failedFuture(e);
         }
+    }
+
+    public CompletableFuture<Void> startExpirationDetection(NamespaceName namespaceName, String queue) {
+        String url = String.format("%s/queues/%s/%s/startExpirationDetection", baseUrl, namespaceName.getLocalName(), queue);
+        return HttpUtil.putAsync(url, new HashMap<>(1), Map.of("tenant", namespaceName.getTenant()));
     }
 
     public CompletableFuture<Void> queueBind(NamespaceName namespaceName,
@@ -68,6 +76,28 @@ public class AmqpAdmin {
         }
     }
 
+    public CompletableFuture<Void> queueBindExchange(NamespaceName namespaceName,
+                                                     String exchange,
+                                                     String queue,
+                                                     BindingParams bindingParams) {
+        String url = String.format("%s/queueBindExchange/%s/e/%s/q/%s", baseUrl, namespaceName.getLocalName(), exchange,
+                queue);
+        try {
+            return HttpUtil.postAsync(url, JsonUtil.toMap(bindingParams), Map.of("tenant", namespaceName.getTenant()));
+        } catch (JsonProcessingException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    public CompletableFuture<Void> queueUnBindExchange(NamespaceName namespaceName,
+                                                       String exchange,
+                                                       String queue,
+                                                       String props) {
+        String url = String.format("%s/queueUnBindExchange/%s/e/%s/q/%s/%s",
+                baseUrl, namespaceName.getLocalName(), exchange, queue, props);
+        return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
+    }
+
     public CompletableFuture<Void> queueUnbind(NamespaceName namespaceName,
                                                String exchange,
                                                String queue,
@@ -76,35 +106,4 @@ public class AmqpAdmin {
                 baseUrl, namespaceName.getLocalName(), exchange, queue, props);
         return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
     }
-
-    /**
-     * Query the list of exchanges bound to the queue
-     *
-     * @param namespaceName
-     * @param exchange
-     * @param queue
-     * @param bindingParams
-     * @return
-     */
-    public CompletableFuture<Void> queueBindings(NamespaceName namespaceName,
-                                             String exchange,
-                                             String queue,
-                                             BindingParams bindingParams) {
-        String url = String.format("%s/queues/%s/e/%s/q/%s", baseUrl, namespaceName.getLocalName(), exchange, queue);
-        try {
-            return HttpUtil.postAsync(url, JsonUtil.toMap(bindingParams), Map.of("tenant", namespaceName.getTenant()));
-        } catch (JsonProcessingException e) {
-            return CompletableFuture.failedFuture(e);
-        }
-    }
-
-    public CompletableFuture<Void> queueUnbindings(NamespaceName namespaceName,
-                                               String exchange,
-                                               String queue,
-                                               String props) {
-        String url = String.format("%s/queues/%s/e/%s/q/%s/%s",
-                baseUrl, namespaceName.getLocalName(), exchange, queue, props);
-        return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
-    }
-
 }

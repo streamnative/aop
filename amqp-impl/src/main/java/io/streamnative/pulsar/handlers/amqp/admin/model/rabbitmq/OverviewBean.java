@@ -1,5 +1,6 @@
 package io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq;
 
+import com.google.common.collect.Lists;
 import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -40,14 +41,7 @@ public class OverviewBean {
         private double rate;
         private double avg_rate;
         private double avg;
-        private List<SamplesBean> samples;
-    }
-
-    @NoArgsConstructor
-    @Data
-    public static class SamplesBean {
-        private long sample;
-        private long timestamp;
+        private List<SamplesBean> samples = Lists.newArrayList();
     }
 
     @NoArgsConstructor
@@ -55,7 +49,7 @@ public class OverviewBean {
     public static class MessageStatsBean {
         private long ack;
         private RateBean ack_details;
-        private int confirm;
+        private long confirm;
         private RateBean confirm_details;
         private long deliver;
         private RateBean deliver_details;

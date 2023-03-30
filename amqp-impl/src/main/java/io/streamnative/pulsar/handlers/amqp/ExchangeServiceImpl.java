@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,7 +61,8 @@ public class ExchangeServiceImpl implements ExchangeService {
         if (isBuildInExchange(exchange)) {
             createIfMissing = true;
             exchangeType = getExchangeType(exchange);
-        } else if (arguments != null && StringUtils.isNotBlank(delayedExchange = (String)arguments.get(PersistentExchange.X_DELAYED_TYPE))) {
+        } else if (arguments != null && StringUtils.isNotBlank(
+                delayedExchange = (String) arguments.get(PersistentExchange.X_DELAYED_TYPE))) {
             exchangeType = delayedExchange;
         } else {
             exchangeType = type;
@@ -75,8 +76,8 @@ public class ExchangeServiceImpl implements ExchangeService {
                             future.completeExceptionally(throwable);
                             return;
                         }
-                        future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
-                                "Failed to get " + exchange + " in vhost " + namespaceName, false, true));
+                        future.completeExceptionally(
+                                new AoPException(ErrorCodes.NOT_FOUND, throwable.getMessage(), false, true));
                         return;
                     }
                     if (ex == null) {
@@ -113,7 +114,7 @@ public class ExchangeServiceImpl implements ExchangeService {
                     }
 
                     future.complete(ex);
-        });
+                });
         return future;
     }
 
@@ -133,39 +134,40 @@ public class ExchangeServiceImpl implements ExchangeService {
         CompletableFuture<Void> future = new CompletableFuture<>();
         exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null)
                 .whenComplete((amqpExchange, throwable) -> {
-            if (throwable != null) {
-                log.error("Failed to get topic {}/{} from container.",
-                        namespaceName, exchange, throwable);
-                future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND, "Failed to get exchange "
-                        + exchange + " from exchange container, vhost is " + namespaceName, false, true));
-                return;
-            }
-            if (null == amqpExchange) {
-                future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
-                        "Unknown exchange: '" + exchangeName + "' in vhost " + namespaceName, true, false));
-                return;
-            }
-            PersistentTopic topic = (PersistentTopic) amqpExchange.getTopic();
-            if (ifUnused && !topic.getSubscriptions().isEmpty()) {
-                future.completeExceptionally(
-                        new AoPException(ErrorCodes.IN_USE, "Exchange " + exchange + " has bindings.", true, false));
-                return;
-            }
-            topic.delete().thenAccept(__ -> {
-                exchangeContainer.deleteExchange(namespaceName, exchangeName);
-                future.complete(null);
-            }).exceptionally(t -> {
-                future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR,
-                        "Failed to delete topic " + exchange + " in vhost " + namespaceName, false, true));
-                return null;
-            });
-        });
+                    if (throwable != null) {
+                        log.error("Failed to get topic {}/{} from container.",
+                                namespaceName, exchange, throwable);
+                        future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND, "Failed to get exchange "
+                                + exchange + " from exchange container, vhost is " + namespaceName, false, true));
+                        return;
+                    }
+                    if (null == amqpExchange) {
+                        future.completeExceptionally(new AoPException(ErrorCodes.NOT_FOUND,
+                                "Unknown exchange: '" + exchangeName + "' in vhost " + namespaceName, true, false));
+                        return;
+                    }
+                    PersistentTopic topic = (PersistentTopic) amqpExchange.getTopic();
+                    if (ifUnused && !topic.getSubscriptions().isEmpty()) {
+                        future.completeExceptionally(
+                                new AoPException(ErrorCodes.IN_USE, "Exchange " + exchange + " has bindings.", true,
+                                        false));
+                        return;
+                    }
+                    topic.delete().thenAccept(__ -> {
+                        exchangeContainer.deleteExchange(namespaceName, exchangeName);
+                        future.complete(null);
+                    }).exceptionally(t -> {
+                        future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR,
+                                "Failed to delete topic " + exchange + " in vhost " + namespaceName, false, true));
+                        return null;
+                    });
+                });
         return future;
     }
 
     @Override
     public CompletableFuture<Integer> exchangeBound(NamespaceName namespaceName, String exchange, String routingKey,
-                              String queueName) {
+                                                    String queueName) {
         String exchangeName = formatExchangeName(exchange);
         CompletableFuture<Integer> future = new CompletableFuture<>();
         exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null)

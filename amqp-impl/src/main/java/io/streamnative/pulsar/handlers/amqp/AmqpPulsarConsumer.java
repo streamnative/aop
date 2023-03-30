@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.PositionImpl;
@@ -63,10 +64,13 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
     private final PulsarAdmin pulsarAdmin;
     private String routingKey;
     private String dleExchangeName;
+    @Getter
+    private final String queue;
 
-    public AmqpPulsarConsumer(String consumerTag, Consumer<byte[]> consumer, boolean autoAck, AmqpChannel amqpChannel,
+    public AmqpPulsarConsumer(String queue, String consumerTag, Consumer<byte[]> consumer, boolean autoAck, AmqpChannel amqpChannel,
                               PulsarService pulsarService)
             throws PulsarAdminException, PulsarServerException {
+        this.queue = queue;
         this.consumerTag = consumerTag;
         this.consumer = consumer;
         this.autoAck = autoAck;

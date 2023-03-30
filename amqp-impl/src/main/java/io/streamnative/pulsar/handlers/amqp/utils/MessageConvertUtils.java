@@ -65,14 +65,14 @@ public final class MessageConvertUtils {
     private static final String FAKE_AMQP_PRODUCER_NAME = "fake_amqp_producer_name";
     private static final String DEFAULT_CHARSET_NAME = "ISO8859-1";
     private static final String PROP_DELIMITER = ".";
-    private static final String BASIC_PROP_PRE = "_bp_" + PROP_DELIMITER;
-    private static final String BASIC_PROP_HEADER_PRE = "_bph_" + PROP_DELIMITER;
+    public static final String BASIC_PROP_PRE = "_bp_" + PROP_DELIMITER;
+    public static final String BASIC_PROP_HEADER_PRE = "_bph_" + PROP_DELIMITER;
     private static final String BASIC_PUBLISH_INFO_PRE = "_pi_" + PROP_DELIMITER;
 
-    private static final String PROP_CONTENT_TYPE = BASIC_PROP_PRE + "content_type";
-    private static final String PROP_ENCODING = BASIC_PROP_PRE + "encoding";
+    public static final String PROP_CONTENT_TYPE = BASIC_PROP_PRE + "content_type";
+    public static final String PROP_ENCODING = BASIC_PROP_PRE + "encoding";
     private static final String PROP_DELIVERY_MODE = BASIC_PROP_PRE + "delivery_mode";
-    private static final String PROP_PRIORITY_PRIORITY = BASIC_PROP_PRE + "priority";
+    public static final String PROP_PRIORITY_PRIORITY = BASIC_PROP_PRE + "priority";
     private static final String PROP_CORRELATION_ID = BASIC_PROP_PRE + "correlation_id";
     private static final String PROP_REPLY_TO = BASIC_PROP_PRE + "reply_to";
     public static final String PROP_EXPIRATION = BASIC_PROP_PRE + "expiration";

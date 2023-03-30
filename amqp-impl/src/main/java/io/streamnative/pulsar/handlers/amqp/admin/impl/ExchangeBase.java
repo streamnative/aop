@@ -21,6 +21,9 @@ import io.streamnative.pulsar.handlers.amqp.admin.model.PublishParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.ExchangeDetail;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.ExchangeSource;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.ExchangesList;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.ExchangeListMetrics;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.ExchangeRangeMetrics;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.PrometheusAdmin;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
@@ -30,17 +33,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.stats.TopicStatsImpl;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -101,22 +106,37 @@ public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<List<ExchangesList.ItemsBean>> getExchangeListByNamespaceAsync(String vhost) {
         NamespaceName namespaceName = getNamespaceName(vhost);
+        PrometheusAdmin prometheusAdmin = prometheusAdmin();
+        CompletableFuture<Map<String, ExchangeListMetrics>> exchangeDetailMetrics;
+        if (prometheusAdmin.isConfig()) {
+            exchangeDetailMetrics =
+                    prometheusAdmin.queryAllExchangeMetrics(
+                            namespaceName.getTenant() + "/" + namespaceName.getLocalName());
+        } else {
+            exchangeDetailMetrics = CompletableFuture.completedFuture(null);
+        }
         return getExchangeListAsync(namespaceName.getTenant(), namespaceName.getLocalName())
                 .thenCompose(exList -> {
                     List<ExchangesList.ItemsBean> itemsBeans = new CopyOnWriteArrayList<>();
-                    Stream<CompletableFuture<ExchangesList.ItemsBean>> futureStream =
+                    Stream<CompletableFuture<Void>> futureStream =
                             exList.stream().map(topic -> {
                                 String exchangeName = TopicName.get(topic).getLocalName()
                                         .substring(PersistentExchange.TOPIC_PREFIX.length());
                                 return getTopicProperties(namespaceName.toString(), PersistentExchange.TOPIC_PREFIX,
-                                        exchangeName).thenApply(properties -> {
+                                        exchangeName).thenAccept(properties -> {
+                                    if (properties == null || properties.isEmpty()) {
+                                        log.error("exchange properties set failed. name:{} ", topic);
+                                        return;
+                                    }
                                     ExchangeDeclareParams exchangeDeclareParams =
                                             ExchangeUtil.covertMapAsParams(properties);
                                     ExchangesList.ItemsBean itemsBean = new ExchangesList.ItemsBean();
                                     itemsBean.setName(exchangeName);
-                                    itemsBean.setDurable(exchangeDeclareParams.isDurable());
+                                    itemsBean.setFullName(TopicName.get(TopicDomain.persistent.value(), namespaceName,
+                                            PersistentExchange.TOPIC_PREFIX + exchangeName).toString());
+                                    itemsBean.setDurable(true);
                                     itemsBean.setInternal(exchangeDeclareParams.isInternal());
-                                    itemsBean.setType(exchangeDeclareParams.getType());
+                                    itemsBean.setType(exchangeDeclareParams.getType().toLowerCase());
                                     itemsBean.setArguments(exchangeDeclareParams.getArguments());
                                     itemsBean.setAuto_delete(exchangeDeclareParams.isAutoDelete());
                                     itemsBean.setVhost(vhost);
@@ -133,15 +153,25 @@ public class ExchangeBase extends BaseResources {
                                     messageStatsBean.setPublish_in_details(publishInDetailsBean);
                                     itemsBean.setMessage_stats(messageStatsBean);
                                     itemsBeans.add(itemsBean);
-                                    return itemsBean;
                                 });
                             });
-                    List<CompletableFuture<ExchangesList.ItemsBean>> futures =
+                    List<CompletableFuture<Void>> futures =
                             futureStream.collect(Collectors.toList());
                     return FutureUtil.waitForAll(futures).thenApply(__ -> {
                         itemsBeans.sort(Comparator.comparing(ExchangesList.ItemsBean::getName));
                         return itemsBeans;
-                    });
+                    }).thenCompose(ib -> exchangeDetailMetrics.thenApply(map -> {
+                        if (MapUtils.isEmpty(map)) {
+                            return ib;
+                        }
+                        ib.forEach(itemsBean -> {
+                            ExchangeListMetrics metrics = map.get(itemsBean.getFullName());
+                            if (metrics != null) {
+                                itemsBean.getMessage_stats().getPublish_in_details().setRate(metrics.getInRate());
+                            }
+                        });
+                        return ib;
+                    }));
                 });
     }
 
@@ -173,9 +203,21 @@ public class ExchangeBase extends BaseResources {
         });
     }
 
-    protected CompletableFuture<ExchangeDetail> getExchangeDetailAsync(String vhost, String exchangeName) {
+    protected CompletableFuture<ExchangeDetail> getExchangeDetailAsync(String vhost, String exchangeName, int age,
+                                                                       int incr) {
+        NamespaceName namespaceName = getNamespaceName(vhost);
+        PrometheusAdmin prometheusAdmin = prometheusAdmin();
+        CompletableFuture<Map<String, ExchangeRangeMetrics>> exchangeDetailMetrics;
+        if (prometheusAdmin.isConfig()) {
+            exchangeDetailMetrics =
+                    prometheusAdmin.queryRangeExchangeDetailMetrics(
+                            namespaceName.getTenant() + "/" + namespaceName.getLocalName(), exchangeName, age, incr);
+        } else {
+            exchangeDetailMetrics = CompletableFuture.completedFuture(null);
+        }
+
         return exchangeContainer().asyncGetExchange(
-                getNamespaceName(vhost), exchangeName, false, null).thenApply(ex -> {
+                namespaceName, exchangeName, false, null).thenApply(ex -> {
             ExchangeDetail exchangeBean = new ExchangeDetail();
             Topic exchangeTopic = ex.getTopic();
             TopicStatsImpl stats = exchangeTopic.getStats(false, false, false);
@@ -183,6 +225,8 @@ public class ExchangeBase extends BaseResources {
                 exchangeBean.setName(exchangeName);
                 exchangeBean.setType(persistentExchange.getType().toString().toLowerCase());
                 exchangeBean.setVhost(vhost);
+                exchangeBean.setFullName(TopicName.get(TopicDomain.persistent.value(), namespaceName,
+                        PersistentExchange.TOPIC_PREFIX + exchangeName).toString());
                 exchangeBean.setAuto_delete(persistentExchange.getAutoDelete());
                 exchangeBean.setDurable(persistentExchange.getDurable());
                 exchangeBean.setInternal(persistentExchange.getInternal());
@@ -196,15 +240,6 @@ public class ExchangeBase extends BaseResources {
                 ExchangeDetail.MessageStatsBean.PublishOutDetailsBean publishOutDetailsBean =
                         new ExchangeDetail.MessageStatsBean.PublishOutDetailsBean();
                 publishInDetailsBean.setRate(stats.getMsgRateIn());
-                ExchangeDetail.MessageStatsBean.PublishInDetailsBean.SamplesBean samplesBean =
-                        new ExchangeDetail.MessageStatsBean.PublishInDetailsBean.SamplesBean();
-                samplesBean.setTimestamp(System.currentTimeMillis());
-                publishInDetailsBean.setSamples(Lists.newArrayList(samplesBean));
-                // --
-                ExchangeDetail.MessageStatsBean.PublishOutDetailsBean.SamplesBeanX samplesBeanX =
-                        new ExchangeDetail.MessageStatsBean.PublishOutDetailsBean.SamplesBeanX();
-                samplesBeanX.setTimestamp(System.currentTimeMillis());
-                publishOutDetailsBean.setSamples(Lists.newArrayList(samplesBeanX));
                 publishOutDetailsBean.setRate(stats.getMsgRateOut());
                 messageStatsBean.setPublish_in_details(publishInDetailsBean);
                 messageStatsBean.setPublish_out_details(publishOutDetailsBean);
@@ -213,7 +248,14 @@ public class ExchangeBase extends BaseResources {
                 exchangeBean.setMessage_stats(messageStatsBean);
             }
             return exchangeBean;
-        });
+        }).thenCompose(exchangeDetail -> exchangeDetailMetrics.thenApply(map -> {
+            ExchangeRangeMetrics metrics = map.get(exchangeDetail.getFullName());
+            if (metrics == null) {
+                return exchangeDetail;
+            }
+            exchangeDetail.getMessage_stats().getPublish_in_details().setSamples(metrics.getIn());
+            return exchangeDetail;
+        }));
     }
 
     protected CompletableFuture<List<ExchangeSource>> getExchangeSourceAsync(String vhost, String exchangeName) {
@@ -221,12 +263,12 @@ public class ExchangeBase extends BaseResources {
                 getNamespaceName(vhost), exchangeName, false, null).thenApply(ex -> {
             List<ExchangeSource> exchangeSources = new ArrayList<>();
             if (ex instanceof PersistentExchange persistentExchange) {
-                ExchangeSource exchangeBean = new ExchangeSource();
-                exchangeBean.setVhost(vhost);
-                exchangeBean.setSource(exchangeName);
                 persistentExchange.getBindings()
                         .stream()
                         .map(binding -> {
+                            ExchangeSource exchangeBean = new ExchangeSource();
+                            exchangeBean.setVhost(vhost);
+                            exchangeBean.setSource(exchangeName);
                             exchangeBean.setArguments(binding.getArguments());
                             exchangeBean.setDestination(binding.getDes());
                             exchangeBean.setRouting_key(binding.getKey());

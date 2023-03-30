@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,12 +72,12 @@ public class ExchangeContainer {
     /**
      * Get or create exchange.
      *
-     * @param namespaceName namespace used in pulsar
-     * @param exchangeName name of exchange
+     * @param namespaceName   namespace used in pulsar
+     * @param exchangeName    name of exchange
      * @param createIfMissing true to create the exchange if not existed, and exchangeType should be not null
      *                        false to get the exchange and return null if not existed
-     * @param exchangeType type of exchange: direct,fanout,topic and headers
-     * @param arguments other properties (construction arguments) for the exchange
+     * @param exchangeType    type of exchange: direct,fanout,topic and headers
+     * @param arguments       other properties (construction arguments) for the exchange
      * @return the completableFuture of get result
      */
     public CompletableFuture<AmqpExchange> asyncGetExchange(NamespaceName namespaceName,
@@ -110,6 +110,18 @@ public class ExchangeContainer {
         CompletableFuture<AmqpExchange> existingAmqpExchangeFuture = exchangeMap.get(namespaceName).
                 putIfAbsent(exchangeName, amqpExchangeCompletableFuture);
         if (existingAmqpExchangeFuture != null) {
+            if (createIfMissing) {
+                return existingAmqpExchangeFuture.thenCompose(amqpExchange -> {
+                    if (amqpExchange instanceof PersistentExchange persistentExchange) {
+                        if (!exchangeDeclareCheck(
+                                amqpExchangeCompletableFuture, namespaceName.getLocalName(),
+                                exchangeName, exchangeType, durable, autoDelete, persistentExchange.getProperties())) {
+                            return amqpExchangeCompletableFuture;
+                        }
+                    }
+                    return existingAmqpExchangeFuture;
+                });
+            }
             return existingAmqpExchangeFuture;
         } else {
             String topicName = PersistentExchange.getExchangeTopicName(namespaceName, exchangeName);
@@ -147,6 +159,7 @@ public class ExchangeContainer {
                         if (createIfMissing && !exchangeDeclareCheck(
                                 amqpExchangeCompletableFuture, namespaceName.getLocalName(),
                                 exchangeName, exchangeType, durable, autoDelete, properties)) {
+                            removeExchangeFuture(namespaceName, exchangeName);
                             return;
                         }
 
@@ -161,7 +174,7 @@ public class ExchangeContainer {
                                     properties.getOrDefault(AUTO_DELETE, "false"));
                             boolean currentInternal = Boolean.parseBoolean(
                                     properties.getOrDefault(INTERNAL, "false"));
-                            amqpExchange = new PersistentExchange(exchangeName,
+                            amqpExchange = new PersistentExchange(exchangeName, properties,
                                     AmqpExchange.Type.value(currentType), persistentTopic, currentDurable,
                                     currentAutoDelete, currentInternal, currentArguments, routeExecutor,
                                     config.getAmqpExchangeRouteQueueSize(), config.isAmqpMultiBundleEnable());
@@ -221,7 +234,7 @@ public class ExchangeContainer {
      * Delete the exchange by namespace and exchange name.
      *
      * @param namespaceName namespace name in pulsar
-     * @param exchangeName name of exchange
+     * @param exchangeName  name of exchange
      */
     public void deleteExchange(NamespaceName namespaceName, String exchangeName) {
         if (StringUtils.isEmpty(exchangeName)) {

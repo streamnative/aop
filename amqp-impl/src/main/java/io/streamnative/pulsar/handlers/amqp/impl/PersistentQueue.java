@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,8 +45,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
+import org.apache.bookkeeper.mledger.ManagedLedger;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.WaitingEntryCallBack;
+import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.pulsar.broker.PulsarServerException;
@@ -104,7 +107,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
 
     private final ScheduledExecutorService scheduledExecutor;
 
-    private boolean isActive;
+    @Getter
+    private volatile boolean isActive;
+    private volatile boolean isWaiting;
 
     public PersistentQueue(String queueName, PersistentTopic indexTopic,
                            long connectionId,
@@ -139,19 +144,26 @@ public class PersistentQueue extends AbstractAmqpQueue {
         }
     }
 
-    public void startMessageExpireChecker(int queueSize){
-        initDefaultSubscription(queueSize)
+    public CompletableFuture<Void> startMessageExpireChecker(int queueSize) {
+        return initDefaultSubscription(queueSize)
                 .thenRun(() -> {
                     initMessageExpire();
                     this.defaultSubscription = indexTopic.getSubscriptions().get(DEFAULT_SUBSCRIPTION);
                     // start check expired
-                    this.isActive = true;
-                    scheduledExecutor.execute(this::readEntries);
+                    start();
                     log.info("[{}] Message expiration checker started successfully", indexTopic.getName());
                 });
     }
 
-    public CompletableFuture<Void> initDefaultSubscription(int queueSize){
+    public synchronized void start() {
+        if (isActive) {
+            return;
+        }
+        this.isActive = true;
+        readEntries();
+    }
+
+    public CompletableFuture<Void> initDefaultSubscription(int queueSize) {
         try {
             return indexTopic.getBrokerService().pulsar()
                     .getClient()
@@ -170,19 +182,51 @@ public class PersistentQueue extends AbstractAmqpQueue {
         }
     }
 
+    static class WaitingCallBack implements WaitingEntryCallBack {
+
+        private final PersistentQueue persistentQueue;
+
+        public WaitingCallBack(PersistentQueue persistentQueue) {
+            this.persistentQueue = persistentQueue;
+        }
+
+        @Override
+        public synchronized void entriesAvailable() {
+            if (persistentQueue.isWaiting) {
+                persistentQueue.isWaiting = false;
+                persistentQueue.readEntries();
+            }
+        }
+    }
+
     public void readEntries() {
-        if (!isActive) {
+        if (!isActive || isWaiting) {
             return;
         }
-        if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0
-                || (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
-                .isConsumerConnected())) {
-            scheduledExecutor.schedule(this::readEntries, DELAY_1000, TimeUnit.MILLISECONDS);
+        // 1. If there are active consumers, stop monitoring
+        // 2. Start detection when the consumer is closed and enter the ledger's wait queue
+        // 3. When the waiting queue is woken up, the detection again detects whether there is a consumer. If there is
+        // no consumer, then read it.
+        if (defaultSubscription.getDispatcher() != null && defaultSubscription.getDispatcher()
+                .isConsumerConnected()) {
+            log.warn("[{}] There are active consumers to stop monitoring", queueName);
+            isActive = false;
             return;
         }
         ManagedCursor cursor = defaultSubscription.getCursor();
-        // TODO To send a message to the topic, the cursor is not read from the first, need to reset
+        if (defaultSubscription.getNumberOfEntriesInBacklog(false) == 0) {
+            if (cursor.getManagedLedger() instanceof ManagedLedgerImpl managedLedger) {
+                log.warn("[{}]start waiting read.", queueName);
+                isWaiting = true;
+                managedLedger.addWaitingEntryCallBack(new WaitingCallBack(this));
+            } else {
+                scheduledExecutor.schedule(PersistentQueue.this::readEntries, 5 * DELAY_1000, TimeUnit.MILLISECONDS);
+            }
+            return;
+        }
+        // To send a message to the topic, the cursor is not read from the first, need to reset
         cursor.rewind();
+        // Use cursor.asyncReadEntriesOrWait() can register only one wait.The user's consumer startup will fail.
         cursor.asyncReadEntries(1, new AsyncCallbacks.ReadEntriesCallback() {
             @Override
             public void readEntriesComplete(List<Entry> entries, Object ctx) {
@@ -212,6 +256,8 @@ public class PersistentQueue extends AbstractAmqpQueue {
                         // Stop check
                         // Sending a non-TTL message requires the presence of a consumer message. When a consumer
                         // exists, the current task will not be executed here.
+                        isActive = false;
+                        log.warn("[{}] Queue message TTL is not set, stop check trace", queueName);
                         return;
                     }
                     long expireMillis;
@@ -432,9 +478,9 @@ public class PersistentQueue extends AbstractAmqpQueue {
     }
 
     @Override
-    public void close(){
+    public void close() {
         this.isActive = false;
-        if (deadLetterProducer != null){
+        if (deadLetterProducer != null) {
             deadLetterProducer.thenAcceptAsync(Producer::closeAsync);
         }
     }

@@ -45,13 +45,13 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     private long currentEntryId;
 
     public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType, boolean autoDelete) {
-        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete, false, null);
+        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete, false, null, null);
         this.currentLedgerId = 1L;
     }
 
     public InMemoryExchange(String exchangeName, AmqpExchange.Type exchangeType, boolean autoDelete,
                             Map<String, Object> arguments) {
-        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete, false, arguments);
+        super(exchangeName, exchangeType, new HashSet<>(), false, autoDelete, false, arguments, null);
         this.currentLedgerId = 1L;
     }
 

@@ -96,15 +96,19 @@ public class Exchanges extends ExchangeBase {
     public void getExchange(@Suspended final AsyncResponse response,
                             @PathParam("vhost") String vhost,
                             @PathParam("exchange") String exchange,
+                            @QueryParam("msg_rates_age") int age,
+                            @QueryParam("msg_rates_incr") int incr,
                             @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 getNamespaceName(vhost), PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> getExchangeDetailAsync(vhost, exchange))
+                .thenCompose(__ -> getExchangeDetailAsync(vhost, exchange, age, incr))
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
-                    log.error("Failed to get exchange {} for tenant {} belong to vhost {}",
-                            exchange, tenant, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to get exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -114,12 +118,18 @@ public class Exchanges extends ExchangeBase {
     @Path("/{vhost}/{exchange}/bindings/source")
     public void getExchangeSource(@Suspended final AsyncResponse response,
                                   @PathParam("vhost") String vhost,
-                                  @PathParam("exchange") String exchange) {
-        getExchangeSourceAsync(vhost, exchange)
+                                  @PathParam("exchange") String exchange,
+                                  @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(___ -> getExchangeSourceAsync(vhost, exchange))
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
-                    log.error("Failed to get exchange {} for tenant {} belong to vhost {}",
-                            exchange, tenant, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to get exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -173,8 +183,10 @@ public class Exchanges extends ExchangeBase {
                     response.resume(Response.noContent().build());
                 })
                 .exceptionally(t -> {
-                    log.error("Failed to delete exchange {} for tenant {} belong to vhost {}",
-                            exchange, tenant, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to delete exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

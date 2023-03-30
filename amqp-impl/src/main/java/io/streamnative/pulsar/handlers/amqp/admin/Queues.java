@@ -15,8 +15,13 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.QueueBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.MessageBean;
+import io.streamnative.pulsar.handlers.amqp.admin.model.MessageParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.PurgeQueueParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.QueuesList;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
+import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import java.util.stream.Collectors;
 import javax.ws.rs.DELETE;
@@ -64,8 +69,10 @@ public class Queues extends QueueBase {
                                @QueryParam("page") int page,
                                @QueryParam("page_size") int pageSize,
                                @QueryParam("name") String name,
+                               @QueryParam("sort") String sort,
+                               @QueryParam("sort_reverse") boolean sort_reverse,
                                @QueryParam("pagination") boolean pagination) {
-        getQueueListByNamespaceAsync(vhost)
+        getQueueListByNamespaceAsync(vhost, sort, sort_reverse)
                 .thenAccept(itemsBeans -> {
                     int total = itemsBeans.size();
                     if (StringUtils.isNotBlank(name)) {
@@ -95,11 +102,79 @@ public class Queues extends QueueBase {
     public void getQueue(@Suspended final AsyncResponse response,
                          @PathParam("vhost") String vhost,
                          @PathParam("queue") String queue,
+                         @QueryParam("data_rates_age") int age,
+                         @QueryParam("data_rates_incr") int incr,
                          @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> getQueueDetailAsync(vhost, queue))
+                .thenCompose(__ -> getQueueDetailAsync(vhost, queue, age, incr))
+                .thenAccept(response::resume)
+                .exceptionally(t -> {
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
+                    }
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+    @DELETE
+    @Path("/{vhost}/{queue}/contents")
+    public void purgeQueue(@Suspended final AsyncResponse response,
+                         @PathParam("vhost") String vhost,
+                         @PathParam("queue") String queue,
+                         PurgeQueueParams purgeQueueParams,
+                         @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> purgeQueueAsync(vhost, queue, purgeQueueParams))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
+                    }
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @PUT
+    @Path("/{vhost}/{queue}/startExpirationDetection")
+    public void startExpirationDetection(@Suspended final AsyncResponse response,
+                           @PathParam("vhost") String vhost,
+                           @PathParam("queue") String queue,
+                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> startExpirationDetection(vhost, queue))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
+                    }
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @POST
+    @Path("/{vhost}/{queue}/get")
+    public void getMessage(@Suspended final AsyncResponse response,
+                           @PathParam("vhost") String vhost,
+                           @PathParam("queue") String queue,
+                           MessageParams params,
+                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenRun(() -> {
+                    if (StringUtils.isAllBlank(params.getMessageId(), params.getEndTime(), params.getStartTime())) {
+                        throw new AoPServiceRuntimeException.GetMessageException("Query message, id and time one of them is required");
+                    }
+                })
+                .thenCompose(__ -> getQueueMessageAsync(vhost, queue, params))
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
@@ -115,7 +190,7 @@ public class Queues extends QueueBase {
     public void getQueueBindings(@Suspended final AsyncResponse response,
                                  @PathParam("vhost") String vhost,
                                  @PathParam("queue") String queue) {
-        getQueueBindings(getNamespaceName(vhost).toString(), queue)
+        getQueueBindings(getNamespaceName(vhost), queue)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
                     log.error("Failed to get queue {} in vhost {}", queue, vhost, t);
@@ -151,13 +226,16 @@ public class Queues extends QueueBase {
     public void queueBindings(@Suspended final AsyncResponse response,
                               @PathParam("vhost") String vhost,
                               @PathParam("exchange") String exchange,
-                              @PathParam("queue") String queue, BindingParams params,
+                              @PathParam("queue") String queue,
+                              BindingParams params,
                               @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName =
-                TopicName.get(TopicDomain.persistent.toString(), namespaceName, PersistentQueue.TOPIC_PREFIX + queue);
+                TopicName.get(TopicDomain.persistent.toString(), namespaceName,
+                        PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> queueBindAsync(namespaceName, exchange, queue, params))
+                .thenCompose(__ -> amqpAdmin().queueBindExchange(namespaceName, exchange, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
@@ -178,9 +256,10 @@ public class Queues extends QueueBase {
                                 @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                namespaceName, PersistentQueue.TOPIC_PREFIX + queue);
+                namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> queueUnbindAsync(namespaceName, exchange, queue, propsKey))
+                .thenCompose(__ -> amqpAdmin().queueUnBindExchange(namespaceName, exchange, queue, propsKey))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
@@ -211,7 +290,9 @@ public class Queues extends QueueBase {
                     response.resume(Response.noContent().build());
                 })
                 .exceptionally(t -> {
-                    log.error("Failed to delete queue {} in vhost {}", queue, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to delete queue {} in vhost {}", queue, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

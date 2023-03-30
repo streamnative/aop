@@ -18,14 +18,18 @@ import io.streamnative.pulsar.handlers.amqp.ExchangeContainer;
 import io.streamnative.pulsar.handlers.amqp.ExchangeService;
 import io.streamnative.pulsar.handlers.amqp.QueueContainer;
 import io.streamnative.pulsar.handlers.amqp.QueueService;
+import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.TenantBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.PrometheusAdmin;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -50,6 +54,7 @@ import org.apache.bookkeeper.mledger.impl.MetaStore;
 import org.apache.bookkeeper.mledger.proto.MLDataFormats;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.namespace.NamespaceService;
@@ -57,7 +62,10 @@ import org.apache.pulsar.broker.resources.NamespaceResources;
 import org.apache.pulsar.broker.resources.TenantResources;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.web.RestException;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -103,11 +111,51 @@ public class BaseResources {
 
     private ManagedLedgerFactoryImpl managedLedgerFactory;
 
+    private PrometheusAdmin prometheusAdmin;
+    private AmqpAdmin amqpAdmin;
+    private PulsarAdmin pulsarAdmin;
+    private PulsarClient pulsarClient;
+
     protected AmqpProtocolHandler aop() {
         if (protocolHandler == null) {
             protocolHandler = (AmqpProtocolHandler) servletContext.getAttribute("aop");
         }
         return protocolHandler;
+    }
+
+    protected PrometheusAdmin prometheusAdmin() {
+        if (prometheusAdmin == null) {
+            prometheusAdmin = aop().getAmqpBrokerService().getPrometheusAdmin();
+        }
+        return prometheusAdmin;
+    }
+   protected PulsarAdmin pulsarAdmin() {
+        if (pulsarAdmin == null) {
+            try {
+                pulsarAdmin = aop().getBrokerService().getPulsar().getAdminClient();
+            } catch (PulsarServerException e) {
+                throw new AoPServiceRuntimeException(e);
+            }
+        }
+        return pulsarAdmin;
+    }
+
+   protected PulsarClient pulsarClient() {
+        if (pulsarClient == null) {
+            try {
+                pulsarClient = aop().getBrokerService().getPulsar().getClient();
+            } catch (PulsarServerException e) {
+                throw new AoPServiceRuntimeException(e);
+            }
+        }
+        return pulsarClient;
+    }
+
+    protected AmqpAdmin amqpAdmin() {
+        if (amqpAdmin == null) {
+            amqpAdmin = aop().getAmqpBrokerService().getAmqpAdmin();
+        }
+        return amqpAdmin;
     }
 
     protected ManagedLedgerFactoryImpl managedLedgerFactory() {
@@ -174,6 +222,7 @@ public class BaseResources {
 
     protected NamespaceName getNamespaceName(String vhost) {
         vhost = StringUtils.isNotBlank(vhost) ? vhost : this.xVhost;
+        vhost = "/".equals(vhost) ? "default" : vhost;
         NamespaceName namespaceName;
         if (tenant == null) {
             namespaceName = NamespaceName.get(vhost);
@@ -188,6 +237,7 @@ public class BaseResources {
                 .thenApply(nsList -> {
                     List<VhostBean> vhostBeanList = new ArrayList<>();
                     nsList.forEach(ns -> {
+                        ns = "default".equals(ns) ? "/" : ns;
                         VhostBean bean = new VhostBean();
                         bean.setName(ns);
                         vhostBeanList.add(bean);
@@ -200,7 +250,7 @@ public class BaseResources {
                                                                         String topic) {
         CompletableFuture<Map<String, String>> future = new CompletableFuture<>();
         // amqp/default/persistent/__amqp_exchange__direct_E2
-        String path = namespaceName + "/persistent/" + topicPrefix + topic;
+        String path = namespaceName + "/persistent/" + topicPrefix + URLEncoder.encode(topic, StandardCharsets.UTF_8);
         managedLedgerFactory().getMetaStore().getManagedLedgerInfo(path, false,
                 new MetaStore.MetaStoreCallback<>() {
                     @Override
@@ -218,7 +268,7 @@ public class BaseResources {
                     @Override
                     public void operationFailed(ManagedLedgerException.MetaStoreException e) {
                         log.error("Failed get TopicProperties.", e);
-                        future.complete(new HashMap<>());
+                        future.complete(null);
                     }
                 });
         return future;
@@ -342,7 +392,8 @@ public class BaseResources {
         } else if (realCause instanceof PulsarAdminException) {
             asyncResponse.resume(new RestException(((PulsarAdminException) realCause)));
         } else if (realCause instanceof AoPServiceRuntimeException.NoSuchQueueException
-                || realCause instanceof AoPServiceRuntimeException.NoSuchExchangeException) {
+                || realCause instanceof AoPServiceRuntimeException.NoSuchExchangeException
+                || realCause instanceof AoPServiceRuntimeException.GetMessageException) {
             asyncResponse.resume(new RestException(500, realCause.getMessage()));
         } else {
             asyncResponse.resume(new RestException(realCause));
@@ -352,9 +403,18 @@ public class BaseResources {
     protected CompletableFuture<Void> queueBindAsync(NamespaceName namespaceName, String exchange, String queue,
                                                      BindingParams params) {
         if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
-            return queueService().queueBind(namespaceName, queue, exchange, params)
-                    .thenCompose(__ -> exchangeService().queueBind(namespaceName, exchange, queue,
-                            params.getRoutingKey(), params.getArguments()));
+            return exchangeService().queueBind(namespaceName, exchange, queue, params.getRoutingKey(),
+                    params.getArguments());
+        } else {
+            return queueService().queueBind(namespaceName, queue, exchange, params.getRoutingKey(),
+                    false, FieldTable.convertToFieldTable(params.getArguments()), -1);
+        }
+    }
+
+    protected CompletableFuture<Void> queueBindExchange(NamespaceName namespaceName, String exchange, String queue,
+                                                     BindingParams params) {
+        if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
+            return queueService().queueBind(namespaceName, queue, exchange, params);
         } else {
             return queueService().queueBind(namespaceName, queue, exchange, params.getRoutingKey(),
                     false, FieldTable.convertToFieldTable(params.getArguments()), -1);
@@ -364,9 +424,17 @@ public class BaseResources {
     protected CompletableFuture<Void> queueUnbindAsync(NamespaceName namespaceName, String exchange, String queue,
                                                        String propertiesKey) {
         if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
-            return queueService().queueUnBind(namespaceName, queue, exchange, propertiesKey)
-                    .thenCompose(__ -> exchangeService()
-                            .queueUnBind(namespaceName, exchange, queue, propertiesKey, null));
+            return exchangeService().queueUnBind(namespaceName, exchange, queue, propertiesKey, null);
+        } else {
+            return queueService().queueUnbind(namespaceName, queue, exchange, propertiesKey,
+                    null, -1);
+        }
+    }
+
+    protected CompletableFuture<Void> queueUnBindExchange(NamespaceName namespaceName, String exchange, String queue,
+                                                       String propertiesKey) {
+        if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
+            return queueService().queueUnBind(namespaceName, queue, exchange, propertiesKey);
         } else {
             return queueService().queueUnbind(namespaceName, queue, exchange, propertiesKey,
                     null, -1);

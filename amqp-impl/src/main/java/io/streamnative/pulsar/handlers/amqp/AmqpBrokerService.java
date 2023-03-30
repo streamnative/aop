@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.PrometheusAdmin;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.Getter;
@@ -42,8 +43,11 @@ public class AmqpBrokerService {
     private PulsarService pulsarService;
     @Getter
     private AmqpAdmin amqpAdmin;
+    @Getter
+    PrometheusAdmin prometheusAdmin;
 
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
+        String clusterName = pulsarService.getBrokerService().getPulsar().getConfiguration().getClusterName();
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService,
@@ -53,6 +57,7 @@ public class AmqpBrokerService {
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer, amqpTopicManager);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
         this.amqpAdmin = new AmqpAdmin(config.getAdvertisedAddress(), config.getAmqpAdminPort());
+        this.prometheusAdmin = new PrometheusAdmin(config.getAmqpPrometheusUrl(), clusterName);
     }
 
     private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {

@@ -1,5 +1,6 @@
 package io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq;
 
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import lombok.Data;
@@ -15,6 +16,7 @@ public class ExchangeDetail {
     private boolean internal;
     private MessageStatsBean message_stats;
     private String name;
+    private String fullName;
     private String type;
     private String user_who_performed_action;
     private String vhost;
@@ -35,14 +37,7 @@ public class ExchangeDetail {
             private double avg;
             private double avg_rate;
             private double rate;
-            private List<SamplesBean> samples;
-
-            @NoArgsConstructor
-            @Data
-            public static class SamplesBean {
-                private int sample;
-                private long timestamp;
-            }
+            private List<SamplesBean> samples = Lists.newArrayList();
         }
 
         @NoArgsConstructor
@@ -51,14 +46,8 @@ public class ExchangeDetail {
             private double avg;
             private double avg_rate;
             private double rate;
-            private List<SamplesBeanX> samples;
+            private List<SamplesBean> samples = Lists.newArrayList();
 
-            @NoArgsConstructor
-            @Data
-            public static class SamplesBeanX {
-                private int sample;
-                private long timestamp;
-            }
         }
     }
 }

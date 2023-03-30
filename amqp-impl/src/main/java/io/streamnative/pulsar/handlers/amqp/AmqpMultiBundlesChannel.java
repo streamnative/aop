@@ -147,10 +147,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
 
         getAmqpAdmin().queueBind(connection.getNamespaceName(),
                         exchange.toString(), queue.toString(), params)
-                .thenRun(() -> {
-                    getAmqpAdmin().queueBindings(connection.getNamespaceName(),
-                            exchange.toString(), queue.toString(), params);
-                }).thenAccept(__ -> {
+                .thenAccept(__ -> {
                     MethodRegistry methodRegistry = connection.getMethodRegistry();
                     AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                     connection.writeFrame(responseBody.generateFrame(channelId));
@@ -171,10 +168,6 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
 
         getAmqpAdmin().queueUnbind(connection.getNamespaceName(), exchange.toString(),
                         queue.toString(), bindingKey.toString())
-                .thenRun(() -> {
-                    getAmqpAdmin().queueUnbindings(connection.getNamespaceName(), exchange.toString(),
-                            queue.toString(), bindingKey.toString());
-                })
                 .thenAccept(__ -> {
                     AMQMethodBody responseBody = connection.getMethodRegistry().createQueueUnbindOkBody();
                     connection.writeFrame(responseBody.generateFrame(channelId));
@@ -249,13 +242,6 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 getAmqpAdmin().exchangeDeclare(connection.getNamespaceName(),
                         AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE, exchangeParams
                 ).thenCompose(__ -> {
-                    QueueDeclareParams queueParams = new QueueDeclareParams();
-                    queueParams.setDurable(true);
-                    queueParams.setExclusive(false);
-                    queueParams.setAutoDelete(false);
-                    return getAmqpAdmin().queueDeclare(connection.getNamespaceName(), routingKeyLocal.toString(),
-                            queueParams);
-                }).thenCompose(__ -> {
                     BindingParams bindingParams = new BindingParams();
                     bindingParams.setRoutingKey(routingKeyLocal.toString());
                     return getAmqpAdmin().queueBind(connection.getNamespaceName(),
@@ -365,6 +351,8 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
             consumerList.forEach(consumer -> {
                 try {
                     consumer.close();
+                    // Start expiration detection
+                    getAmqpAdmin().startExpirationDetection(connection.getNamespaceName(), consumer.getQueue());
                 } catch (Exception e) {
                     log.error("Failed to close consumer.", e);
                 }
@@ -424,7 +412,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 .thenAccept(consumer -> {
                     AmqpPulsarConsumer amqpPulsarConsumer;
                     try {
-                        amqpPulsarConsumer = new AmqpPulsarConsumer(consumerTag, consumer, autoAck,
+                        amqpPulsarConsumer = new AmqpPulsarConsumer(queue, consumerTag, consumer, autoAck,
                                 AmqpMultiBundlesChannel.this,
                                 AmqpMultiBundlesChannel.this.connection.getPulsarService());
                     } catch (PulsarServerException | PulsarAdminException e) {

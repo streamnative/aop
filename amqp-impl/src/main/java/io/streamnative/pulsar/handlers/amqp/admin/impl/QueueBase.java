@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,36 +19,63 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
+import io.streamnative.pulsar.handlers.amqp.admin.model.MessageBean;
+import io.streamnative.pulsar.handlers.amqp.admin.model.MessageParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.PurgeQueueParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.VhostBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.QueueBinds;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.QueueDetail;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.QueuesList;
+import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.SamplesBean;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.PrometheusAdmin;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.QueueListMetrics;
+import io.streamnative.pulsar.handlers.amqp.admin.prometheus.QueueRangeMetrics;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
+import io.streamnative.pulsar.handlers.amqp.utils.TopicUtil;
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.MessageId;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.Reader;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.policies.data.ConsumerStats;
 import org.apache.pulsar.common.policies.data.SubscriptionStats;
 import org.apache.pulsar.common.policies.data.stats.TopicStatsImpl;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.checkerframework.checker.units.qual.C;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * QueueBase.
@@ -89,7 +116,8 @@ public class QueueBase extends BaseResources {
                         s.contains(PersistentQueue.TOPIC_PREFIX)).collect(Collectors.toList()));
     }
 
-    protected CompletableFuture<List<QueuesList.ItemsBean>> getQueueListByNamespaceAsync(String vhost) {
+    protected CompletableFuture<List<QueuesList.ItemsBean>> getQueueListByNamespaceAsync(String vhost, String sort,
+                                                                                         boolean sortReverse) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         return getQueueListAsync(namespaceName.getTenant(), namespaceName.getLocalName())
                 .thenCompose(exList -> {
@@ -98,13 +126,71 @@ public class QueueBase extends BaseResources {
                     exList.forEach(topic -> {
                         String queue = TopicName.get(topic).getLocalName()
                                 .substring(PersistentQueue.TOPIC_PREFIX.length());
-                        futureList.add(getQueueBeanByNamespaceAsync(namespaceName, queue).thenAccept(
-                                beanList::add));
+                        futureList.add(getQueueBeanByNamespaceAsync(namespaceName, queue)
+                                .thenAccept(itemsBean -> {
+                                    if (itemsBean != null) {
+                                        beanList.add(itemsBean);
+                                    }
+                                }));
                     });
-                    return FutureUtil.waitForAll(futureList).thenApply(__ -> {
-                        beanList.sort(Comparator.comparing(QueuesList.ItemsBean::getName));
-                        return beanList;
-                    });
+                    return FutureUtil.waitForAll(futureList).thenApply(__ -> beanList);
+                }).thenCompose(itemsBeans -> {
+                    PrometheusAdmin prometheusAdmin = prometheusAdmin();
+                    if (!prometheusAdmin.isConfig()) {
+                        return CompletableFuture.completedFuture(itemsBeans);
+                    }
+                    return prometheusAdmin.queryQueueListMetrics(
+                                    namespaceName.getTenant() + "/" + namespaceName.getLocalName())
+                            .thenApply(queueListMetricsMap -> {
+                                itemsBeans.forEach(itemsBean -> {
+                                    QueueListMetrics metrics =
+                                            queueListMetricsMap.get(itemsBean.getFullName());
+                                    if (metrics == null) {
+                                        return;
+                                    }
+                                    itemsBean.setMessages_ready(metrics.getReady());
+                                    itemsBean.setMessages_unacknowledged(metrics.getUnAck());
+                                    itemsBean.setMessages(metrics.getTotal());
+                                    itemsBean.getMessage_stats().getAck_details().setRate(metrics.getAckRate());
+                                    itemsBean.getMessage_stats().getPublish_details()
+                                            .setRate(metrics.getIncomingRate());
+                                    itemsBean.getMessage_stats().getDeliver_get_details()
+                                            .setRate(metrics.getDeliverRate());
+                                });
+                                return itemsBeans;
+                            }).thenApply(ib -> {
+                                if (sort == null) {
+                                    ib.sort(Comparator.comparing(QueuesList.ItemsBean::getName,
+                                            Comparator.naturalOrder()));
+                                    return ib;
+                                }
+                                switch (sort) {
+                                    case "messages_ready" ->
+                                            ib.sort(Comparator.comparing(QueuesList.ItemsBean::getMessages_ready,
+                                                    sortReverse ? Comparator.reverseOrder() :
+                                                            Comparator.naturalOrder()));
+                                    case "messages_unacknowledged" -> ib.sort(Comparator.comparing(
+                                            QueuesList.ItemsBean::getMessages_unacknowledged,
+                                            sortReverse ? Comparator.reverseOrder() : Comparator.naturalOrder()));
+                                    case "messages" -> ib.sort(Comparator.comparing(QueuesList.ItemsBean::getMessages,
+                                            sortReverse ? Comparator.reverseOrder() : Comparator.naturalOrder()));
+                                    case "message_stats.publish_details.rate" -> ib.sort(Comparator.comparing(
+                                            (Function<QueuesList.ItemsBean, Double>) itemsBean -> itemsBean.getMessage_stats()
+                                                    .getPublish_details().getRate(),
+                                            sortReverse ? Comparator.reverseOrder() : Comparator.naturalOrder()));
+                                    case "message_stats.deliver_get_details.rate" -> ib.sort(Comparator.comparing(
+                                            (Function<QueuesList.ItemsBean, Double>) itemsBean -> itemsBean.getMessage_stats()
+                                                    .getDeliver_get_details().getRate(),
+                                            sortReverse ? Comparator.reverseOrder() : Comparator.naturalOrder()));
+                                    case "message_stats.ack_details.rate" -> ib.sort(Comparator.comparing(
+                                            (Function<QueuesList.ItemsBean, Double>) itemsBean -> itemsBean.getMessage_stats()
+                                                    .getAck_details().getRate(),
+                                            sortReverse ? Comparator.reverseOrder() : Comparator.naturalOrder()));
+                                    default -> ib.sort(Comparator.comparing(QueuesList.ItemsBean::getName,
+                                            Comparator.naturalOrder()));
+                                }
+                                return ib;
+                            });
                 });
     }
 
@@ -123,44 +209,46 @@ public class QueueBase extends BaseResources {
 
     protected CompletableFuture<QueuesList.ItemsBean> getQueueBeanByNamespaceAsync(NamespaceName namespaceName,
                                                                                    String queue) {
-        return getTopicProperties(namespaceName.toString(), PersistentQueue.TOPIC_PREFIX, queue).thenApply(properties -> {
-            QueueDeclareParams declareParams = QueueUtil.covertMapAsParams(properties);
-            QueuesList.ItemsBean itemsBean = new QueuesList.ItemsBean();
-            itemsBean.setName(queue);
-            itemsBean.setVhost(namespaceName.getLocalName());
-            itemsBean.setDurable(true);
-            itemsBean.setExclusive(declareParams.isExclusive());
-            itemsBean.setAuto_delete(declareParams.isAutoDelete());
-            itemsBean.setArguments(declareParams.getArguments());
-            QueuesList.ItemsBean.MessageStatsBean statsBean = new QueuesList.ItemsBean.MessageStatsBean();
-            statsBean.setAck_details(new QueuesList.ItemsBean.MessageStatsBean.AckDetailsBean());
-            QueuesList.ItemsBean.MessageStatsBean.DeliverDetailsBean deliverDetailsBean =
-                    new QueuesList.ItemsBean.MessageStatsBean.DeliverDetailsBean();
-            statsBean.setDeliver_details(deliverDetailsBean);
-            statsBean.setGet_details(new QueuesList.ItemsBean.MessageStatsBean.GetDetailsBean());
-            statsBean.setDeliver_no_ack_details(new QueuesList.ItemsBean.MessageStatsBean.DeliverNoAckDetailsBean());
-            statsBean.setGet_no_ack_details(new QueuesList.ItemsBean.MessageStatsBean.GetNoAckDetailsBean());
-            statsBean.setRedeliver_details(new QueuesList.ItemsBean.MessageStatsBean.RedeliverDetailsBean());
+        return getTopicProperties(namespaceName.toString(), PersistentQueue.TOPIC_PREFIX, queue).thenApply(
+                properties -> {
+                    if (properties == null || properties.isEmpty()) {
+                        log.error("queue properties is null. topic:{}/{}", namespaceName, queue);
+                        return null;
+                    }
+                    QueueDeclareParams declareParams = QueueUtil.covertMapAsParams(properties);
+                    QueuesList.ItemsBean itemsBean = new QueuesList.ItemsBean();
+                    itemsBean.setName(queue);
+                    itemsBean.setFullName(TopicName.get(TopicDomain.persistent.value(), namespaceName,
+                            PersistentQueue.TOPIC_PREFIX + queue).toString());
+                    itemsBean.setVhost(namespaceName.getLocalName());
+                    itemsBean.setDurable(true);
+                    itemsBean.setExclusive(declareParams.isExclusive());
+                    itemsBean.setAuto_delete(declareParams.isAutoDelete());
+                    itemsBean.setArguments(declareParams.getArguments());
 
-            QueuesList.ItemsBean.MessageStatsBean.PublishDetailsBean publishDetailsBean =
-                    new QueuesList.ItemsBean.MessageStatsBean.PublishDetailsBean();
-            statsBean.setPublish_details(publishDetailsBean);
+                    QueuesList.ItemsBean.MessageStatsBean statsBean = new QueuesList.ItemsBean.MessageStatsBean();
+                    statsBean.setAck_details(new QueuesList.RateBean());
+                    statsBean.setDeliver_details(new QueuesList.RateBean());
+                    statsBean.setDeliver_get_details(new QueuesList.RateBean());
+                    statsBean.setGet_details(new QueuesList.RateBean());
+                    statsBean.setDeliver_no_ack_details(new QueuesList.RateBean());
+                    statsBean.setGet_no_ack_details(new QueuesList.RateBean());
+                    statsBean.setRedeliver_details(new QueuesList.RateBean());
+                    statsBean.setPublish_details(new QueuesList.RateBean());
+                    statsBean.setAck_details(new QueuesList.RateBean());
 
-            QueuesList.ItemsBean.MessageStatsBean.AckDetailsBean ackDetailsBean =
-                    new QueuesList.ItemsBean.MessageStatsBean.AckDetailsBean();
-            statsBean.setAck_details(ackDetailsBean);
-
-            itemsBean.setMessage_stats(statsBean);
-            itemsBean.setMessages_details(new QueuesList.ItemsBean.MessagesDetailsBean());
-            itemsBean.setMessages_ready_details(new QueuesList.ItemsBean.MessagesReadyDetailsBean());
-            itemsBean.setMessages_unacknowledged_details(new QueuesList.ItemsBean.MessagesUnacknowledgedDetailsBean());
-            itemsBean.setReductions_details(new QueuesList.ItemsBean.ReductionsDetailsBean());
-            return itemsBean;
-        });
+                    itemsBean.setMessage_stats(statsBean);
+                    itemsBean.setMessages_details(new QueuesList.RateBean());
+                    itemsBean.setMessages_ready_details(new QueuesList.RateBean());
+                    itemsBean.setMessages_unacknowledged_details(
+                            new QueuesList.RateBean());
+                    itemsBean.setReductions_details(new QueuesList.RateBean());
+                    return itemsBean;
+                });
     }
 
-    protected CompletableFuture<List<QueueBinds>> getQueueBindings(String namespace, String queue) {
-        return getTopicProperties(namespace, PersistentQueue.TOPIC_PREFIX, queue).thenCompose(properties -> {
+    protected CompletableFuture<List<QueueBinds>> getQueueBindings(NamespaceName namespace, String queue) {
+        return getTopicProperties(namespace.toString(), PersistentQueue.TOPIC_PREFIX, queue).thenCompose(properties -> {
             Set<PersistentExchange.Binding> bindings = Sets.newHashSet();
             try {
                 if (properties.containsKey("BINDINGS")) {
@@ -179,7 +267,7 @@ public class QueueBase extends BaseResources {
                         queueBinds.setDestination(binding.getDes());
                         queueBinds.setRouting_key(binding.getKey());
                         queueBinds.setProperties_key(binding.getKey());
-                        queueBinds.setVhost(namespace);
+                        queueBinds.setVhost(namespace.getLocalName());
                         queueBinds.setDestination_type(binding.getDesType());
                         return queueBinds;
                     }).collect(Collectors.toList());
@@ -190,8 +278,138 @@ public class QueueBase extends BaseResources {
         });
     }
 
-    protected CompletableFuture<QueueDetail> getQueueDetailAsync(String vhost, String queue) {
+    protected CompletableFuture<List<MessageBean>> getQueueMessageAsync(String vhost, String queue,
+                                                                        MessageParams messageParams) {
+        PulsarAdmin adminClient = pulsarAdmin();
+        String messageId = messageParams.getMessageId();
+        String topicName = TopicUtil.getTopicName(PersistentQueue.TOPIC_PREFIX, tenant, vhost, queue);
+        if (StringUtils.isNotBlank(messageId)) {
+            StringTokenizer tokenizer = new StringTokenizer(messageId, ":", false);
+            Pair<Long, Long> pair = switch (tokenizer.countTokens()) {
+                case 2, 3 -> Pair.of(Long.valueOf(tokenizer.nextToken()), Long.valueOf(tokenizer.nextToken()));
+                default -> {
+                    throw new AoPServiceRuntimeException.GetMessageException("Unexpected messageId: " + messageId);
+                }
+            };
+            return adminClient.topics()
+                    .getMessageByIdAsync(topicName, pair.getKey(), pair.getValue())
+                    .thenApply(message -> {
+                        if (message == null) {
+                            return Lists.newArrayList();
+                        }
+                        MessageBean messageBean = getMessageBean(messageParams, message);
+                        return Lists.newArrayList(messageBean);
+                    });
+        }
+        if (StringUtils.isAnyBlank(messageParams.getStartTime(), messageParams.getEndTime())) {
+            throw new AoPServiceRuntimeException.GetMessageException("The start time and end time are required");
+        }
+        long startTime = LocalDateTime.parse(messageParams.getStartTime())
+                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        long endTime = LocalDateTime.parse(messageParams.getEndTime())
+                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        if (startTime > endTime) {
+            throw new AoPServiceRuntimeException.GetMessageException(
+                    "The start time cannot be later than the end time");
+        }
+        if (endTime - startTime > 1000 * 60 * 60 * 48) {
+            throw new AoPServiceRuntimeException.GetMessageException(
+                    "The interval between the start time and the end time cannot exceed 2 days");
+        }
+        // by time query
+        try (Reader<byte[]> reader = pulsarClient().newReader()
+                .startMessageId(MessageId.earliest)
+                .topic(topicName)
+                .create()) {
+            reader.seek(startTime);
+            List<MessageBean> messageBeans = Lists.newArrayList();
+            while (reader.hasMessageAvailable()) {
+                Message<byte[]> message = reader.readNext(5, TimeUnit.SECONDS);
+                // The default value is 200
+                if (message == null || message.getPublishTime() > endTime
+                        || messageBeans.size() >= 200
+                        || (messageParams.getMessages() > 0 && messageBeans.size() >= messageParams.getMessages())) {
+                    break;
+                }
+                MessageBean messageBean = getMessageBean(messageParams, message);
+                messageBeans.add(messageBean);
+            }
+            return CompletableFuture.completedFuture(messageBeans);
+        } catch (Exception e) {
+            throw new AoPServiceRuntimeException.GetMessageException(e);
+        }
+    }
+
+    @NotNull
+    private static MessageBean getMessageBean(MessageParams messageParams, Message<byte[]> message) {
+        MessageBean messageBean = new MessageBean();
+        if ("base64".equals(messageParams.getEncoding())) {
+            byte[] encode = Base64.getEncoder().encode(message.getValue());
+            messageBean.setPayload(new String(encode));
+        } else {
+            messageBean.setPayload(new String(message.getValue()));
+        }
+        Map<String, String> properties = message.getProperties();
+        messageBean.setPayload_bytes(message.getData().length);
+        messageBean.setRedelivered(false);
+        messageBean.setPayload_encoding("string");
+        messageBean.setRouting_key(properties.get(MessageConvertUtils.PROP_ROUTING_KEY));
+        messageBean.setExchange(properties.get(MessageConvertUtils.PROP_EXCHANGE));
+        Map<String, Object> props = new HashMap<>();
+        Map<String, Object> propsHeaders = new HashMap<>();
+        props.put("headers", propsHeaders);
+        properties.forEach((k, v) -> {
+            if (k.startsWith(MessageConvertUtils.BASIC_PROP_PRE)) {
+                props.put(k.substring(MessageConvertUtils.BASIC_PROP_PRE.length()), v);
+            } else if (k.startsWith(MessageConvertUtils.BASIC_PROP_HEADER_PRE)) {
+                propsHeaders.put(k.substring(MessageConvertUtils.BASIC_PROP_HEADER_PRE.length()), v);
+            }
+        });
+        messageBean.setProperties(props);
+        return messageBean;
+    }
+
+    protected CompletableFuture<Void> purgeQueueAsync(String vhost, String queue, PurgeQueueParams purgeQueueParams) {
+        if (!"purge".equals(purgeQueueParams.getMode())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return aop().getBrokerService()
+                .getTopic(TopicUtil.getTopicName(PersistentQueue.TOPIC_PREFIX, tenant, vhost, queue), false)
+                .thenAccept(topicOptional -> topicOptional.ifPresent(topic -> {
+                    if (topic instanceof PersistentTopic persistentTopic) {
+                        persistentTopic.clearBacklog();
+                    }
+                }))
+                .thenCompose(__ -> queueContainer().asyncGetQueue(getNamespaceName(vhost), queue, false)
+                        .thenAccept(amqpQueue -> {
+                            if (amqpQueue instanceof PersistentQueue persistentQueue) {
+                                persistentQueue.start();
+                            }
+                        }));
+    }
+
+    protected CompletableFuture<Void> startExpirationDetection(String vhost, String queue) {
         return queueContainer().asyncGetQueue(getNamespaceName(vhost), queue, false)
+                .thenAccept(amqpQueue -> {
+                    if (amqpQueue instanceof PersistentQueue persistentQueue) {
+                        persistentQueue.start();
+                    }
+                });
+    }
+
+    protected CompletableFuture<QueueDetail> getQueueDetailAsync(String vhost, String queue, long age, long incr) {
+        NamespaceName namespaceName = getNamespaceName(vhost);
+        PrometheusAdmin prometheusAdmin = prometheusAdmin();
+        CompletableFuture<Map<String, QueueRangeMetrics>> queueDetailMetrics;
+        if (prometheusAdmin.isConfig()) {
+            queueDetailMetrics =
+                    prometheusAdmin.queryRangeQueueDetailMetrics(
+                            namespaceName.getTenant() + "/" + namespaceName.getLocalName(), queue, age, incr);
+        } else {
+            queueDetailMetrics = CompletableFuture.completedFuture(null);
+        }
+
+        return queueContainer().asyncGetQueue(namespaceName, queue, false)
                 .thenApply(qu -> {
                     if (qu == null) {
                         throw new AoPServiceRuntimeException.NoSuchQueueException("Queue [" + queue + "] not created");
@@ -205,6 +423,8 @@ public class QueueBase extends BaseResources {
                     SubscriptionStats subscriptionStats = stats.getSubscriptions().get("AMQP_DEFAULT");
                     if (qu instanceof PersistentQueue persistentQueue) {
                         queueDetail.setName(queue);
+                        queueDetail.setFullName(TopicName.get(TopicDomain.persistent.value(), namespaceName,
+                                PersistentQueue.TOPIC_PREFIX + queue).toString());
                         queueDetail.setDurable(persistentQueue.getDurable());
                         queueDetail.setExclusive(persistentQueue.getExclusive());
                         queueDetail.setArguments(persistentQueue.getArguments());
@@ -222,22 +442,23 @@ public class QueueBase extends BaseResources {
                         QueueDetail.MessageStatsBean messageStatsBean = new QueueDetail.MessageStatsBean();
                         QueueDetail.RateBean ackDetailsBean = new QueueDetail.RateBean();
                         ackDetailsBean.setSamples(
-                                Lists.newArrayList(new QueueDetail.SamplesBean(0, System.currentTimeMillis())));
+                                Lists.newArrayList(new SamplesBean(0, System.currentTimeMillis())));
                         QueueDetail.RateBean publishDetailsBean = new QueueDetail.RateBean();
                         publishDetailsBean.setSamples(
-                                Lists.newArrayList(new QueueDetail.SamplesBean(0, System.currentTimeMillis())));
+                                Lists.newArrayList(new SamplesBean(0, System.currentTimeMillis())));
                         QueueDetail.RateBean redeliverDetailsBean = new QueueDetail.RateBean();
                         redeliverDetailsBean.setSamples(
-                                Lists.newArrayList(new QueueDetail.SamplesBean(0, System.currentTimeMillis())));
+                                Lists.newArrayList(new SamplesBean(0, System.currentTimeMillis())));
                         QueueDetail.RateBean deliverDetailsBean = new QueueDetail.RateBean();
                         deliverDetailsBean.setSamples(
-                                Lists.newArrayList(new QueueDetail.SamplesBean(0, System.currentTimeMillis())));
+                                Lists.newArrayList(new SamplesBean(0, System.currentTimeMillis())));
                         QueueDetail.RateBean messagesDetailsBean = new QueueDetail.RateBean();
                         messagesDetailsBean.setSamples(
-                                Lists.newArrayList(new QueueDetail.SamplesBean(0, System.currentTimeMillis())));
+                                Lists.newArrayList(new SamplesBean(0, System.currentTimeMillis())));
                         QueueDetail.RateBean readyDetailsBean = new QueueDetail.RateBean();
                         readyDetailsBean.setSamples(
-                                Lists.newArrayList(new QueueDetail.SamplesBean(0, System.currentTimeMillis())));
+                                Lists.newArrayList(new SamplesBean(0, System.currentTimeMillis())));
+                        List<QueueDetail.ConsumerDetailsBean> detailsBeans = Lists.newArrayList();
                         if (subscriptionStats != null) {
                             ackDetailsBean.setRate(subscriptionStats.getMessageAckRate());
                             publishDetailsBean.setRate(stats.getMsgRateIn());
@@ -254,8 +475,7 @@ public class QueueBase extends BaseResources {
                             queueDetail.setMessages_unacknowledged(subscriptionStats.getUnackedMessages());
                             queueDetail.setConsumers(subscriptionStats.getConsumers().size());
 
-                            List<QueueDetail.ConsumerDetailsBean> detailsBeans = Lists.newArrayList();
-                            if(subscription != null){
+                            if (subscription != null) {
                                 List<Consumer> consumers = subscription.getConsumers();
                                 consumers.stream()
                                         .map(consumer -> {
@@ -289,9 +509,8 @@ public class QueueBase extends BaseResources {
                                             return consumerDetailsBean;
                                         }).collect(Collectors.toCollection(() -> detailsBeans));
                             }
-
-                            queueDetail.setConsumer_details(detailsBeans);
                         }
+                        queueDetail.setConsumer_details(detailsBeans);
                         messageStatsBean.setPublish_details(publishDetailsBean);
                         messageStatsBean.setAck_details(ackDetailsBean);
                         messageStatsBean.setDeliver_details(deliverDetailsBean);
@@ -308,7 +527,22 @@ public class QueueBase extends BaseResources {
                         queueDetail.setReductions_details(new QueueDetail.RateBean());
                     }
                     return queueDetail;
-                });
+                })
+                .thenCompose(queueDetail -> queueDetailMetrics.thenApply(map -> {
+                    QueueRangeMetrics rangeMetrics;
+                    if (map != null && (rangeMetrics = map.get(queueDetail.getFullName())) != null) {
+                        queueDetail.getMessages_ready_details().setSamples(rangeMetrics.getReady());
+                        queueDetail.getMessages_unacknowledged_details().setSamples(rangeMetrics.getUnAck());
+                        queueDetail.getMessages_details().setSamples(rangeMetrics.getTotal());
+
+                        QueueDetail.MessageStatsBean messageStats = queueDetail.getMessage_stats();
+                        // Pulsar is Rate, it should be a value statistic.
+                        // messageStats.getAck_details().setSamples(rangeMetrics.getAck());
+                        messageStats.getPublish_details().setSamples(rangeMetrics.getPublish());
+                        messageStats.getDeliver_details().setSamples(rangeMetrics.getDeliver());
+                    }
+                    return queueDetail;
+                }));
     }
 
     protected CompletableFuture<QueueBean> getQueueBeanAsync(String vhost, String queue) {
@@ -327,8 +561,8 @@ public class QueueBase extends BaseResources {
     protected CompletableFuture<AmqpQueue> declareQueueAsync(NamespaceName namespaceName, String queue,
                                                              QueueDeclareParams declareParams) {
         return queueService().queueDeclare(namespaceName, queue, false,
-                        declareParams.isDurable(), declareParams.isExclusive(), declareParams.isAutoDelete(),
-                        true, declareParams.getArguments(), -1);
+                declareParams.isDurable(), declareParams.isExclusive(), declareParams.isAutoDelete(),
+                true, declareParams.getArguments(), -1);
     }
 
     protected CompletableFuture<Void> deleteQueueAsync(NamespaceName namespaceName, String queue, boolean ifUnused,

@@ -14,6 +14,10 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.AUTO_DELETE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURABLE;
+import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
 import java.util.HashMap;
@@ -22,12 +26,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
+import org.apache.qpid.server.protocol.ErrorCodes;
 
 /**
  * Container for all queues in the broker.
@@ -113,6 +119,10 @@ public class QueueContainer {
                                 removeQueueFuture(namespaceName, queueName);
                                 return;
                             }
+                        } else {
+                            amqpQueue.startMessageExpireChecker(config.getAmqpPulsarConsumerQueueSize())
+                                    .thenRun(() -> queueCompletableFuture.complete(amqpQueue));
+                            return;
                         }
                         queueCompletableFuture.complete(amqpQueue);
                     }
@@ -142,19 +152,14 @@ public class QueueContainer {
             queueCompletableFuture.completeExceptionally(new PulsarServerException("PulsarService not start"));
             return queueCompletableFuture;
         }
-        queueMap.putIfAbsent(namespaceName, new ConcurrentHashMap<>());
-        CompletableFuture<AmqpQueue> existingAmqpExchangeFuture = queueMap.get(namespaceName).
-                putIfAbsent(queueName, queueCompletableFuture);
-        if (existingAmqpExchangeFuture != null) {
-            return existingAmqpExchangeFuture;
-        }
         String topicName = PersistentQueue.getQueueTopicName(namespaceName, queueName);
 
         Map<String, String> initProperties = new HashMap<>();
+
         if (!passive) {
             try {
-                initProperties = QueueUtil.generateTopicProperties(queueName, durable,
-                        autoDelete, passive, arguments);
+                initProperties.putAll(QueueUtil.generateTopicProperties(queueName, durable,
+                        autoDelete, passive, arguments));
             } catch (Exception e) {
                 log.error("Failed to generate topic properties for exchange {} in vhost {}.",
                         queueName, namespaceName, e);
@@ -162,6 +167,23 @@ public class QueueContainer {
                 removeQueueFuture(namespaceName, queueName);
                 return queueCompletableFuture;
             }
+        }
+        queueMap.putIfAbsent(namespaceName, new ConcurrentHashMap<>());
+        CompletableFuture<AmqpQueue> existingAmqpQueueFuture = queueMap.get(namespaceName).
+                putIfAbsent(queueName, queueCompletableFuture);
+        if (existingAmqpQueueFuture != null) {
+            return existingAmqpQueueFuture.thenCompose(amqpQueue -> {
+                if (amqpQueue instanceof PersistentQueue persistentQueue) {
+                    if (!passive) {
+                        if (!queueDeclareCheck(
+                                queueCompletableFuture, namespaceName.getLocalName(),
+                                queueName, initProperties, persistentQueue.getProperties())) {
+                            return queueCompletableFuture;
+                        }
+                    }
+                }
+                return existingAmqpQueueFuture;
+            });
         }
 
         CompletableFuture<Topic> topicCompletableFuture =
@@ -181,6 +203,12 @@ public class QueueContainer {
                     PersistentTopic persistentTopic = (PersistentTopic) topic;
                     Map<String, String> properties = persistentTopic.getManagedLedger().getProperties();
 
+                    if (!passive && !queueDeclareCheck(
+                            queueCompletableFuture, namespaceName.getLocalName(),
+                            queueName, initProperties, properties)) {
+                        removeQueueFuture(namespaceName, queueName);
+                        return;
+                    }
                     // TODO: reset connectionId, exclusive and autoDelete
                     PersistentQueue amqpQueue = new PersistentQueue(queueName, persistentTopic,
                             0, false, false, properties);
@@ -196,7 +224,9 @@ public class QueueContainer {
                             return;
                         }
                     } else {
-                        amqpQueue.startMessageExpireChecker(config.getAmqpPulsarConsumerQueueSize());
+                        amqpQueue.startMessageExpireChecker(config.getAmqpPulsarConsumerQueueSize())
+                                .thenRun(() -> queueCompletableFuture.complete(amqpQueue));
+                        return;
                     }
                     queueCompletableFuture.complete(amqpQueue);
                 }
@@ -208,6 +238,28 @@ public class QueueContainer {
             return null;
         });
         return queueCompletableFuture;
+    }
+
+    private boolean queueDeclareCheck(CompletableFuture<AmqpQueue> queueFuture, String vhost,
+                                      String queueName, Map<String, String> arguments, Map<String, String> properties) {
+
+        String replyTextFormat = "PRECONDITION_FAILED - inequivalent arg '%s' for queue '" + queueName + "' in "
+                + "vhost '" + vhost + "': received '%s' but current is '%s'";
+        if (properties == null) {
+            queueFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
+                    String.format(replyTextFormat, "queueInfo", arguments, properties), true, false));
+            return false;
+        }
+        for (Map.Entry<String, String> entry : arguments.entrySet()) {
+            String k = entry.getKey();
+            String v = entry.getValue();
+            if (!StringUtils.equals(v, properties.get(k))) {
+                queueFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
+                        String.format(replyTextFormat, k, v, properties.get(k)), true, false));
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
-
 import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
@@ -51,9 +50,11 @@ import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.AMQMethodBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicAckBody;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicConsumeOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.ExchangeDeleteOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.QueueDeclareOkBody;
+import org.apache.qpid.server.protocol.v0_8.transport.QueueDeleteOkBody;
 
 /**
  * Amqp Channel level method processor.
@@ -65,6 +66,8 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
     private final List<AmqpPulsarConsumer> consumerList;
 
     private final Map<String, MessagePublishInfo> publishInfoMap = new HashMap<>();
+
+    private volatile String defQueue;
 
     public AmqpMultiBundlesChannel(int channelId, AmqpConnection connection, AmqpBrokerService amqpBrokerService) {
         super(channelId, connection, amqpBrokerService);
@@ -118,10 +121,11 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         params.setDurable(durable);
         params.setExclusive(exclusive);
         params.setAutoDelete(autoDelete);
+        params.setPassive(passive);
         params.setArguments(FieldTable.convertToMap(arguments));
         getAmqpAdmin().queueDeclare(
                 connection.getNamespaceName(), queue.toString(), params).thenAccept(amqpQueue -> {
-//            setDefaultQueue(amqpQueue);
+            setDefQueue(queue.toString());
             MethodRegistry methodRegistry = connection.getMethodRegistry();
             QueueDeclareOkBody responseBody = methodRegistry.createQueueDeclareOkBody(
                     AMQShortString.createAMQShortString(queue.toString()), 0, 0);
@@ -145,14 +149,15 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         params.setRoutingKey(bindingKey != null ? bindingKey.toString() : "");
         params.setArguments(FieldTable.convertToMap(argumentsTable));
 
+        AMQShortString finalQueue = getDefQueue(queue);
         getAmqpAdmin().queueBind(connection.getNamespaceName(),
-                        exchange.toString(), queue.toString(), params)
+                        exchange.toString(), finalQueue.toString(), params)
                 .thenAccept(__ -> {
                     MethodRegistry methodRegistry = connection.getMethodRegistry();
                     AMQMethodBody responseBody = methodRegistry.createQueueBindOkBody();
                     connection.writeFrame(responseBody.generateFrame(channelId));
                 }).exceptionally(t -> {
-                    log.error("Failed to bind queue {} to exchange {}.", queue, exchange, t);
+                    log.error("Failed to bind queue {} to exchange {}.", finalQueue, exchange, t);
                     handleAoPException(t);
                     return null;
                 });
@@ -174,6 +179,54 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 }).exceptionally(t -> {
                     log.error("Failed to unbind queue {} with exchange {} in vhost {}",
                             queue, exchange, connection.getNamespaceName(), t);
+                    handleAoPException(t);
+                    return null;
+                });
+    }
+
+    @Override
+    public void receiveQueueDelete(AMQShortString queue, boolean ifUnused, boolean ifEmpty, boolean nowait) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] QueueDelete[ queue: {}, ifUnused:{}, ifEmpty:{}, nowait:{} ]", channelId, queue,
+                    ifUnused, ifEmpty, nowait);
+        }
+        Map<String, Object> params = new HashMap<>(4);
+        params.put("if-unused", ifUnused);
+        params.put("if-empty", ifEmpty);
+        params.put("mode", "delete");
+        params.put("name", queue.toString());
+        params.put("vhost", connection.getNamespaceName().getLocalName());
+        getAmqpAdmin().queueDelete(connection.getNamespaceName(), queue.toString(), params)
+                .thenAccept(__ -> {
+                    MethodRegistry methodRegistry = connection.getMethodRegistry();
+                    QueueDeleteOkBody responseBody = methodRegistry.createQueueDeleteOkBody(0);
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to delete queue " + queue, t);
+                    handleAoPException(t);
+                    return null;
+                });
+    }
+
+    @Override
+    public void receiveExchangeDelete(AMQShortString exchange, boolean ifUnused, boolean nowait) {
+        if (log.isDebugEnabled()) {
+            log.debug("RECV[{}] receiveExchangeDelete[ exchange: {}, ifUnused:{} ]", channelId,
+                    ifUnused, nowait);
+        }
+        Map<String, Object> params = new HashMap<>(2);
+        params.put("if-unused", ifUnused);
+        params.put("name", exchange.toString());
+        params.put("vhost", connection.getNamespaceName().getLocalName());
+        getAmqpAdmin().exchangeDelete(connection.getNamespaceName(), exchange.toString(), params)
+                .thenAccept(__ -> {
+                    ExchangeDeleteOkBody responseBody = connection.getMethodRegistry().createExchangeDeleteOkBody();
+                    connection.writeFrame(responseBody.generateFrame(channelId));
+                })
+                .exceptionally(t -> {
+                    log.error("Failed to delete exchange {} in vhost {}.",
+                            exchange, connection.getNamespaceName(), t);
                     handleAoPException(t);
                     return null;
                 });
@@ -336,7 +389,7 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         closeAllConsumers();
         closeAllProducers();
         // TODO need to delete exclusive queues in this channel.
-        setDefaultQueue(null);
+        setDefQueue(null);
     }
 
     private void closeAllConsumers() {
@@ -381,10 +434,12 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
         PulsarClient client = connection.getPulsarService().getClient();
         return producerMap.computeIfAbsent(exchange, k -> {
             try {
-                return client.newProducer()
+                Producer<byte[]> producer = client.newProducer()
                         .topic(getTopicName(PersistentExchange.TOPIC_PREFIX, exchange))
                         .enableBatching(false)
                         .create();
+                getAmqpAdmin().loadExchange(connection.getNamespaceName(), exchange);
+                return producer;
             } catch (PulsarClientException e) {
                 throw new AoPServiceRuntimeException.ProducerCreationRuntimeException(e);
             }
@@ -435,4 +490,12 @@ public class AmqpMultiBundlesChannel extends AmqpChannel {
                 + topicPrefix + name;
     }
 
+    public void setDefQueue(String queue) {
+        defQueue = queue;
+    }
+
+    public AMQShortString getDefQueue(AMQShortString queue){
+        return queue == null || queue.length() == 0 ?
+                defQueue != null ? AMQShortString.valueOf(defQueue) : null : queue;
+    }
 }

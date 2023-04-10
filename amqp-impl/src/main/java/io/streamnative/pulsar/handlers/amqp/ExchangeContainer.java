@@ -20,6 +20,7 @@ import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURAB
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.INTERNAL;
 import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
 
+import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil;
@@ -49,13 +50,15 @@ public class ExchangeContainer {
     private PulsarService pulsarService;
     private final ExecutorService routeExecutor;
     private final AmqpServiceConfiguration config;
+    private final AmqpAdmin amqpAdmin;
 
     protected ExchangeContainer(AmqpTopicManager amqpTopicManager, PulsarService pulsarService,
-                                ExecutorService routeExecutor, AmqpServiceConfiguration config) {
+                                ExecutorService routeExecutor, AmqpServiceConfiguration config, AmqpAdmin amqpAdmin) {
         this.amqpTopicManager = amqpTopicManager;
         this.pulsarService = pulsarService;
         this.routeExecutor = routeExecutor;
         this.config = config;
+        this.amqpAdmin = amqpAdmin;
     }
 
     @Getter
@@ -177,7 +180,7 @@ public class ExchangeContainer {
                             amqpExchange = new PersistentExchange(exchangeName, properties,
                                     AmqpExchange.Type.value(currentType), persistentTopic, currentDurable,
                                     currentAutoDelete, currentInternal, currentArguments, routeExecutor,
-                                    config.getAmqpExchangeRouteQueueSize(), config.isAmqpMultiBundleEnable());
+                                    config.getAmqpExchangeRouteQueueSize(), config.isAmqpMultiBundleEnable(), amqpAdmin);
                         } catch (Exception e) {
                             log.error("Failed to init exchange {} in vhost {}.",
                                     exchangeName, namespaceName.getLocalName(), e);
@@ -205,11 +208,11 @@ public class ExchangeContainer {
         String currentType = properties.get(TYPE);
         if (!StringUtils.equals(properties.get(TYPE), exchangeType)) {
             exchangeFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
-                    String.format(replyTextFormat, "type", exchangeType, currentType), true, false));
+                    String.format(replyTextFormat, "type", exchangeType, currentType), true, true));
             return false;
         }
 
-        if (properties.containsKey(DURABLE)) {
+        /*if (properties.containsKey(DURABLE)) {
             boolean currentDurable = Boolean.parseBoolean(properties.get(DURABLE));
             if (durable != currentDurable) {
                 exchangeFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
@@ -225,7 +228,7 @@ public class ExchangeContainer {
                         String.format(replyTextFormat, "auto_delete", autoDelete, currentAutoDelete), true, false));
                 return false;
             }
-        }
+        }*/
 
         return true;
     }

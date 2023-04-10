@@ -39,10 +39,7 @@ import org.jetbrains.annotations.NotNull;
 @Slf4j
 public class HttpUtil {
 
-    private static final OkHttpClient client = new OkHttpClient.Builder()
-            .callTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS).build();
+    private static final OkHttpClient client = new OkHttpClient();
 
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
@@ -50,10 +47,37 @@ public class HttpUtil {
         return getAsync(url, new HashMap<>(), classType);
     }
 
+    public static CompletableFuture<Void> getAsync(String url, Map<String, String> headers) {
+        Request request = new Request.Builder()
+                .url(url)
+                .headers(Headers.of(headers))
+                .get()
+                .build();
+
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                future.completeExceptionally(e);
+            }
+
+            @Override
+            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
+                if (!response.isSuccessful()) {
+                    future.completeExceptionally(new IOException("Unexpected code " + response));
+                    return;
+                }
+                future.complete(null);
+            }
+        });
+        return future;
+    }
+
     public static <T> CompletableFuture<T> getAsync(String url, Map<String, String> headers, Class<T> classType) {
         Request request = new Request.Builder()
                 .url(url)
                 .headers(Headers.of(headers))
+                .get()
                 .build();
 
         CompletableFuture<T> future = new CompletableFuture<>();

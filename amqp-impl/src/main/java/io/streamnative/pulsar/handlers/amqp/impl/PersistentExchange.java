@@ -25,6 +25,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.ExchangeMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.Serializable;
@@ -102,7 +103,8 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     public PersistentExchange(String exchangeName, Map<String, String> properties, Type type, PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
+                              ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable,
+                              AmqpAdmin amqpAdmin)
             throws JsonProcessingException {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments, properties);
         this.persistentTopic = persistentTopic;
@@ -123,10 +125,21 @@ public class PersistentExchange extends AbstractAmqpExchange {
                 this.bindings.addAll(amqpQueueProperties);
             }
             this.exchangeMessageRouter = ExchangeMessageRouter.getInstance(this, routeExecutor);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            NamespaceName namespaceName = TopicName.get(persistentTopic.getName()).getNamespaceObject();
             for (Binding binding : this.bindings) {
+                // The initialization queue triggers the message expiration detection task
+                if ("queue".equals(binding.desType)) {
+                    futures.add(amqpAdmin.loadQueue(namespaceName, binding.des));
+                }
                 this.exchangeMessageRouter.addBinding(binding.des, binding.desType, binding.key, binding.arguments);
             }
-            this.exchangeMessageRouter.start();
+            FutureUtil.waitForAll(futures).whenComplete((__, throwable) -> {
+                if (throwable != null) {
+                    log.error("Failed to init exchange [{}]", exchangeName, throwable);
+                }
+                this.exchangeMessageRouter.start();
+            });
             return;
         }
 

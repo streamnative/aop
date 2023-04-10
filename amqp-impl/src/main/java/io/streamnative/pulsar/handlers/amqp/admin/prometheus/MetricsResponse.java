@@ -1,5 +1,6 @@
 package io.streamnative.pulsar.handlers.amqp.admin.prometheus;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -47,33 +48,22 @@ public class MetricsResponse {
     }
 
     public Map<String, Double> getTopicValueMap() {
-        String instance = getInstance();
-        return data.result.stream()
-                .filter(resultBean -> {
-                    if (instance == null) {
-                        return true;
-                    }
-                    return resultBean.getMetric().getInstance().equals(instance);
-                })
-                .collect(Collectors.toMap(resultBean -> resultBean.getMetric().getTopic(), v -> {
-                    List<Double> value = v.getValue();
-                    if (value.isEmpty()) {
-                        return 0.0;
-                    }
-                    return value.get(value.size() - 1);
-                }));
-    }
-
-    private String getInstance() {
-        String instance = null;
-        if (data.result.size() > 1) {
-            TreeMap<Integer, String> treeMap = data.result.stream()
-                    .collect(
-                            Collectors.toMap(resultBean -> resultBean.getValue().size(),
-                                    r -> r.getMetric().getInstance(),
-                                    (v1, v2) -> v1, TreeMap::new));
-            instance = treeMap.lastEntry().getValue();
-        }
-        return instance;
+        Map<String, List<Double>> resultMap = data.result.stream()
+                .collect(Collectors.toMap(resultBean -> resultBean.getMetric().getTopic(),
+                        DataBean.ResultBean::getValue, (o, o2) -> {
+                            if (o.size() >= o2.size()) {
+                                return o;
+                            }
+                            return o2;
+                        }));
+        Map<String, Double> valToMap = new HashMap<>(resultMap.size());
+        resultMap.forEach((k, v) -> {
+            if (v.isEmpty()) {
+                valToMap.put(k, 0.0);
+                return;
+            }
+            valToMap.put(k, v.get(v.size() - 1));
+        });
+        return valToMap;
     }
 }

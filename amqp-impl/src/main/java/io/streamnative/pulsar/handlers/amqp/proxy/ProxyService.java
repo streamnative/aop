@@ -57,7 +57,7 @@ public class ProxyService implements Closeable {
         this.tenant = this.proxyConfig.getAmqpTenant();
         this.acceptorGroup = EventLoopUtil.newEventLoopGroup(1, false,
                 new DefaultThreadFactory("amqp-redirect-acceptor"));
-        this.workerGroup = EventLoopUtil.newEventLoopGroup(NUM_THREADS, false,
+        this.workerGroup = EventLoopUtil.newEventLoopGroup(NUM_THREADS * 2, false,
                 new DefaultThreadFactory("amqp-redirect-io"));
     }
 

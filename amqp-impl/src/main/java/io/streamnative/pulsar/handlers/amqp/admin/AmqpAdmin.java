@@ -59,9 +59,19 @@ public class AmqpAdmin {
         }
     }
 
-    public CompletableFuture<Void> startExpirationDetection(NamespaceName namespaceName, String queue) {
+    public CompletableFuture<Void> queueDelete(NamespaceName namespaceName, String queue, Map<String, Object> params) {
+        String url = String.format("%s/queues/%s/%s", baseUrl, namespaceName.getLocalName(), queue);
+        return HttpUtil.deleteAsync(url, params, Map.of("tenant", namespaceName.getTenant()));
+    }
+
+    public CompletableFuture<Void> exchangeDelete(NamespaceName namespaceName, String exchange, Map<String, Object> params) {
+        String url = String.format("%s/exchanges/%s/%s", baseUrl, namespaceName.getLocalName(), exchange);
+        return HttpUtil.deleteAsync(url, params, Map.of("tenant", namespaceName.getTenant()));
+    }
+
+    public void startExpirationDetection(NamespaceName namespaceName, String queue) {
         String url = String.format("%s/queues/%s/%s/startExpirationDetection", baseUrl, namespaceName.getLocalName(), queue);
-        return HttpUtil.putAsync(url, new HashMap<>(1), Map.of("tenant", namespaceName.getTenant()));
+        HttpUtil.putAsync(url, new HashMap<>(1), Map.of("tenant", namespaceName.getTenant()));
     }
 
     public CompletableFuture<Void> queueBind(NamespaceName namespaceName,
@@ -74,6 +84,22 @@ public class AmqpAdmin {
         } catch (JsonProcessingException e) {
             return CompletableFuture.failedFuture(e);
         }
+    }
+    public CompletableFuture<Void> loadExchange(NamespaceName namespaceName, String ex) {
+        String url = String.format("%s/exchanges/%s/%s/loadExchange", baseUrl, namespaceName.getLocalName(), ex);
+        return HttpUtil.getAsync(url, Map.of("tenant", namespaceName.getTenant()));
+    }
+    public CompletableFuture<Void> loadQueue(NamespaceName namespaceName, String queue) {
+        String url = String.format("%s/queues/%s/%s/loadQueue", baseUrl, namespaceName.getLocalName(), queue);
+        return HttpUtil.getAsync(url, Map.of("tenant", namespaceName.getTenant()));
+    }
+    public CompletableFuture<Void> loadVhostAllQueue(NamespaceName namespaceName) {
+        String url = String.format("%s/queues/%s/loadVhostAllQueue", baseUrl, namespaceName.getLocalName());
+        return HttpUtil.getAsync(url, Map.of("tenant", namespaceName.getTenant()));
+    }
+    public CompletableFuture<Void> loadAllVhost(String tenant) {
+        String url = String.format("%s/vhosts/loadAllVhost", baseUrl);
+        return HttpUtil.getAsync(url, Map.of("tenant",tenant));
     }
 
     public CompletableFuture<Void> queueBindExchange(NamespaceName namespaceName,
@@ -93,17 +119,17 @@ public class AmqpAdmin {
                                                        String exchange,
                                                        String queue,
                                                        String props) {
-        String url = String.format("%s/queueUnBindExchange/%s/e/%s/q/%s/%s",
-                baseUrl, namespaceName.getLocalName(), exchange, queue, props);
-        return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
+        String url = String.format("%s/queueUnBindExchange/%s/e/%s/q/%s/unbind",
+                baseUrl, namespaceName.getLocalName(), exchange, queue);
+        return HttpUtil.deleteAsync(url, Map.of("properties_key", props), Map.of("tenant", namespaceName.getTenant()));
     }
 
     public CompletableFuture<Void> queueUnbind(NamespaceName namespaceName,
                                                String exchange,
                                                String queue,
                                                String props) {
-        String url = String.format("%s/bindings/%s/e/%s/q/%s/%s",
-                baseUrl, namespaceName.getLocalName(), exchange, queue, props);
-        return HttpUtil.deleteAsync(url, null, Map.of("tenant", namespaceName.getTenant()));
+        String url = String.format("%s/bindings/%s/e/%s/q/%s/unbind",
+                baseUrl, namespaceName.getLocalName(), exchange, queue);
+        return HttpUtil.deleteAsync(url, Map.of("properties_key", props), Map.of("tenant", namespaceName.getTenant()));
     }
 }

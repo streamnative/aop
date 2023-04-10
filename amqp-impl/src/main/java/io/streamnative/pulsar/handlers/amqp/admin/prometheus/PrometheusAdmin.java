@@ -34,7 +34,7 @@ public class PrometheusAdmin {
 
         PrometheusAdmin admin = new PrometheusAdmin("http://10.70.20.193:9090/", "pulsar-cluster-test");
 
-        admin.queryRangeQueueDetailMetrics("amqp/default","basic.customs.goods.notify.queue", 7200, 120).thenAccept(System.out::println);
+        admin.queryQueueListMetrics("amqp/abm-oms-test").thenAccept(System.out::println);
     }
 
     public CompletableFuture<Map<String, QueueListMetrics>> queryQueueListMetrics(String namespace) {
@@ -80,8 +80,8 @@ public class PrometheusAdmin {
                         Map<String, Double> ackRate = ackRateFuture.get();
                         unAckMap.forEach((key, value) -> {
                             QueueListMetrics queueListMetrics = new QueueListMetrics();
-                            queueListMetrics.setReady(value.longValue());
-                            queueListMetrics.setUnAck(readyMap.getOrDefault(key, 0.0).longValue());
+                            queueListMetrics.setReady(readyMap.getOrDefault(key, 0.0).longValue());
+                            queueListMetrics.setUnAck(value.longValue());
                             queueListMetrics.setTotal(totalMap.getOrDefault(key, 0.0).longValue());
 
                             queueListMetrics.setIncomingRate(inRate.getOrDefault(key, 0.0));

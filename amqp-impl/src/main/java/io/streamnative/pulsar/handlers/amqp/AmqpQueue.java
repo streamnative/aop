@@ -23,7 +23,7 @@ import org.apache.pulsar.broker.service.Topic;
  * Interface of the AMQP queue.
  * The AMQP broker should maintaining queues in a Map, so that the broker can find the right queue to read messages.
  */
-public interface AmqpQueue {
+public interface AmqpQueue extends AutoCloseable{
 
     /**
      * Get name of the queue.
@@ -97,6 +97,6 @@ public interface AmqpQueue {
 
     Topic getTopic();
 
-    default void close(){
-    }
+    @Override
+    void close();
 }

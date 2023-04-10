@@ -19,6 +19,8 @@ import io.streamnative.pulsar.handlers.amqp.admin.model.MessageBean;
 import io.streamnative.pulsar.handlers.amqp.admin.model.MessageParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.PurgeQueueParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueDeleteParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueUnBindingParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.QueuesList;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
@@ -118,13 +120,52 @@ public class Queues extends QueueBase {
                     return null;
                 });
     }
+
+    @GET
+    @Path("/{vhost}/loadVhostAllQueue")
+    public void loadVhostAllQueue(@Suspended final AsyncResponse response,
+                               @PathParam("vhost") String vhost,
+                               @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        getQueueListAsync(tenant, vhost)
+                .thenAccept(queues -> queues.forEach(topic -> {
+                    String s = TopicName.get(topic).getLocalName()
+                            .substring(PersistentQueue.TOPIC_PREFIX.length());
+                    amqpAdmin().loadQueue(getNamespaceName(vhost), s);
+                }))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @GET
+    @Path("/{vhost}/{queue}/loadQueue")
+    public void loadQueue(@Suspended final AsyncResponse response,
+                          @PathParam("vhost") String vhost,
+                          @PathParam("queue") String queue,
+                          @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> loadQueueAsync(vhost, queue))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to declare queue {} {} in vhost {}", queue, tenant, vhost, t);
+                    }
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
     @DELETE
     @Path("/{vhost}/{queue}/contents")
     public void purgeQueue(@Suspended final AsyncResponse response,
-                         @PathParam("vhost") String vhost,
-                         @PathParam("queue") String queue,
-                         PurgeQueueParams purgeQueueParams,
-                         @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+                           @PathParam("vhost") String vhost,
+                           @PathParam("queue") String queue,
+                           PurgeQueueParams purgeQueueParams,
+                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
@@ -142,9 +183,9 @@ public class Queues extends QueueBase {
     @PUT
     @Path("/{vhost}/{queue}/startExpirationDetection")
     public void startExpirationDetection(@Suspended final AsyncResponse response,
-                           @PathParam("vhost") String vhost,
-                           @PathParam("queue") String queue,
-                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+                                         @PathParam("vhost") String vhost,
+                                         @PathParam("queue") String queue,
+                                         @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 getNamespaceName(vhost), PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
@@ -171,7 +212,8 @@ public class Queues extends QueueBase {
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenRun(() -> {
                     if (StringUtils.isAllBlank(params.getMessageId(), params.getEndTime(), params.getStartTime())) {
-                        throw new AoPServiceRuntimeException.GetMessageException("Query message, id and time one of them is required");
+                        throw new AoPServiceRuntimeException.GetMessageException(
+                                "Query message, id and time one of them is required");
                     }
                 })
                 .thenCompose(__ -> getQueueMessageAsync(vhost, queue, params))
@@ -235,8 +277,8 @@ public class Queues extends QueueBase {
                         PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
                 .thenCompose(__ -> queueBindAsync(namespaceName, exchange, queue, params))
-                .thenCompose(__ -> amqpAdmin().queueBindExchange(namespaceName, exchange, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .thenRunAsync(() -> amqpAdmin().queueBindExchange(namespaceName, exchange, queue, params))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
                         log.error("Failed to update queue {} {} in vhost {}", queue, tenant, vhost, t);
@@ -247,19 +289,19 @@ public class Queues extends QueueBase {
     }
 
     @DELETE
-    @Path("/{vhost}/e/{exchange}/q/{queue}/{props}")
+    @Path("/{vhost}/e/{exchange}/q/{queue}/unbind")
     public void queueUnBindings(@Suspended final AsyncResponse response,
                                 @PathParam("vhost") String vhost,
                                 @PathParam("exchange") String exchange,
                                 @PathParam("queue") String queue,
-                                @PathParam("props") String propsKey,
+                                QueueUnBindingParams params,
                                 @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> queueUnbindAsync(namespaceName, exchange, queue, propsKey))
-                .thenCompose(__ -> amqpAdmin().queueUnBindExchange(namespaceName, exchange, queue, propsKey))
+                .thenCompose(__ -> queueUnbindAsync(namespaceName, exchange, queue, params.getProperties_key()))
+                .thenCompose(__ -> amqpAdmin().queueUnBindExchange(namespaceName, exchange, queue, params.getProperties_key()))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
@@ -276,17 +318,16 @@ public class Queues extends QueueBase {
     public void deleteQueue(@Suspended final AsyncResponse response,
                             @PathParam("vhost") String vhost,
                             @PathParam("queue") String queue,
-                            @QueryParam("if-unused") boolean ifUnused,
-                            @QueryParam("if-empty") boolean ifEmpty,
+                            QueueDeleteParams params,
                             @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 namespaceName, PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> deleteQueueAsync(namespaceName, queue, ifUnused, ifEmpty))
+                .thenCompose(__ -> deleteQueueAsync(namespaceName, queue, params.isIfUnused(), params.isIfEmpty()))
                 .thenAccept(__ -> {
                     log.info("Success delete queue {} in vhost {}, if-unused is {}, if-empty is {}",
-                            queue, vhost, ifUnused, ifEmpty);
+                            queue, vhost, params.isIfUnused(), params.isIfEmpty());
                     response.resume(Response.noContent().build());
                 })
                 .exceptionally(t -> {

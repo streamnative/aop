@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.FALSE;
 import static org.apache.bookkeeper.mledger.impl.ManagedCursorImpl.TRUE;
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.netty.util.ReferenceCountUtil;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
@@ -202,7 +201,7 @@ public abstract class ExchangeMessageRouter {
                 message = MessageImpl.create(null, null,
                         Commands.parseMessageMetadata(entry.getDataBuffer()),
                         entry.getDataBuffer(),
-                        Optional.empty(), null, Schema.BYTES, 0, true, -1L);
+                        Optional.empty(), null, Schema.BYTES, 0, false, -1L);
                 message.getMessageBuilder().clearSequenceId();
                 props = message.getMessageBuilder().getPropertiesList().stream()
                         .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
@@ -228,6 +227,7 @@ public abstract class ExchangeMessageRouter {
                         throw new AoPServiceRuntimeException.MessageRouteException(
                                 "Failed to get producer for des " + des.name + ".");
                     }
+                    message.getDataBuffer().retain();
                     message.getMessageBuilder().clearProducerName();
                     message.getMessageBuilder().clearPublishTime();
                     message.getDataBuffer().readerIndex(readerIndex);
@@ -264,15 +264,13 @@ public abstract class ExchangeMessageRouter {
                         log.error("{} Failed to delete message at {}", exchange.getName(), ctx, exception);
                     }
                 }, position);
-
+                tryToReadMoreEntries();
             });
-            PENDING_SIZE_UPDATER.decrementAndGet(this);
         }
-        tryToReadMoreEntries();
     }
 
     private void tryToReadMoreEntries() {
-        if (PENDING_SIZE_UPDATER.get(this) < replicatorQueueSize * 0.5
+        if (PENDING_SIZE_UPDATER.decrementAndGet(this) < replicatorQueueSize * 0.5
                 && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
             this.readMoreEntries();
         }
@@ -475,6 +473,7 @@ public abstract class ExchangeMessageRouter {
             }
             return destinations;
         }
+
     }
 
 }

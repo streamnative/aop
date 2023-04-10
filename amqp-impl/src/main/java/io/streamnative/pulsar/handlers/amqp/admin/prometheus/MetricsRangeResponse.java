@@ -1,19 +1,13 @@
 package io.streamnative.pulsar.handlers.amqp.admin.prometheus;
 
-import com.google.common.collect.Lists;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.SamplesBean;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.jetbrains.annotations.Nullable;
 
 @NoArgsConstructor
 @Data
@@ -49,14 +43,7 @@ public class MetricsRangeResponse {
     }
 
     public Map<String, List<SamplesBean>> getTopicValueMap() {
-        String instance = getInstance();
         return data.result.stream()
-                .filter(resultBean -> {
-                    if (instance == null) {
-                        return true;
-                    }
-                    return resultBean.getMetric().getInstance().equals(instance);
-                })
                 .collect(Collectors.toMap(resultBean -> resultBean.getMetric().getTopic(),
                         v -> {
                             List<List<String>> values = v.getValues();
@@ -71,46 +58,19 @@ public class MetricsRangeResponse {
                                     })
                                     .sorted(Comparator.comparing(SamplesBean::getTimestamp, Comparator.reverseOrder()))
                                     .collect(Collectors.toList());
+                        }, (o, o2) -> {
+                            if (o.size() >= o2.size()) {
+                                return o;
+                            }
+                            return o2;
                         }));
     }
 
-    private String getInstance() {
-        String instance = null;
-        if (data.result.size() > 1) {
-            TreeMap<Integer, String> treeMap = data.result.stream().collect(
-                    Collectors.toMap(resultBean -> resultBean.getValues().size(),
-                            r -> r.getMetric().getInstance(),
-                            (v1, v2) -> v1, TreeMap::new));
-            instance = treeMap.lastEntry().getValue();
-        }
-        return instance;
-    }
-
     public List<SamplesBean> getValueMap() {
-        String instance = getInstance();
-        return data.result.stream()
-                .filter(resultBean -> {
-                    if (instance == null) {
-                        return true;
-                    }
-                    return resultBean.getMetric().getInstance().equals(instance);
-                })
-                .map(resultBean -> {
-                    List<List<String>> values = resultBean.getValues();
-                    return values.stream()
-                            .map(strList -> {
-                                SamplesBean samplesBean = new SamplesBean();
-                                String time = strList.get(0) + "000";
-                                String count = strList.get(1);
-                                samplesBean.setTimestamp(Double.parseDouble(time));
-                                samplesBean.setSample(Double.parseDouble(count));
-                                return samplesBean;
-                            })
-                            .sorted(Comparator.comparing(SamplesBean::getTimestamp, Comparator.reverseOrder()))
-                            .collect(Collectors.toList());
-
-                })
+        return getTopicValueMap().values()
+                .stream()
                 .flatMap(Collection::stream)
+                .sorted(Comparator.comparing(SamplesBean::getTimestamp, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
     }
 }

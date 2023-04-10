@@ -153,4 +153,8 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
         return autoDelete;
     }
 
+    @Override
+    public void close() {
+
+    }
 }

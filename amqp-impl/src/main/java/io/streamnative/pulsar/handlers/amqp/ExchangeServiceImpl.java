@@ -147,13 +147,13 @@ public class ExchangeServiceImpl implements ExchangeService {
                         return;
                     }
                     PersistentTopic topic = (PersistentTopic) amqpExchange.getTopic();
-                    if (ifUnused && !topic.getSubscriptions().isEmpty()) {
+                    if (ifUnused && ((PersistentExchange)amqpExchange).getBindings().size() > 0) {
                         future.completeExceptionally(
                                 new AoPException(ErrorCodes.IN_USE, "Exchange " + exchange + " has bindings.", true,
                                         false));
                         return;
                     }
-                    topic.delete().thenAccept(__ -> {
+                    topic.deleteForcefully().thenAccept(__ -> {
                         exchangeContainer.deleteExchange(namespaceName, exchangeName);
                         future.complete(null);
                     }).exceptionally(t -> {

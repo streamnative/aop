@@ -54,6 +54,19 @@ public class Vhosts extends ExchangeBase {
                 });
     }
 
+    @GET
+    @Path("/loadAllVhost")
+    public void loadAllVhost(@Suspended final AsyncResponse response,
+                             @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        namespaceResource().listNamespacesAsync(tenant)
+                .thenAccept(names -> names.forEach(name -> amqpAdmin().loadVhostAllQueue(getNamespaceName(name))))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
     @PUT
     @Path("/{vhost}")
     public void declareVhost(@Suspended final AsyncResponse response,

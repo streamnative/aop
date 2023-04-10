@@ -349,13 +349,13 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
 
         NamespaceName namespaceName = NamespaceName.get(pair.getLeft(), pair.getRight());
-        if (AmqpConnection.DEFAULT_NAMESPACE.equals(pair.getRight())) {
+        /*if (AmqpConnection.DEFAULT_NAMESPACE.equals(pair.getRight())) {
             // avoid the namespace public/default is not owned in standalone mode
             TopicName topic = TopicName.get(TopicDomain.persistent.value(),
                     namespaceName, "__lookup__");
             LookupOptions lookupOptions = LookupOptions.builder().authoritative(true).build();
             getPulsarService().getNamespaceService().getBrokerServiceUrlAsync(topic, lookupOptions);
-        }
+        }*/
         // Policies policies = getPolicies(namespaceName);
 //        if (policies != null) {
         this.namespaceName = namespaceName;

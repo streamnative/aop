@@ -141,7 +141,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
                         AmqpPulsarConsumer.this, message.size());
             }
             consumeBackoff.reset();
-            this.consume();
+            this.executorService.execute(this::consume);
         } catch (Exception e) {
             long backoff = consumeBackoff.next();
             log.error("Failed to receive message and send to client, retry in {} ms.", backoff, e);

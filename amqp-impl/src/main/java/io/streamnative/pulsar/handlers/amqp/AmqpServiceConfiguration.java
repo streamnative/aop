@@ -68,7 +68,7 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
         required = true,
         doc = "The maximum number of channels which can exist concurrently on a connection."
     )
-    private int amqpMaxNoOfChannels = 64;
+    private int amqpMaxNoOfChannels = 2048;
 
     @FieldContext(
         category = CATEGORY_AMQP,

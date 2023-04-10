@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
@@ -24,6 +23,7 @@ import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -31,9 +31,12 @@ import org.apache.pulsar.broker.ServiceConfigurationUtils;
 import org.apache.pulsar.broker.protocol.ProtocolHandler;
 import org.apache.pulsar.broker.service.BrokerService;
 import org.apache.pulsar.policies.data.loadbalancer.AdvertisedListener;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.glassfish.jersey.servlet.ServletContainer;
 
 /**
@@ -138,7 +141,13 @@ public class AmqpProtocolHandler implements ProtocolHandler {
         context.setContextPath("/api");
         context.setAttribute("aop", this);
 
-        webServer = new Server(InetSocketAddress.createUnresolved(bindAddress, port));
+        InetSocketAddress socketAddress = InetSocketAddress.createUnresolved(bindAddress, port);
+        webServer = new Server(new QueuedThreadPool(600, 8,
+                60000, new LinkedBlockingQueue<>(1024)));
+        ServerConnector connector = new ServerConnector(webServer);
+        connector.setHost(socketAddress.getHostName());
+        connector.setPort(socketAddress.getPort());
+        webServer.setConnectors(new Connector[]{connector});
         webServer.setHandler(context);
 
         ServletHolder jerseyServlet = context.addServlet(ServletContainer.class, "/*");

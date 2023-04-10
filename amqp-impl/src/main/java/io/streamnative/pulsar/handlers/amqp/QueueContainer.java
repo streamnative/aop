@@ -14,9 +14,6 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
-import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.AUTO_DELETE;
-import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.DURABLE;
-import static io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange.TYPE;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
@@ -26,7 +23,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -121,7 +117,12 @@ public class QueueContainer {
                             }
                         } else {
                             amqpQueue.startMessageExpireChecker(config.getAmqpPulsarConsumerQueueSize())
-                                    .thenRun(() -> queueCompletableFuture.complete(amqpQueue));
+                                    .whenComplete((__, t) -> {
+                                        if (t != null) {
+                                            log.error("Failed to start message expire checker queue [{}]", queueName, t);
+                                        }
+                                        queueCompletableFuture.complete(amqpQueue);
+                                    });
                             return;
                         }
                         queueCompletableFuture.complete(amqpQueue);
@@ -225,7 +226,12 @@ public class QueueContainer {
                         }
                     } else {
                         amqpQueue.startMessageExpireChecker(config.getAmqpPulsarConsumerQueueSize())
-                                .thenRun(() -> queueCompletableFuture.complete(amqpQueue));
+                                .whenComplete((__, t) -> {
+                                    if (t != null) {
+                                        log.error("Failed to start message expire checker queue [{}]", queueName, t);
+                                    }
+                                    queueCompletableFuture.complete(amqpQueue);
+                                });
                         return;
                     }
                     queueCompletableFuture.complete(amqpQueue);
@@ -247,17 +253,15 @@ public class QueueContainer {
                 + "vhost '" + vhost + "': received '%s' but current is '%s'";
         if (properties == null) {
             queueFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
-                    String.format(replyTextFormat, "queueInfo", arguments, properties), true, false));
+                    String.format(replyTextFormat, "queueInfo", arguments, properties), true, true));
             return false;
         }
-        for (Map.Entry<String, String> entry : arguments.entrySet()) {
-            String k = entry.getKey();
-            String v = entry.getValue();
-            if (!StringUtils.equals(v, properties.get(k))) {
-                queueFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
-                        String.format(replyTextFormat, k, v, properties.get(k)), true, false));
-                return false;
-            }
+        String oldArgs = properties.get("ARGUMENTS");
+        String newArgs = arguments.get("ARGUMENTS");
+        if (!QueueUtil.covertStringValueAsObjectMap(oldArgs).equals(QueueUtil.covertStringValueAsObjectMap(newArgs))) {
+            queueFuture.completeExceptionally(new AoPException(ErrorCodes.IN_USE,
+                    String.format(replyTextFormat, "arguments", newArgs, oldArgs), true, true));
+            return false;
         }
         return true;
     }

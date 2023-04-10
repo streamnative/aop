@@ -48,16 +48,16 @@ public class AmqpBrokerService {
 
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         String clusterName = pulsarService.getBrokerService().getPulsar().getConfiguration().getClusterName();
+        this.amqpAdmin = new AmqpAdmin(config.getAdvertisedAddress(), config.getAmqpAdminPort());
+        this.prometheusAdmin = new PrometheusAdmin(config.getAmqpPrometheusUrl(), clusterName);
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService,
-                initRouteExecutor(config), config);
+                initRouteExecutor(config), config, amqpAdmin);
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, config);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer, amqpTopicManager);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
-        this.amqpAdmin = new AmqpAdmin(config.getAdvertisedAddress(), config.getAmqpAdminPort());
-        this.prometheusAdmin = new PrometheusAdmin(config.getAmqpPrometheusUrl(), clusterName);
     }
 
     private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {

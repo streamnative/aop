@@ -131,39 +131,31 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         switch (state) {
-            case Init:
-            case RedirectLookup:
+            case Init, RedirectLookup -> {
                 log.info("ProxyConnection [channelRead] - RedirectLookup");
                 connectMsgList.add(msg);
 
                 // Get a buffer that contains the full frame
                 ByteBuf buffer = (ByteBuf) msg;
-
                 io.netty.channel.Channel nettyChannel = ctx.channel();
                 checkState(nettyChannel.equals(this.cnx.channel()));
-
                 try {
                     brokerDecoder.decodeBuffer(QpidByteBuffer.wrap(buffer.nioBuffer()));
                 } catch (Throwable e) {
                     log.error("error while handle command:", e);
                     close();
                 }
-
-                break;
-            case RedirectToBroker:
+            }
+            case RedirectToBroker -> {
                 if (log.isDebugEnabled()) {
                     log.debug("ProxyConnection [channelRead] - RedirectToBroker");
                 }
                 if (proxyHandler != null) {
                     proxyHandler.getBrokerChannel().writeAndFlush(msg);
                 }
-                break;
-            case Closed:
-                log.info("ProxyConnection [channelRead] - closed");
-                break;
-            default:
-                log.error("ProxyConnection [channelRead] - invalid state");
-                break;
+            }
+            case Closed -> log.info("ProxyConnection [channelRead] - closed");
+            default -> log.error("ProxyConnection [channelRead] - invalid state");
         }
     }
 

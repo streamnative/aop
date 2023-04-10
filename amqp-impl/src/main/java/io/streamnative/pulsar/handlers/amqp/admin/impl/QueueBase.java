@@ -38,7 +38,6 @@ import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.QueueUtil;
 import io.streamnative.pulsar.handlers.amqp.utils.TopicUtil;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -65,7 +64,6 @@ import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
-import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
@@ -74,7 +72,6 @@ import org.apache.pulsar.common.policies.data.ConsumerStats;
 import org.apache.pulsar.common.policies.data.SubscriptionStats;
 import org.apache.pulsar.common.policies.data.stats.TopicStatsImpl;
 import org.apache.pulsar.common.util.FutureUtil;
-import org.checkerframework.checker.units.qual.C;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -109,7 +106,7 @@ public class QueueBase extends BaseResources {
                 });
     }
 
-    private CompletableFuture<List<String>> getQueueListAsync(String tenant, String ns) {
+    protected CompletableFuture<List<String>> getQueueListAsync(String tenant, String ns) {
         return namespaceService()
                 .getFullListOfTopics(NamespaceName.get(tenant, ns))
                 .thenApply(list -> list.stream().filter(s ->
@@ -312,9 +309,8 @@ public class QueueBase extends BaseResources {
             throw new AoPServiceRuntimeException.GetMessageException(
                     "The start time cannot be later than the end time");
         }
-        if (endTime - startTime > 1000 * 60 * 60 * 48) {
-            throw new AoPServiceRuntimeException.GetMessageException(
-                    "The interval between the start time and the end time cannot exceed 2 days");
+        if (startTime > System.currentTimeMillis()) {
+            return CompletableFuture.completedFuture(Lists.newArrayList());
         }
         // by time query
         try (Reader<byte[]> reader = pulsarClient().newReader()
@@ -357,6 +353,7 @@ public class QueueBase extends BaseResources {
         messageBean.setExchange(properties.get(MessageConvertUtils.PROP_EXCHANGE));
         Map<String, Object> props = new HashMap<>();
         Map<String, Object> propsHeaders = new HashMap<>();
+        propsHeaders.put("pulsar_message_position", message.getMessageId().toString());
         props.put("headers", propsHeaders);
         properties.forEach((k, v) -> {
             if (k.startsWith(MessageConvertUtils.BASIC_PROP_PRE)) {
@@ -395,6 +392,10 @@ public class QueueBase extends BaseResources {
                         persistentQueue.start();
                     }
                 });
+    }
+
+    protected CompletableFuture<AmqpQueue> loadQueueAsync(String vhost, String queue) {
+        return queueContainer().asyncGetQueue(getNamespaceName(vhost), queue, false);
     }
 
     protected CompletableFuture<QueueDetail> getQueueDetailAsync(String vhost, String queue, long age, long incr) {
@@ -560,7 +561,7 @@ public class QueueBase extends BaseResources {
 
     protected CompletableFuture<AmqpQueue> declareQueueAsync(NamespaceName namespaceName, String queue,
                                                              QueueDeclareParams declareParams) {
-        return queueService().queueDeclare(namespaceName, queue, false,
+        return queueService().queueDeclare(namespaceName, queue, declareParams.isPassive(),
                 declareParams.isDurable(), declareParams.isExclusive(), declareParams.isAutoDelete(),
                 true, declareParams.getArguments(), -1);
     }

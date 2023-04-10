@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 import com.google.common.collect.Lists;
 import io.streamnative.pulsar.handlers.amqp.admin.impl.ExchangeBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeleteParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.PublishParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.ExchangesList;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
@@ -115,6 +116,27 @@ public class Exchanges extends ExchangeBase {
     }
 
     @GET
+    @Path("/{vhost}/{exchange}/loadExchange")
+    public void loadExchange(@Suspended final AsyncResponse response,
+                             @PathParam("vhost") String vhost,
+                             @PathParam("exchange") String exchange,
+                             @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> loadExchangeAsync(vhost, exchange))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to load exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @GET
     @Path("/{vhost}/{exchange}/bindings/source")
     public void getExchangeSource(@Suspended final AsyncResponse response,
                                   @PathParam("vhost") String vhost,
@@ -171,15 +193,16 @@ public class Exchanges extends ExchangeBase {
     public void deleteExchange(@Suspended final AsyncResponse response,
                                @PathParam("vhost") String vhost,
                                @PathParam("exchange") String exchange,
-                               @QueryParam("if-unused") boolean ifUnused,
+                               ExchangeDeleteParams params,
                                @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> deleteExchange(namespaceName, exchange, ifUnused))
+                .thenCompose(__ -> deleteExchange(namespaceName, exchange, params.isIfUnused()))
                 .thenAccept(__ -> {
-                    log.info("Success delete exchange {} in vhost {}, ifUnused is {}", exchange, vhost, ifUnused);
+                    log.info("Success delete exchange {} in vhost {}, ifUnused is {}", exchange, vhost,
+                            params.isIfUnused());
                     response.resume(Response.noContent().build());
                 })
                 .exceptionally(t -> {

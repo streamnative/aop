@@ -29,6 +29,7 @@ public class QueueDeclareParams {
     private boolean autoDelete;
     private boolean durable;
     private boolean exclusive;
+    private boolean passive;
     private String node;
     private Map<String, Object> arguments;
     private String vhost;

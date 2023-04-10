@@ -414,7 +414,8 @@ public class BaseResources {
     protected CompletableFuture<Void> queueBindExchange(NamespaceName namespaceName, String exchange, String queue,
                                                      BindingParams params) {
         if (aop().getAmqpConfig().isAmqpMultiBundleEnable()) {
-            return queueService().queueBind(namespaceName, queue, exchange, params);
+            return queueContainer().asyncGetQueue(namespaceName, queue, false)
+                    .thenCompose(__ -> queueService().queueBind(namespaceName, queue, exchange, params));
         } else {
             return queueService().queueBind(namespaceName, queue, exchange, params.getRoutingKey(),
                     false, FieldTable.convertToFieldTable(params.getArguments()), -1);

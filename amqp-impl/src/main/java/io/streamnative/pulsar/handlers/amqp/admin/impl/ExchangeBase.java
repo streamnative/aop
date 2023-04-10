@@ -203,6 +203,10 @@ public class ExchangeBase extends BaseResources {
         });
     }
 
+    protected CompletableFuture<AmqpExchange> loadExchangeAsync(String vhost, String exchangeName) {
+        return exchangeContainer().asyncGetExchange(getNamespaceName(vhost), exchangeName, false, null);
+    }
+
     protected CompletableFuture<ExchangeDetail> getExchangeDetailAsync(String vhost, String exchangeName, int age,
                                                                        int incr) {
         NamespaceName namespaceName = getNamespaceName(vhost);

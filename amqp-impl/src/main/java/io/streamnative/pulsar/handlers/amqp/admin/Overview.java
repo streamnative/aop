@@ -8,6 +8,7 @@ import io.streamnative.pulsar.handlers.amqp.AopVersion;
 import io.streamnative.pulsar.handlers.amqp.admin.impl.BaseResources;
 import io.streamnative.pulsar.handlers.amqp.admin.mock.MockData;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueUnBindingParams;
 import io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq.OverviewBean;
 import io.streamnative.pulsar.handlers.amqp.admin.prometheus.PrometheusAdmin;
 import io.streamnative.pulsar.handlers.amqp.admin.prometheus.QueueRangeMetrics;
@@ -65,23 +66,23 @@ public class Overview extends BaseResources {
     }
 
     @DELETE
-    @Path("/queueUnBindExchange/{vhost}/e/{exchange}/q/{queue}/{props}")
+    @Path("/queueUnBindExchange/{vhost}/e/{exchange}/q/{queue}/unbind")
     public void queueUnBindExchange(@Suspended final AsyncResponse response,
                            @PathParam("vhost") String vhost,
                            @PathParam("exchange") String exchange,
                            @PathParam("queue") String queue,
-                           @PathParam("props") String propsKey,
+                           QueueUnBindingParams params,
                            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
                 namespaceName, PersistentQueue.TOPIC_PREFIX + queue);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> queueUnBindExchange(namespaceName, exchange, queue, propsKey))
+                .thenCompose(__ -> queueUnBindExchange(namespaceName, exchange, queue, params.getProperties_key()))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
                         log.error("Failed to unbind exchange {} to queue {} with key {} in vhost {}",
-                                queue, exchange, propsKey, vhost, t);
+                                queue, exchange, params.getProperties_key(), vhost, t);
                     }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;

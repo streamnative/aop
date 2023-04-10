@@ -41,9 +41,13 @@ import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pulsar.broker.service.Consumer;
+import org.apache.pulsar.broker.service.Subscription;
+import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.util.FutureUtil;
+import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 import org.apache.qpid.server.protocol.v0_8.FieldTable;
@@ -113,6 +117,23 @@ public class QueueServiceImpl implements QueueService {
                     future.completeExceptionally(
                             new AoPException(ErrorCodes.NOT_FOUND, "No such queue: " + queue, true, false));
                 } else {
+                    Topic topic = amqpQueue.getTopic();
+                    ConcurrentOpenHashMap<String, ? extends Subscription> subscriptions = topic.getSubscriptions();
+                    if (subscriptions != null) {
+                        Subscription subscription = subscriptions.get(PersistentQueue.DEFAULT_SUBSCRIPTION);
+                        if (subscription != null) {
+                            if (ifUnused && CollectionUtils.isNotEmpty(subscription.getConsumers())) {
+                                future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR, "Failed to delete queue: "
+                                                + queue + ", Queue has active consumers", true, false));
+                                return;
+                            }
+                            if (ifEmpty && subscription.getNumberOfEntriesInBacklog(false) > 0) {
+                                future.completeExceptionally(new AoPException(ErrorCodes.INTERNAL_ERROR, "Failed to delete queue: "
+                                        + queue + ", Queue has message", true, false));
+                                return;
+                            }
+                        }
+                    }
                     Collection<AmqpMessageRouter> routers = amqpQueue.getRouters();
                     if (!CollectionUtils.isEmpty(routers)) {
                         for (AmqpMessageRouter router : routers) {

@@ -18,6 +18,7 @@ import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
@@ -32,7 +33,7 @@ import org.apache.pulsar.common.naming.NamespaceName;
 public class ConnectionContainer {
 
     @Getter
-    private Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
+    private final Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
 
     protected ConnectionContainer(PulsarService pulsarService,
                                   ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
@@ -63,12 +64,12 @@ public class ConnectionContainer {
                     connectionMap.remove(namespaceName);
                 }
 
-                if (exchangeContainer.getExchangeMap().containsKey(namespaceName)) {
-                    exchangeContainer.getExchangeMap().remove(namespaceName);
-                }
+                exchangeContainer.getExchangeMap().remove(namespaceName);
 
                 if (queueContainer.getQueueMap().containsKey(namespaceName)) {
-                    queueContainer.getQueueMap().remove(namespaceName);
+                    Map<String, CompletableFuture<AmqpQueue>> futureMap =
+                            queueContainer.getQueueMap().remove(namespaceName);
+                    futureMap.values().forEach(future -> future.thenAcceptAsync(AmqpQueue::close));
                 }
             }
 

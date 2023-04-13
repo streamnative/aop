@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkState;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -122,7 +121,6 @@ public class ProxyHandler {
             this.cnx = ctx;
             super.channelActive(ctx);
             for (Object msg : connectMsgList) {
-                ((ByteBuf) msg).retain();
                 ctx.channel().writeAndFlush(msg).addListener(future -> {
                     ctx.channel().read();
                 });

@@ -76,7 +76,6 @@ import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 
-import javax.servlet.DispatcherType;
 
 /**
  * Base test for AMQP protocol tests.

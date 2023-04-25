@@ -186,8 +186,7 @@ public abstract class AmqpProtocolTestBase {
         subFuture.complete(subscription);
         when(persistentTopic.createSubscription(Mockito.anyString(),
                 Mockito.any(), Mockito.anyBoolean(), Mockito.any())).thenReturn(subFuture);
-        Dispatcher mockDispatcher = Mockito.mock(Dispatcher.class);
-        when(subscription.getDispatcher()).thenReturn(mockDispatcher);
+        when(subscription.getDispatcher()).thenReturn(mock(Dispatcher.class));
         when(subscription.addConsumer(Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
         when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
         ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);

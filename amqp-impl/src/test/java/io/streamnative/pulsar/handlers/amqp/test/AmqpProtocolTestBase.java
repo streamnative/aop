@@ -29,7 +29,6 @@ import io.streamnative.pulsar.handlers.amqp.AmqpConnection;
 import io.streamnative.pulsar.handlers.amqp.AmqpPulsarServerCnx;
 import io.streamnative.pulsar.handlers.amqp.AmqpServiceConfiguration;
 import io.streamnative.pulsar.handlers.amqp.AmqpTopicManager;
-import io.streamnative.pulsar.handlers.amqp.test.mock.MockDispatcher;
 import java.net.SocketAddress;
 import java.util.Map;
 import java.util.Optional;
@@ -49,6 +48,7 @@ import org.apache.pulsar.broker.namespace.NamespaceService;
 import org.apache.pulsar.broker.resources.NamespaceResources;
 import org.apache.pulsar.broker.resources.PulsarResources;
 import org.apache.pulsar.broker.service.BrokerService;
+import org.apache.pulsar.broker.service.Dispatcher;
 import org.apache.pulsar.broker.service.Subscription;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -75,6 +75,8 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
+
+import javax.servlet.DispatcherType;
 
 /**
  * Base test for AMQP protocol tests.
@@ -185,7 +187,8 @@ public abstract class AmqpProtocolTestBase {
         subFuture.complete(subscription);
         when(persistentTopic.createSubscription(Mockito.anyString(),
                 Mockito.any(), Mockito.anyBoolean(), Mockito.any())).thenReturn(subFuture);
-        when(subscription.getDispatcher()).thenReturn(mock(MockDispatcher.class));
+        Dispatcher mockDispatcher = Mockito.mock(Dispatcher.class);
+        when(subscription.getDispatcher()).thenReturn(mockDispatcher);
         when(subscription.addConsumer(Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
         when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentOpenHashMap<>());
         ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);

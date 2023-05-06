@@ -30,6 +30,8 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     private static final String CATEGORY_AMQP = "AMQP on Pulsar";
     @Category
     private static final String CATEGORY_AMQP_PROXY = "AMQP Proxy";
+    @Category
+    private static final String CATEGORY_AMQP_SSL = "AMQP Proxy SSL";
 
     //
     // --- AMQP on Pulsar Broker configuration ---
@@ -137,4 +139,87 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpPulsarConsumerQueueSize = 10000;
 
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        doc = "is the amqp authentication open"
+    )
+    private boolean amqpAuthenticationEnabled = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            doc = "is the amqp authorization open"
+    )
+    private boolean amqpAuthorizationEnabled = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "is the amqp proxy ssl open"
+    )
+    private boolean amqpTlsEnabled = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslProtocol = "TLSv1.2";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeystoreType = "PKCS12";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeystoreLocation;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeystorePassword;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTruststoreType = "JKS";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTruststoreLocation;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTruststorePassword;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeymanagerAlgorithm = "SunX509";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTrustmanagerAlgorithm = "SunX509";
+
+    @FieldContext(
+        category = CATEGORY_AMQP_SSL,
+        doc = "amqp TLS peer or not"
+    )
+    private boolean amqpSslClientAuth = false;
+
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        doc = "Mechanisms supported"
+    )
+    private String amqpAllowedMechanisms = "PLAIN token";
 }

@@ -799,7 +799,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         return bufferSender;
     }
 
-    // authorization method
+    @VisibleForTesting
     protected CompletableFuture<Boolean> authorize(AmqpOperation operation, Resource resource) {
         return authorize(operation, resource, this.session);
     }

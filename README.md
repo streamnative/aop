@@ -7,9 +7,9 @@
     to you under the Apache License, Version 2.0 (the
     "License"); you may not use this file except in compliance
     with the License.  You may obtain a copy of the License at
-    
+
       http://www.apache.org/licenses/LICENSE-2.0
-    
+
     Unless required by applicable law or agreed to in writing,
     software distributed under the License is distributed on an
     "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -122,7 +122,7 @@ The following is an example.
         additivity: false
         AppenderRef:
           - ref: Console
-```
+``` 
 
 ### AoP configuration
 
@@ -144,7 +144,7 @@ Java 17 | https://openjdk.java.net/install/
 Maven | https://maven.apache.org/
 
 2. Clone code to your machine. 
-   
+    
     ```bash
     git@github.com:streamnative/aop.git
     ```
@@ -387,7 +387,7 @@ To use proxy, complete the following steps. If you do not know some detailed ste
     $PULSAR_HOME/bin/pulsar-admin namespaces delete public/default
     $PULSAR_HOME/bin/pulsar-admin namespaces create -b 1 public/default
     $PULSAR_HOME/bin/pulsar-admin namespaces set-retention -s 100M -t 3d public/default
-    ```
+    ``` 
 
 7. Prepare exchange and queue for test.
 

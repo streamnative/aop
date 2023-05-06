@@ -246,7 +246,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 authenticationState = authenticationProvider.newAuthState(authData, null, null);
                 tokenAuth.setAuthorizationId(authenticationState.getAuthRole());
                 if (log.isDebugEnabled()) {
-                    String authRole = tokenAuth.getAuthorizationId()/*authenticationState.getAuthRole()*/;
+                    String authRole = tokenAuth.getAuthorizationId();
                     log.debug("Authentication succeeded: mechanism={}, authRole={}", mechanism, authRole);
                 }
 

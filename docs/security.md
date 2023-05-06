@@ -16,13 +16,13 @@ Currently, PLAIN mechanism based on JWT authentication, so you must configure `a
 
 ### `PLAIN`
 
-Currently, in order to improve security, we used SASL_PLAIN mechanism in KOP to Implement PLAIN mechanism in AOP, and it's a better way for authorizartion.
+Currently, in order to improve security, we used SASL_PLAIN mechanism in KoP to Implement PLAIN mechanism in AoP, and it's a better way for authorizartion.
 
 If you want to enable the authentication feature for AoP using the `PLAIN` mechanism, follow the steps below.
 
 1. Enable authentication on Pulsar broker.
 
-   For the `PLAIN` mechanism, the Rabbitmq authentication is forwarded to the [JWT authentication](https://pulsar.apache.org/docs/en/security-jwt/) of Pulsar, so you need to configure the JWT authentication and set the following properties in the `conf/broker.conf` or `conf/standalone.conf` file.
+   For the `PLAIN` mechanism, the RabbitMQ authentication is forwarded to the [JWT authentication](https://pulsar.apache.org/docs/en/security-jwt/) of Pulsar, so you need to configure the JWT authentication and set the following properties in the `conf/broker.conf` or `conf/standalone.conf` file.
 
    (1) Enable authentication for the Pulsar broker.
 
@@ -71,7 +71,7 @@ If you want to enable the authentication feature for AoP using the `PLAIN` mecha
     amqpAllowedMechanisms=PLAIN token
     ```
    
-4. Enable authentication on Rabbitmq client
+4. Enable authentication on RabbitMQ client
 
 
 | Property   | Description                                                  | Example value |
@@ -84,11 +84,9 @@ connectionFactory.setPassword("token:xxxx");
 Connection connection = connectionFactory.newConnection();
 ```
 
-
-
 ## Authorization
 
-Currently, AOP authorization only supports production and consumption permissions at the vhost/namespace level. To enable authorization in AoP, please make sure the authentication is enabled.
+Currently, AoP authorization only supports production and consumption permissions at the vhost/namespace level. To enable authorization in AoP, please make sure the authentication is enabled.
 
 **Note**: For more information, see [Authorization](http://pulsar.apache.org/docs/en/security-jwt/#authorization).
 

@@ -29,9 +29,19 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+
+import io.streamnative.pulsar.handlers.amqp.security.AmqpOperation;
+import io.streamnative.pulsar.handlers.amqp.security.AmqpPrincipal;
+import io.streamnative.pulsar.handlers.amqp.security.Session;
+import io.streamnative.pulsar.handlers.amqp.security.TokenAuth;
+import io.streamnative.pulsar.handlers.amqp.security.auth.Authorizer;
+import io.streamnative.pulsar.handlers.amqp.security.auth.Resource;
+import io.streamnative.pulsar.handlers.amqp.security.auth.SimpleAuthorizer;
+import io.streamnative.pulsar.handlers.amqp.utils.TokenUtils;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
@@ -82,7 +92,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     }
 
     public static final String DEFAULT_NAMESPACE = "default";
-
+    public static final String DEFAULT_MECHANISM = "PLAIN";
     private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 
     private long connectionId;
@@ -110,6 +120,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private AmqpBrokerService amqpBrokerService;
     private AuthenticationState authenticationState;
 
+    private final boolean authenticationEnabled;
+    private final String allowedMechanisms;
+    private final Authorizer authorizer;
+    private Session session;
+
     public AmqpConnection(AmqpServiceConfiguration amqpConfig,
                           AmqpBrokerService amqpBrokerService) {
         super(amqpBrokerService.getPulsarService(), amqpConfig);
@@ -124,6 +139,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
         this.amqpBrokerService = amqpBrokerService;
+
+        this.authenticationEnabled = amqpConfig.isAmqpAuthenticationEnabled();
+        this.allowedMechanisms = StringUtils.isBlank(amqpConfig.getAmqpAllowedMechanisms())
+            ? DEFAULT_MECHANISM
+            : amqpConfig.getAmqpAllowedMechanisms();
+        this.authorizer = this.authenticationEnabled && amqpConfig.isAmqpAuthorizationEnabled()
+                ? new SimpleAuthorizer(amqpBrokerService.getPulsarService())
+                : null;
     }
 
 
@@ -188,9 +211,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
         assertState(ConnectionState.AWAIT_START_OK);
         // TODO clientProperties
+        this.session = new Session(null, null);
 
         // TODO tls security process
-        if (amqpBrokerService.isAuthenticationEnabled()) {
+        if (this.authenticationEnabled) {
             if (mechanism == null) {
                 sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "No mechanism provided", 0);
                 return;
@@ -202,7 +226,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
             String authMethod = String.valueOf(mechanism);
             if (authMethod.equals("PLAIN")) {
-                authMethod = "basic";
+                authMethod = "token";
             }
 
             AuthenticationProvider authenticationProvider = amqpBrokerService.getAuthenticationService()
@@ -216,31 +240,21 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             }
 
             try {
-                AuthData authData;
-                if (authMethod.equals("basic")) {
-                    // Original format: \000USERNAME\000PASSWORD
-                    String splitter = "\000";
-                    String[] data = StringUtils.stripStart(new String(response, StandardCharsets.UTF_8), splitter)
-                            .split(splitter);
-                    if (data.length != 2) {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Authentication data format error: mechanism={}", mechanism);
-                        }
-                        sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "Authentication data format error", 0);
-                        return;
-                    }
-                    // Encode data to Pulsar format: USERNAME:PASSWORD
-                    authData = AuthData.of(String.format("%s:%s", data[0], data[1]).getBytes(StandardCharsets.UTF_8));
-                } else {
-                    authData = AuthData.of(response);
-                }
+                TokenAuth tokenAuth = TokenUtils.parseTokenAuthBytes(response, authMethod);
+                AuthData authData = AuthData.of(tokenAuth.getAuthData().getBytes(StandardCharsets.UTF_8));
 
                 authenticationState = authenticationProvider.newAuthState(authData, null, null);
-                authenticationState.authenticate(authData);
+                tokenAuth.setAuthorizationId(authenticationState.getAuthRole());
                 if (log.isDebugEnabled()) {
-                    String authRole = authenticationState.getAuthRole();
+                    String authRole = tokenAuth.getAuthorizationId()/*authenticationState.getAuthRole()*/;
                     log.debug("Authentication succeeded: mechanism={}, authRole={}", mechanism, authRole);
                 }
+
+                // create session
+                this.session = new Session(new AmqpPrincipal(AmqpPrincipal.USER_TYPE,
+                        tokenAuth.getAuthorizationId(),
+                        null,
+                        authenticationState.getAuthDataSource()), clientProperties.get("version").toString());
             } catch (Exception e) {
                 log.error("Failed to authenticate: mechanism={}", mechanism, e);
                 sendConnectionClose(ErrorCodes.NOT_ALLOWED, "Authentication failed", 0);
@@ -783,5 +797,32 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     @VisibleForTesting
     public ByteBufferSender getBufferSender() {
         return bufferSender;
+    }
+
+    // authorization method
+    protected CompletableFuture<Boolean> authorize(AmqpOperation operation, Resource resource) {
+        return authorize(operation, resource, this.session);
+    }
+
+    protected CompletableFuture<Boolean> authorize(AmqpOperation operation, Resource resource, Session session) {
+        if (authorizer == null) {
+            return CompletableFuture.completedFuture(true);
+        }
+        if (session == null) {
+            log.error("No authentication provided! Please open the authentication then use the authorization");
+            return CompletableFuture.completedFuture(false);
+        }
+        CompletableFuture<Boolean> isAuthorizedFuture = null;
+        switch (operation) {
+            case READ:
+                isAuthorizedFuture = authorizer.canConsumeAsync(session.getAmqpPrincipal(), resource);
+                break;
+            case WRITE:
+                isAuthorizedFuture = authorizer.canProduceAsync(session.getAmqpPrincipal(), resource);
+                break;
+            default:
+                break;
+        }
+        return isAuthorizedFuture;
     }
 }

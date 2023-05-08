@@ -36,6 +36,7 @@ public class UnacknowledgedMessageMap {
     public interface MessageProcessor {
         void messageAck(Position position);
         void requeue(List<PositionImpl> positions);
+        void handleFlow(int permits);
     }
 
     /**

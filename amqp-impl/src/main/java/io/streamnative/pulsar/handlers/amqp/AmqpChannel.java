@@ -17,7 +17,6 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.getExchang
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInExchange;
 import static org.apache.qpid.server.protocol.ErrorCodes.INTERNAL_ERROR;
 import static org.apache.qpid.server.transport.util.Functions.hex;
-
 import com.google.common.annotations.VisibleForTesting;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
@@ -755,6 +754,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         } else {
             closeChannel(ErrorCodes.IN_USE, "deliveryTag not found");
         }
+        ackedMessages.forEach(entry -> {
+            entry.getConsumer().handleFlow(1);
+        });
         if (creditManager.hasCredit() && isBlockedOnCredit()) {
             unBlockedOnCredit();
         }
@@ -767,6 +769,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
         if (!ackedMessages.isEmpty()) {
             requeue(ackedMessages);
         }
+        ackedMessages.forEach(entry -> {
+            entry.getConsumer().handleFlow(1);
+        });
         if (creditManager.hasCredit() && isBlockedOnCredit()) {
             unBlockedOnCredit();
         }

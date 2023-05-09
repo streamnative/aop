@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.proxy;
 
 import static com.google.common.base.Preconditions.checkState;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -24,6 +23,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.flush.FlushConsolidationHandler;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpClientDecoder;
@@ -126,6 +126,7 @@ public class ProxyHandler {
                 ctx.channel().writeAndFlush(msg).addListener(future -> {
                     ctx.channel().read();
                 });
+                ReferenceCountUtil.safeRelease(msg);
             }
         }
 
@@ -134,30 +135,36 @@ public class ProxyHandler {
             if (log.isDebugEnabled()) {
                 log.debug("[{}] ProxyBackendHandler [channelRead]", vhost);
             }
-            switch (state) {
-                case Init:
-                case Failed:
-                    // Get a buffer that contains the full frame
-                    ByteBuf buffer = (ByteBuf) msg;
+            try {
+                // Get a buffer that contains the full frame
+                ByteBuf buffer = (ByteBuf) msg;
+                switch (state) {
+                    case Init:
+                    case Failed:
 
-                    io.netty.channel.Channel nettyChannel = ctx.channel();
-                    checkState(nettyChannel.equals(this.cnx.channel()));
+                        io.netty.channel.Channel nettyChannel = ctx.channel();
+                        checkState(nettyChannel.equals(this.cnx.channel()));
 
-                    try {
-                        clientDecoder.decodeBuffer(buffer.nioBuffer());
-                    } catch (Throwable e) {
-                        log.error("error while handle command:", e);
-                        close();
-                    } finally {
+                        try {
+                            clientDecoder.decodeBuffer(buffer.nioBuffer());
+                        } catch (Throwable e) {
+                            log.error("error while handle command:", e);
+                            close();
+                        } finally {
+                            buffer.release();
+                        }
+
+                        break;
+                    case Connected:
+                        clientChannel.writeAndFlush(msg);
+                        break;
+                    case Closed:
                         buffer.release();
-                    }
-
-                    break;
-                case Connected:
-                    clientChannel.writeAndFlush(msg);
-                    break;
-                case Closed:
-                    break;
+                        break;
+                }
+            } catch (Throwable e) {
+                ReferenceCountUtil.safeRelease(msg);
+                throw e;
             }
         }
 

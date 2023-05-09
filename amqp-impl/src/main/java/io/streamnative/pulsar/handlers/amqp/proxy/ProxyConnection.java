@@ -16,10 +16,10 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.streamnative.pulsar.handlers.amqp.AmqpBrokerDecoder;
@@ -121,40 +121,48 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        switch (state) {
-            case Init:
-            case RedirectLookup:
-                log.info("ProxyConnection [channelRead] - RedirectLookup");
-                connectMsgList.add(msg);
+        try {
+            // Get a buffer that contains the full frame
+            ByteBuf buffer = (ByteBuf) msg;
+            switch (state) {
+                case Init:
+                case RedirectLookup:
+                    log.info("ProxyConnection [channelRead] - RedirectLookup");
+                    connectMsgList.add(msg);
 
-                // Get a buffer that contains the full frame
-                ByteBuf buffer = (ByteBuf) msg;
+                    io.netty.channel.Channel nettyChannel = ctx.channel();
+                    checkState(nettyChannel.equals(this.cnx.channel()));
 
-                io.netty.channel.Channel nettyChannel = ctx.channel();
-                checkState(nettyChannel.equals(this.cnx.channel()));
+                    try {
+                        brokerDecoder.decodeBuffer(QpidByteBuffer.wrap(buffer.nioBuffer()));
+                    } catch (Throwable e) {
+                        log.error("error while handle command:", e);
+                        close();
+                    }
 
-                try {
-                    brokerDecoder.decodeBuffer(QpidByteBuffer.wrap(buffer.nioBuffer()));
-                } catch (Throwable e) {
-                    log.error("error while handle command:", e);
-                    close();
-                }
-
-                break;
-            case RedirectToBroker:
-                if (log.isDebugEnabled()) {
-                    log.debug("ProxyConnection [channelRead] - RedirectToBroker");
-                }
-                if (proxyHandler != null) {
-                    proxyHandler.getBrokerChannel().writeAndFlush(msg);
-                }
-                break;
-            case Closed:
-                log.info("ProxyConnection [channelRead] - closed");
-                break;
-            default:
-                log.error("ProxyConnection [channelRead] - invalid state");
-                break;
+                    break;
+                case RedirectToBroker:
+                    if (log.isDebugEnabled()) {
+                        log.debug("ProxyConnection [channelRead] - RedirectToBroker");
+                    }
+                    if (proxyHandler != null) {
+                        proxyHandler.getBrokerChannel().writeAndFlush(msg);
+                    } else {
+                        buffer.release();
+                    }
+                    break;
+                case Closed:
+                    log.info("ProxyConnection [channelRead] - closed");
+                    buffer.release();
+                    break;
+                default:
+                    log.error("ProxyConnection [channelRead] - invalid state");
+                    buffer.release();
+                    break;
+            }
+        } catch (Throwable e) {
+            ReferenceCountUtil.safeRelease(msg);
+            throw e;
         }
     }
 

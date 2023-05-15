@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
+import org.apache.commons.codec.DecoderException;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
@@ -46,7 +47,7 @@ import org.testng.annotations.Test;
 public class MessageConvertTest {
 
     @Test
-    private void test() throws UnsupportedEncodingException {
+    private void test() throws UnsupportedEncodingException, DecoderException {
         String exchange = "testExchange";
         boolean immediate = true;
         boolean mandatory = false;

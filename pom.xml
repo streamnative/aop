@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <!--
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,33 +14,26 @@
     limitations under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
     <version>18</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-
   <packaging>pom</packaging>
-
   <groupId>io.streamnative.pulsar.handlers</groupId>
   <artifactId>pulsar-protocol-handler-amqp-parent</artifactId>
-  <version>2.11.0-SNAPSHOT</version>
+  <version>2.11.1.2</version>
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Parent</name>
   <description>Parent for AMQP on Pulsar implemented using Pulsar Protocol Handler.</description>
-
   <properties>
     <redirectTestOutputToFile>true</redirectTestOutputToFile>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
-
     <!-- dependencies -->
-    <pulsar.version>2.11.0.0-rc3</pulsar.version>
+    <pulsar.version>2.11.1.2</pulsar.version>
     <spotbugs-annotations.version>3.1.8</spotbugs-annotations.version>
     <testcontainers.version>1.12.5</testcontainers.version>
     <!-- plugin dependencies -->
@@ -59,7 +52,6 @@
     <geronimo-jms-version>1.1.1</geronimo-jms-version>
     <hamcrest-version>2.2</hamcrest-version>
   </properties>
-
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -67,14 +59,12 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-
   <modules>
     <module>amqp-impl</module>
     <module>tests</module>
     <module>tests-qpid-jms-client</module>
     <module>amqp-client-auth</module>
   </modules>
-
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
@@ -98,7 +88,6 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
-
   <dependencies>
     <!-- provided dependencies (available at compilation and test classpths and *NOT* packaged) -->
     <dependency>
@@ -106,7 +95,6 @@
       <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-broker</artifactId>
@@ -130,72 +118,59 @@
         </exclusion>
       </exclusions>
     </dependency>
-
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-all</artifactId>
       <scope>provided</scope>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>testmocks</artifactId>
       <version>${pulsar.version}</version>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-broker-common</artifactId>
       <version>${pulsar.version}</version>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-client-original</artifactId>
       <version>${pulsar.version}</version>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-client-admin-original</artifactId>
       <version>${pulsar.version}</version>
     </dependency>
-
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.fasterxml.jackson.dataformat</groupId>
       <artifactId>jackson-dataformat-yaml</artifactId>
     </dependency>
-
     <dependency>
       <groupId>com.beust</groupId>
       <artifactId>jcommander</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
-
     <dependency>
       <groupId>org.apache.qpid</groupId>
       <artifactId>qpid-broker-core</artifactId>
@@ -211,25 +186,21 @@
         </exclusion>
       </exclusions>
     </dependency>
-
     <dependency>
       <groupId>org.apache.qpid</groupId>
       <artifactId>qpid-broker-plugins-amqp-0-8-protocol</artifactId>
       <version>${qpid-protocol-plugin.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>pulsar-broker</artifactId>
@@ -237,7 +208,6 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>managed-ledger</artifactId>
@@ -245,9 +215,7 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
-
   </dependencies>
-
   <build>
     <pluginManagement>
       <plugins>
@@ -296,7 +264,6 @@
           <excludeFilterFile>resources/findbugsExclude.xml</excludeFilterFile>
         </configuration>
       </plugin>
-
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>${maven-compiler-plugin.version}</version>
@@ -313,7 +280,6 @@
           </compilerArgs>
         </configuration>
       </plugin>
-
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
@@ -329,14 +295,12 @@
           <trimStackTrace>false</trimStackTrace>
         </configuration>
       </plugin>
-
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
         <version>${license-maven-plugin.version}</version>
         <configuration>
           <header>resources/license.template</header>
-
           <excludes>
             <exclude>LICENSE</exclude>
             <exclude>NOTICE</exclude>
@@ -366,7 +330,6 @@
           </mapping>
         </configuration>
       </plugin>
-
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>templating-maven-plugin</artifactId>
@@ -380,7 +343,6 @@
           </execution>
         </executions>
       </plugin>
-
       <plugin>
         <groupId>pl.project13.maven</groupId>
         <artifactId>git-commit-id-plugin</artifactId>
@@ -406,16 +368,31 @@
           <commitIdGenerationMode>full</commitIdGenerationMode>
         </configuration>
       </plugin>
-
     </plugins>
   </build>
-
   <repositories>
     <repository>
       <id>central</id>
       <layout>default</layout>
       <url>https://repo1.maven.org/maven2</url>
     </repository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-2208/content</url>
+    </repository>
+    <repository>
+      <id>nexus-snapshot</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
   </repositories>
-
+  <distributionManagement>
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
+  </distributionManagement>
 </project>

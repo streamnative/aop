@@ -14,10 +14,12 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Getter;
 
 /**
  * Base class for AMQP queue.
@@ -31,6 +33,9 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     protected boolean exclusive;
     protected boolean autoDelete;
     protected final Map<String, AmqpMessageRouter> routers = new ConcurrentHashMap<>();
+    protected final Map<String, Object> arguments = new HashMap<>();
+    @Getter
+    protected Map<String, String> properties;
 
     protected AbstractAmqpQueue(String queueName, boolean durable, long connectionId) {
         this.queueName = queueName;
@@ -42,12 +47,13 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
 
     protected AbstractAmqpQueue(String queueName,
                                 boolean durable, long connectionId,
-                                boolean exclusive, boolean autoDelete) {
+                                boolean exclusive, boolean autoDelete, Map<String, String> properties) {
         this.queueName = queueName;
         this.durable = durable;
         this.connectionId = connectionId;
         this.exclusive = exclusive;
         this.autoDelete = autoDelete;
+        this.properties = properties;
     }
 
     @Override
@@ -58,6 +64,20 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
     @Override
     public boolean getDurable() {
         return durable;
+    }
+
+    @Override
+    public boolean getExclusive() {
+        return exclusive;
+    }
+    @Override
+    public boolean getAutoDelete() {
+        return autoDelete;
+    }
+
+    @Override
+    public Map<String, Object> getArguments() {
+        return arguments;
     }
 
     @Override
@@ -133,4 +153,8 @@ public abstract class AbstractAmqpQueue implements AmqpQueue {
         return autoDelete;
     }
 
+    @Override
+    public void close() {
+
+    }
 }

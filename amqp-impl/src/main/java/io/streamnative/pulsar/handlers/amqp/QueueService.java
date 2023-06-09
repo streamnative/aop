@@ -14,6 +14,7 @@
 
 package io.streamnative.pulsar.handlers.amqp;
 
+import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -61,7 +62,7 @@ public interface QueueService {
      * @param argumentsTable other properties (binding parameters)
      */
     CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange, String bindingKey,
-                   boolean nowait, FieldTable argumentsTable, long connectionId);
+                                      boolean nowait, FieldTable argumentsTable, long connectionId);
 
     /**
      * Unbinds a queue from an exchange.
@@ -72,7 +73,7 @@ public interface QueueService {
      * @param arguments other properties (binding parameters)
      */
     CompletableFuture<Void> queueUnbind(NamespaceName namespaceName, String queue, String exchange, String bindingKey,
-                     FieldTable arguments, long connectionId);
+                                        FieldTable arguments, long connectionId);
 
     /**
      * Purges the contents of the given queue.
@@ -84,4 +85,10 @@ public interface QueueService {
 
     CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
                                           long connectionId);
+    CompletableFuture<AmqpQueue> getQueue(NamespaceName namespaceName, String queue, boolean createIfMissing,
+                                          long connectionId,  boolean durable, boolean exclusive, boolean autoDelete,
+                                          boolean nowait, Map<String, Object> arguments);
+
+    CompletableFuture<Void> queueBind(NamespaceName namespaceName, String queue, String exchange, BindingParams params);
+    CompletableFuture<Void> queueUnBind(NamespaceName namespaceName, String queue, String exchange, String params);
 }

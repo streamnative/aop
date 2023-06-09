@@ -34,8 +34,8 @@ public class InMemoryQueue extends AbstractAmqpQueue {
         super(queueName, false, connectionId);
     }
 
-    public InMemoryQueue(String queueName, long connectionId, boolean exclusive, boolean autoDelete) {
-        super(queueName, false, connectionId, exclusive, autoDelete);
+    public InMemoryQueue(String queueName, long connectionId, boolean exclusive, boolean autoDelete, Map<String, String> properties) {
+        super(queueName, false, connectionId, exclusive, autoDelete, properties);
     }
 
     @Override

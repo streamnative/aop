@@ -31,9 +31,12 @@ import org.apache.pulsar.common.naming.NamespaceName;
 public class ConnectionContainer {
 
     private Map<NamespaceName, Set<AmqpConnection>> connectionMap = Maps.newConcurrentMap();
+    private final AmqpServiceConfiguration config;
 
     protected ConnectionContainer(PulsarService pulsarService,
-                                  ExchangeContainer exchangeContainer, QueueContainer queueContainer) {
+                                  ExchangeContainer exchangeContainer,
+                                  QueueContainer queueContainer, AmqpServiceConfiguration config) {
+        this.config = config;
         pulsarService.getNamespaceService().addNamespaceBundleOwnershipListener(new NamespaceBundleOwnershipListener() {
             @Override
             public void onLoad(NamespaceBundle namespaceBundle) {
@@ -48,17 +51,19 @@ public class ConnectionContainer {
                 log.info("ConnectionContainer [unLoad] namespaceBundle: {}", namespaceBundle);
                 NamespaceName namespaceName = namespaceBundle.getNamespaceObject();
 
-                if (connectionMap.containsKey(namespaceName)) {
-                    Set<AmqpConnection> connectionSet = connectionMap.get(namespaceName);
-                    for (AmqpConnection connection : connectionSet) {
-                        log.info("close connection: {}", connection);
-                        if (connection.getOrderlyClose().compareAndSet(false, true)) {
-                            connection.completeAndCloseAllChannels();
-                            connection.close();
+                if (!config.isAmqpMultiBundleEnable()) {
+                    if (connectionMap.containsKey(namespaceName)) {
+                        Set<AmqpConnection> connectionSet = connectionMap.get(namespaceName);
+                        for (AmqpConnection connection : connectionSet) {
+                            log.info("close connection: {}", connection);
+                            if (connection.getOrderlyClose().compareAndSet(false, true)) {
+                                connection.completeAndCloseAllChannels();
+                                connection.close();
+                            }
                         }
+                        connectionSet.clear();
+                        connectionMap.remove(namespaceName);
                     }
-                    connectionSet.clear();
-                    connectionMap.remove(namespaceName);
                 }
 
                 if (exchangeContainer.getExchangeMap().containsKey(namespaceName)) {

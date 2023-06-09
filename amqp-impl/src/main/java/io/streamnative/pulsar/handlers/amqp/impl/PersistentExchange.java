@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,7 @@ import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
 import io.streamnative.pulsar.handlers.amqp.AmqpQueue;
 import io.streamnative.pulsar.handlers.amqp.ExchangeMessageRouter;
+import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import io.streamnative.pulsar.handlers.amqp.utils.PulsarTopicMetadataUtils;
 import java.io.Serializable;
@@ -39,6 +40,7 @@ import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
@@ -51,6 +53,7 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
 import org.apache.pulsar.common.api.proto.KeyValue;
@@ -74,52 +77,70 @@ public class PersistentExchange extends AbstractAmqpExchange {
     public static final String ARGUMENTS = "ARGUMENTS";
     public static final String TOPIC_PREFIX = "__amqp_exchange__";
     private static final String BINDINGS = "BINDINGS";
+    public static final String X_DELAYED_TYPE = "x-delayed-type";
+    @Getter
+    private final boolean existDelayedType;
 
     private PersistentTopic persistentTopic;
-    private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
+    private ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
 
     private ExchangeMessageRouter exchangeMessageRouter;
+    @Getter
     private Set<Binding> bindings;
+
+    @Getter
+    private PulsarClient pulsarClient;
 
     @NoArgsConstructor
     @AllArgsConstructor
-    @EqualsAndHashCode
+    @EqualsAndHashCode(exclude = {"source", "arguments"})
     @Data
-    static class Binding implements Serializable {
+    public static class Binding implements Serializable {
         private String des;
         private String desType;
         private String key;
+        private String source;
         private Map<String, Object> arguments;
     }
 
-    public PersistentExchange(String exchangeName, Type type, PersistentTopic persistentTopic,
+    public PersistentExchange(String exchangeName, Map<String, String> properties, Type type,
+                              PersistentTopic persistentTopic,
                               boolean durable, boolean autoDelete, boolean internal, Map<String, Object> arguments,
-                              ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable)
+                              ExecutorService routeExecutor, int routeQueueSize, boolean amqpMultiBundleEnable,
+                              AmqpAdmin amqpAdmin, PulsarClient pulsarClient)
             throws JsonProcessingException {
-        super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
+        super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments, properties);
+        this.pulsarClient = pulsarClient;
         this.persistentTopic = persistentTopic;
+        this.existDelayedType = arguments != null && arguments.containsKey(X_DELAYED_TYPE);
         topicNameValidate();
-        cursors = new ConcurrentOpenHashMap<>(16, 1);
-        for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {
-            cursors.put(cursor.getName(), CompletableFuture.completedFuture(cursor));
-            log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());
-            cursor.setInactive();
-        }
 
         if (amqpMultiBundleEnable) {
             bindings = Sets.newConcurrentHashSet();
             if (persistentTopic.getManagedLedger().getProperties().containsKey(BINDINGS)) {
                 List<Binding> amqpQueueProperties = JSON_MAPPER.readValue(
-                        persistentTopic.getManagedLedger().getProperties().get(BINDINGS), new TypeReference<>() {});
+                        persistentTopic.getManagedLedger().getProperties().get(BINDINGS), new TypeReference<>() {
+                        });
                 this.bindings.addAll(amqpQueueProperties);
             }
             this.exchangeMessageRouter = ExchangeMessageRouter.getInstance(this, routeExecutor);
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            NamespaceName namespaceName = TopicName.get(persistentTopic.getName()).getNamespaceObject();
             for (Binding binding : this.bindings) {
+                // The initialization queue triggers the message expiration detection task
+                if ("queue".equals(binding.desType)) {
+                    futures.add(amqpAdmin.loadQueue(namespaceName, binding.des));
+                }
                 this.exchangeMessageRouter.addBinding(binding.des, binding.desType, binding.key, binding.arguments);
             }
-            this.exchangeMessageRouter.start();
+            FutureUtil.waitForAll(futures).whenComplete((__, throwable) -> {
+                if (throwable != null) {
+                    log.error("Failed to init queue [{}]", exchangeName, throwable);
+                }
+                this.exchangeMessageRouter.start();
+            });
             return;
         }
 
@@ -302,7 +323,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     }
 
     @Override
-    public Topic getTopic(){
+    public Topic getTopic() {
         return persistentTopic;
     }
 
@@ -337,21 +358,21 @@ public class PersistentExchange extends AbstractAmqpExchange {
             }
             ledger.asyncOpenCursor(name, CommandSubscribe.InitialPosition.Earliest,
                     new AsyncCallbacks.OpenCursorCallback() {
-                    @Override
-                    public void openCursorComplete(ManagedCursor cursor, Object ctx) {
-                        cursorFuture.complete(cursor);
-                    }
-
-                    @Override
-                    public void openCursorFailed(ManagedLedgerException exception, Object ctx) {
-                        log.error("[{}] Failed to open cursor. ", name, exception);
-                        cursorFuture.completeExceptionally(exception);
-                        if (cursors.get(name) != null && cursors.get(name).isCompletedExceptionally()
-                                || cursors.get(name).isCancelled()) {
-                            cursors.remove(name);
+                        @Override
+                        public void openCursorComplete(ManagedCursor cursor, Object ctx) {
+                            cursorFuture.complete(cursor);
                         }
-                    }
-                }, null);
+
+                        @Override
+                        public void openCursorFailed(ManagedLedgerException exception, Object ctx) {
+                            log.error("[{}] Failed to open cursor. ", name, exception);
+                            cursorFuture.completeExceptionally(exception);
+                            if (cursors.get(name) != null && cursors.get(name).isCompletedExceptionally()
+                                    || cursors.get(name).isCancelled()) {
+                                cursors.remove(name);
+                            }
+                        }
+                    }, null);
             return cursorFuture;
         });
     }
@@ -397,7 +418,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> queueBind(String queue, String routingKey, Map<String, Object> arguments) {
-        this.bindings.add(new Binding(queue, "queue", routingKey, arguments));
+        this.bindings.add(new Binding(queue, "queue", routingKey, exchangeName, arguments));
         String bindingsJson;
         try {
             bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
@@ -408,24 +429,24 @@ public class PersistentExchange extends AbstractAmqpExchange {
         CompletableFuture<Void> future = new CompletableFuture<>();
         this.persistentTopic.getManagedLedger().asyncSetProperty(BINDINGS, bindingsJson,
                 new AsyncCallbacks.UpdatePropertiesCallback() {
-            @Override
-            public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
-                PersistentExchange.this.exchangeMessageRouter.addBinding(queue, "queue", routingKey, arguments);
-                future.complete(null);
-            }
+                    @Override
+                    public void updatePropertiesComplete(Map<String, String> properties, Object ctx) {
+                        PersistentExchange.this.exchangeMessageRouter.addBinding(queue, "queue", routingKey, arguments);
+                        future.complete(null);
+                    }
 
-            @Override
-            public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
-                log.error("Failed to save binding metadata for bind operation.", exception);
-                future.completeExceptionally(exception);
-            }
-        }, null);
+                    @Override
+                    public void updatePropertiesFailed(ManagedLedgerException exception, Object ctx) {
+                        log.error("Failed to save binding metadata for bind operation.", exception);
+                        future.completeExceptionally(exception);
+                    }
+                }, null);
         return future;
     }
 
     @Override
     public CompletableFuture<Void> queueUnBind(String queue, String routingKey, Map<String, Object> arguments) {
-        this.bindings.remove(new Binding(queue, "queue", routingKey, arguments));
+        this.bindings.remove(new Binding(queue, "queue", routingKey, exchangeName, arguments));
         String bindingsJson;
         try {
             bindingsJson = JSON_MAPPER.writeValueAsString(this.bindings);
@@ -452,4 +473,10 @@ public class PersistentExchange extends AbstractAmqpExchange {
         return future;
     }
 
+    @Override
+    public void close() {
+        if (exchangeMessageRouter != null) {
+            exchangeMessageRouter.close();
+        }
+    }
 }

@@ -18,12 +18,15 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.Getter;
 
 /**
  * Base class of AMQP exchange.
  */
 public abstract class AbstractAmqpExchange implements AmqpExchange {
 
+    @Getter
+    protected final Map<String, String> properties;
     protected final String exchangeName;
     protected final AmqpExchange.Type exchangeType;
     protected Set<AmqpQueue> queues;
@@ -37,7 +40,8 @@ public abstract class AbstractAmqpExchange implements AmqpExchange {
 
     protected AbstractAmqpExchange(String exchangeName, AmqpExchange.Type exchangeType,
                                    Set<AmqpQueue> queues, boolean durable, boolean autoDelete, boolean internal,
-                                   Map<String, Object> arguments) {
+                                   Map<String, Object> arguments, Map<String, String> properties) {
+        this.properties = properties;
         this.exchangeName = exchangeName;
         this.exchangeType = exchangeType;
         this.queues = queues;

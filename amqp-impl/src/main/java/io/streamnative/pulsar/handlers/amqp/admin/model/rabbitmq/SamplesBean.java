@@ -11,27 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.streamnative.pulsar.handlers.amqp.admin.model;
+package io.streamnative.pulsar.handlers.amqp.admin.model.rabbitmq;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Map;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * This class is used to declare exchange params.
- */
-@Data
 @NoArgsConstructor
-public class ExchangeDeclareParams {
-
-    private String type;
-    @JsonProperty(value = "auto_delete")
-    private boolean autoDelete;
-    private boolean durable;
-    private boolean internal;
-    private boolean passive;
-    private Map<String, Object> arguments;
-    private String vhost;
-    private String name;
+@AllArgsConstructor
+@Data
+public class SamplesBean {
+    private double sample;
+    private double timestamp;
 }

@@ -76,13 +76,13 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
     private final int maxPermits = 1000;
 
     public AmqpConsumer(QueueContainer queueContainer, Subscription subscription,
-        CommandSubscribe.SubType subType, String topicName, long consumerId,
-        int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
-        String appId, Map<String, String> metadata, boolean readCompacted, MessageId messageId,
-        KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) {
+                        CommandSubscribe.SubType subType, String topicName, long consumerId,
+                        int priorityLevel, String consumerName, boolean isDurable, ServerCnx cnx,
+                        String appId, Map<String, String> metadata, boolean readCompacted, MessageId messageId,
+                        KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
+                        boolean autoAck) {
         super(subscription, subType, topicName, consumerId, priorityLevel, consumerName, isDurable,
-            cnx, appId, metadata, readCompacted, keySharedMeta, messageId, Commands.DEFAULT_CONSUMER_EPOCH);
+                cnx, appId, metadata, readCompacted, keySharedMeta, messageId, Commands.DEFAULT_CONSUMER_EPOCH);
         this.channel = channel;
         this.queueContainer = queueContainer;
         this.autoAck = autoAck;
@@ -101,8 +101,8 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
 
     @Override
     public Future<Void> sendMessages(final List<? extends Entry> entries, EntryBatchSizes batchSizes,
-           EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
-           RedeliveryTracker redeliveryTracker, long epoch) {
+                                     EntryBatchIndexesAcks batchIndexesAcks, int totalMessages, long totalBytes, long totalChunkedMessages,
+                                     RedeliveryTracker redeliveryTracker, long epoch) {
         ChannelPromise writePromise = this.channel.getConnection().getCtx().newPromise();
         if (entries.isEmpty() || totalMessages == 0) {
             if (log.isDebugEnabled()) {
@@ -153,49 +153,50 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
         }
         asyncGetQueue()
                 .thenCompose(amqpQueue -> amqpQueue.readEntryAsync(
-                        indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
-                .thenAccept(msg -> {
-                    try {
-                        long deliveryTag = channel.getNextDeliveryTag();
+                                indexMessage.getExchangeName(), indexMessage.getLedgerId(), indexMessage.getEntryId())
+                        .thenAccept(msg -> {
+                            try {
+                                long deliveryTag = channel.getNextDeliveryTag();
 
-                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                                (PositionImpl) msg.getPosition());
-                        if (!autoAck) {
-                            channel.getUnacknowledgedMessageMap().add(deliveryTag,
-                                    index.getPosition(), this, msg.getLength());
-                        }
+                                addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
+                                        (PositionImpl) msg.getPosition());
+                                if (!autoAck) {
+                                    channel.getUnacknowledgedMessageMap().add(deliveryTag,
+                                            index.getPosition(), this, msg.getLength());
+                                }
 
-                        try {
-                            boolean isRedelivery = getRedeliveryTracker().getRedeliveryCount(
-                                    index.getPosition().getLedgerId(), index.getPosition().getEntryId()) > 0;
-                            channel.getConnection().getAmqpOutputConverter().writeDeliver(
-                                    MessageConvertUtils.entryToAmqpBody(msg),
-                                    channel.getChannelId(),
-                                    isRedelivery,
-                                    deliveryTag,
-                                    AMQShortString.createAMQShortString(consumerTag));
-                            sendFuture.complete(null);
-                        } catch (Exception e) {
-                            log.error("[{}-{}] Failed to send message to consumer.", queueName, consumerTag, e);
-                            sendFuture.completeExceptionally(e);
-                            return;
-                        } finally {
-                            msg.release();
-                        }
+                                try {
+                                    boolean isRedelivery = getRedeliveryTracker().getRedeliveryCount(
+                                            index.getPosition().getLedgerId(),
+                                            index.getPosition().getEntryId()) > 0;
+                                    channel.getConnection().getAmqpOutputConverter().writeDeliver(
+                                            MessageConvertUtils.entryToAmqpBody(msg),
+                                            channel.getChannelId(),
+                                            isRedelivery,
+                                            deliveryTag,
+                                            AMQShortString.createAMQShortString(consumerTag));
+                                    sendFuture.complete(null);
+                                } catch (Exception e) {
+                                    log.error("[{}-{}] Failed to send message to consumer.", queueName, consumerTag, e);
+                                    sendFuture.completeExceptionally(e);
+                                    return;
+                                } finally {
+                                    msg.release();
+                                }
 
-                        if (autoAck) {
-                            messageAck(index.getPosition());
-                        }
-                    } finally {
-                        index.release();
-                        indexMessage.recycle();
-                    }
-                })).exceptionally(throwable -> {
+                                if (autoAck) {
+                                    messageAck(index.getPosition());
+                                }
+                            } finally {
+                                index.release();
+                                indexMessage.recycle();
+                            }
+                        })).exceptionally(throwable -> {
                     log.error("[{}-{}] Failed to read data from exchange topic {}.",
                             queueName, consumerTag, indexMessage.getExchangeName(), throwable);
                     sendFuture.completeExceptionally(throwable);
                     return null;
-        });
+                });
         return sendFuture;
     }
 
@@ -259,7 +260,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
             return availablePermits;
         }
         return this.channel.getCreditManager().hasCredit()
-            ? (int) this.channel.getCreditManager().getMessageCredit() : 0;
+                ? (int) this.channel.getCreditManager().getMessageCredit() : 0;
     }
 
     @Override

@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.ExchangeBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeclareParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.ExchangeDeleteParams;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -69,12 +70,36 @@ public class Exchanges extends ExchangeBase {
     @Path("/{vhost}/{exchange}")
     public void getExchange(@Suspended final AsyncResponse response,
                             @PathParam("vhost") String vhost,
-                            @PathParam("exchange") String exchange) {
+                            @PathParam("exchange") String exchange,
+                            @QueryParam("msg_rates_age") int age,
+                            @QueryParam("msg_rates_incr") int incr,
+                            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
         getExchangeBeanAsync(vhost, exchange)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
                     log.error("Failed to get exchange {} for tenant {} belong to vhost {}",
                             exchange, tenant, vhost, t);
+                    resumeAsyncResponseExceptionally(response, t);
+                    return null;
+                });
+    }
+
+    @GET
+    @Path("/{vhost}/{exchange}/loadExchange")
+    public void loadExchange(@Suspended final AsyncResponse response,
+                             @PathParam("vhost") String vhost,
+                             @PathParam("exchange") String exchange,
+                             @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                getNamespaceName(vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> loadExchangeAsync(vhost, exchange))
+                .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .exceptionally(t -> {
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to load exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });
@@ -87,10 +112,11 @@ public class Exchanges extends ExchangeBase {
                                 @PathParam("exchange") String exchange,
                                 ExchangeDeclareParams params,
                                 @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get(tenant, vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+                namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> declareExchange(vhost, exchange, params))
+                .thenCompose(__ -> declareExchange(namespaceName, exchange, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
@@ -104,18 +130,26 @@ public class Exchanges extends ExchangeBase {
 
     @DELETE
     @Path("/{vhost}/{exchange}")
-    public void declareExchange(@Suspended final AsyncResponse response,
-                                @PathParam("vhost") String vhost,
-                                @PathParam("exchange") String exchange,
-                                @QueryParam("if-unused") boolean ifUnused) {
-        deleteExchange(vhost, exchange, ifUnused)
+    public void deleteExchange(@Suspended final AsyncResponse response,
+                               @PathParam("vhost") String vhost,
+                               @PathParam("exchange") String exchange,
+                               ExchangeDeleteParams params,
+                               @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        NamespaceName namespaceName = getNamespaceName(vhost);
+        TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
+                namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
+        validateTopicOwnershipAsync(topicName, authoritative)
+                .thenCompose(__ -> deleteExchange(namespaceName, exchange, params.isIfUnused()))
                 .thenAccept(__ -> {
-                    log.info("Success delete exchange {} in vhost {}, ifUnused is {}", exchange, vhost, ifUnused);
+                    log.info("Success delete exchange {} in vhost {}, ifUnused is {}", exchange, vhost,
+                            params.isIfUnused());
                     response.resume(Response.noContent().build());
                 })
                 .exceptionally(t -> {
-                    log.error("Failed to delete exchange {} for tenant {} belong to vhost {}",
-                            exchange, tenant, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to delete exchange {} for tenant {} belong to vhost {}",
+                                exchange, tenant, vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

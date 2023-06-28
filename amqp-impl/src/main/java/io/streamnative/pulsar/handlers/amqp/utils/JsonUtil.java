@@ -42,6 +42,9 @@ public class JsonUtil {
     public static <T> T parseObject(String jsonStr, Class<T> clazz) throws IOException {
         return objectMapper.readValue(jsonStr, clazz);
     }
+    public static <T> T parseObject(String jsonStr, TypeReference<T> tTypeReference) throws IOException {
+        return objectMapper.readValue(jsonStr, tTypeReference);
+    }
 
     public static <T> List<T> parseObjectList(String json, Class<T> obj) throws JsonProcessingException {
         JavaType javaType = objectMapper.getTypeFactory().constructParametricType(ArrayList.class, obj);

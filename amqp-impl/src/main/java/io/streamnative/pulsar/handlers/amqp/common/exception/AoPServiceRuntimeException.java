@@ -28,6 +28,11 @@ public class AoPServiceRuntimeException extends RuntimeException {
             super(e);
         }
     }
+    public static class ReaderCreationRuntimeException extends AoPServiceRuntimeException {
+        public ReaderCreationRuntimeException(Exception e) {
+            super(e);
+        }
+    }
 
     public static class ExchangeParameterException extends AoPServiceRuntimeException{
         public ExchangeParameterException(String message) {
@@ -47,4 +52,31 @@ public class AoPServiceRuntimeException extends RuntimeException {
         }
     }
 
+    public static class NotSupportedExchangeTypeException extends AoPServiceRuntimeException{
+        public NotSupportedExchangeTypeException(String message) {
+            super(message);
+        }
+    }
+
+    public static class NoSuchQueueException extends AoPServiceRuntimeException{
+        public NoSuchQueueException(String message) {
+            super(message);
+        }
+    }
+
+    public static class NoSuchExchangeException extends AoPServiceRuntimeException{
+        public NoSuchExchangeException(String message) {
+            super(message);
+        }
+    }
+
+    public static class GetMessageException extends AoPServiceRuntimeException{
+        public GetMessageException(String message) {
+            super(message);
+        }
+
+        public GetMessageException(Exception e) {
+            super(e);
+        }
+    }
 }

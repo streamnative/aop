@@ -16,11 +16,16 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.client.api.SizeUnit;
 
 /**
  * AMQP broker related.
@@ -43,16 +48,32 @@ public class AmqpBrokerService {
     @Getter
     private AmqpAdmin amqpAdmin;
 
+    @Getter
+    private final PulsarClient pulsarClient;
+
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
+        try {
+            this.pulsarClient = PulsarClient.builder()
+                    .serviceUrl(config.getAmqpServerAddress())
+                    .ioThreads(config.getNumIOThreads())
+                    .listenerThreads(config.getNumIOThreads())
+                    .memoryLimit(0, SizeUnit.BYTES)
+                    .statsInterval(0, TimeUnit.MILLISECONDS)
+                    .connectionMaxIdleSeconds(-1)
+                    .build();
+        } catch (PulsarClientException e) {
+            throw new AoPServiceRuntimeException(e);
+        }
+        String clusterName = pulsarService.getBrokerService().getPulsar().getConfiguration().getClusterName();
+        this.amqpAdmin = new AmqpAdmin(config.getAdvertisedAddress(), config.getAmqpAdminPort());
         this.pulsarService = pulsarService;
         this.amqpTopicManager = new AmqpTopicManager(pulsarService);
         this.exchangeContainer = new ExchangeContainer(amqpTopicManager, pulsarService,
-                initRouteExecutor(config), config);
+                initRouteExecutor(config), config, amqpAdmin, pulsarClient);
         this.queueContainer = new QueueContainer(amqpTopicManager, pulsarService, exchangeContainer, config);
         this.exchangeService = new ExchangeServiceImpl(exchangeContainer);
-        this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
-        this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
-        this.amqpAdmin = new AmqpAdmin("localhost", config.getAmqpAdminPort());
+        this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer, amqpTopicManager);
+        this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer, config);
     }
 
     private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {

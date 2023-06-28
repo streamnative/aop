@@ -15,6 +15,7 @@ package io.streamnative.pulsar.handlers.amqp.admin;
 
 import io.streamnative.pulsar.handlers.amqp.admin.impl.BindingBase;
 import io.streamnative.pulsar.handlers.amqp.admin.model.BindingParams;
+import io.streamnative.pulsar.handlers.amqp.admin.model.QueueUnBindingParams;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -57,16 +58,18 @@ public class Bindings extends BindingBase {
     @POST
     @Path("/{vhost}/e/{exchange}/q/{queue}")
     public void queueBind(@Suspended final AsyncResponse response,
-                                @PathParam("vhost") String vhost,
-                                @PathParam("exchange") String exchange,
-                                @PathParam("queue") String queue,
-                                BindingParams params,
+                          @PathParam("vhost") String vhost,
+                          @PathParam("exchange") String exchange,
+                          @PathParam("queue") String queue,
+                          BindingParams params,
                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+                namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> queueBindAsync(vhost, exchange, queue, params))
+                .thenCompose(__ -> queueBindAsync(namespaceName, exchange, queue, params))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
+                .thenComposeAsync(__ -> amqpAdmin().queueBindExchange(namespaceName, exchange, queue, params))
                 .exceptionally(t -> {
                     if (!isRedirectException(t)) {
                         log.error("Failed to bind queue {} to exchange {} with key {} in vhost {}",
@@ -80,10 +83,10 @@ public class Bindings extends BindingBase {
     @GET
     @Path("/{vhost}/e/{exchange}/q/{queue}/{props}")
     public void getQueueBinding(@Suspended final AsyncResponse response,
-                             @PathParam("vhost") String vhost,
-                             @PathParam("exchange") String exchange,
-                             @PathParam("queue") String queue,
-                             @PathParam("props") String propsKey) {
+                                @PathParam("vhost") String vhost,
+                                @PathParam("exchange") String exchange,
+                                @PathParam("queue") String queue,
+                                @PathParam("props") String propsKey) {
         getBindingsByPropsKeyAsync(vhost, exchange, queue, propsKey)
                 .thenAccept(response::resume)
                 .exceptionally(t -> {
@@ -95,21 +98,25 @@ public class Bindings extends BindingBase {
     }
 
     @DELETE
-    @Path("/{vhost}/e/{exchange}/q/{queue}/{props}")
-    public void queueUnbind(@Suspended final AsyncResponse response,
-                            @PathParam("vhost") String vhost,
-                            @PathParam("exchange") String exchange,
-                            @PathParam("queue") String queue,
-                            @PathParam("props") String propsKey,
-                            @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+    @Path("/{vhost}/e/{exchange}/q/{queue}/unbind")
+    public void queuUnbind(@Suspended final AsyncResponse response,
+                           @PathParam("vhost") String vhost,
+                           @PathParam("exchange") String exchange,
+                           @PathParam("queue") String queue,
+                           QueueUnBindingParams params,
+                           @QueryParam("authoritative") @DefaultValue("false") boolean authoritative) {
+        NamespaceName namespaceName = getNamespaceName(vhost);
         TopicName topicName = TopicName.get(TopicDomain.persistent.toString(),
-                NamespaceName.get("public", vhost), PersistentExchange.TOPIC_PREFIX + exchange);
+                namespaceName, PersistentExchange.TOPIC_PREFIX + exchange);
         validateTopicOwnershipAsync(topicName, authoritative)
-                .thenCompose(__ -> queueUnbindAsync(vhost, exchange, queue, propsKey))
+                .thenCompose(__ -> queueUnbindAsync(namespaceName, exchange, queue, params.getProperties_key()))
+                .thenCompose(__ -> amqpAdmin().queueUnBindExchange(namespaceName, exchange, queue, params.getProperties_key()))
                 .thenAccept(__ -> response.resume(Response.noContent().build()))
                 .exceptionally(t -> {
-                    log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",
-                            queue, exchange, propsKey, vhost, t);
+                    if (!isRedirectException(t)) {
+                        log.error("Failed to unbind queue {} to exchange {} with key {} in vhost {}",
+                                queue, exchange, params.getProperties_key(), vhost, t);
+                    }
                     resumeAsyncResponseExceptionally(response, t);
                     return null;
                 });

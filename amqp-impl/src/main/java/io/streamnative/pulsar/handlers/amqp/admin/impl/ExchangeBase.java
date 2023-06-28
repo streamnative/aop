@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,8 +20,10 @@ import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -29,7 +31,7 @@ import org.apache.pulsar.common.util.FutureUtil;
 /**
  * Exchange base.
  */
-
+@Slf4j
 public class ExchangeBase extends BaseResources {
 
     protected CompletableFuture<List<ExchangeBean>> getExchangeListAsync() {
@@ -44,7 +46,7 @@ public class ExchangeBase extends BaseResources {
                 }).thenApply(__ -> exchangeList);
     }
 
-    private CompletableFuture<List<String>> getExchangeListAsync(String tenant, String ns) {
+    protected CompletableFuture<List<String>> getExchangeListAsync(String tenant, String ns) {
         return namespaceService()
                 .getFullListOfTopics(NamespaceName.get(tenant, ns))
                 .thenApply(list -> list.stream().filter(s ->
@@ -79,15 +81,28 @@ public class ExchangeBase extends BaseResources {
         });
     }
 
-    protected CompletableFuture<AmqpExchange> declareExchange(String vhost, String exchangeName,
+    protected CompletableFuture<AmqpExchange> loadExchangeAsync(String vhost, String exchangeName) {
+        Map<String, CompletableFuture<AmqpExchange>> exMap =
+                exchangeContainer().getExchangeMap().get(getNamespaceName(vhost));
+        if (exMap != null) {
+            CompletableFuture<AmqpExchange> future = exMap.get(exchangeName);
+            if (future != null) {
+                return future;
+            }
+        }
+        return exchangeContainer().asyncGetExchange(getNamespaceName(vhost), exchangeName, false, null);
+    }
+
+    protected CompletableFuture<AmqpExchange> declareExchange(NamespaceName namespaceName, String exchangeName,
                                                               ExchangeDeclareParams declareParams) {
-        return exchangeService().exchangeDeclare(NamespaceName.get(tenant, vhost), exchangeName,
+        return exchangeService().exchangeDeclare(namespaceName, exchangeName,
                 declareParams.getType(), declareParams.isPassive(), declareParams.isDurable(),
                 declareParams.isAutoDelete(), declareParams.isInternal(), declareParams.getArguments());
     }
 
-    protected CompletableFuture<Void> deleteExchange(String vhost, String exchangeName, boolean ifUnused) {
-        return exchangeService().exchangeDelete(NamespaceName.get(tenant, vhost), exchangeName, ifUnused);
+    protected CompletableFuture<Void> deleteExchange(NamespaceName namespaceName, String exchangeName,
+                                                     boolean ifUnused) {
+        return exchangeService().exchangeDelete(namespaceName, exchangeName, ifUnused);
     }
 
 }

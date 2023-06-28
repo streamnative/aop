@@ -139,4 +139,9 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpPulsarConsumerQueueSize = 10000;
 
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            required = true
+    )
+    private String amqpServerAddress;
 }

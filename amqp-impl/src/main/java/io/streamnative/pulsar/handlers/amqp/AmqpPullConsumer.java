@@ -28,14 +28,14 @@ import org.apache.pulsar.common.api.proto.KeySharedMeta;
 public class AmqpPullConsumer extends AmqpConsumer {
 
     public AmqpPullConsumer(QueueContainer queueContainer, Subscription subscription,
-        CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
-        String consumerName, boolean isDurable, ServerCnx cnx, String appId,
-        Map<String, String> metadata, boolean readCompacted, MessageId messageId,
-        KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
-        boolean autoAck) {
+                            CommandSubscribe.SubType subType, String topicName, long consumerId, int priorityLevel,
+                            String consumerName, boolean isDurable, ServerCnx cnx, String appId,
+                            Map<String, String> metadata, boolean readCompacted, MessageId messageId,
+                            KeySharedMeta keySharedMeta, AmqpChannel channel, String consumerTag, String queueName,
+                            boolean autoAck) {
         super(queueContainer, subscription, subType, topicName, consumerId, priorityLevel, consumerName,
                 isDurable, cnx, appId, metadata, readCompacted, messageId, keySharedMeta, channel,
-            consumerTag, queueName, autoAck);
+                consumerTag, queueName, autoAck);
     }
 
     @Override

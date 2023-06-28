@@ -15,7 +15,6 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.nio.charset.StandardCharsets.US_ASCII;
-
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -28,7 +27,12 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
+import java.util.StringTokenizer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -36,16 +40,16 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.authentication.AuthenticationProvider;
 import org.apache.pulsar.broker.authentication.AuthenticationState;
-import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.ServerCnx;
+import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.common.api.AuthData;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
+import org.apache.qpid.server.common.ServerPropertyNames;
 import org.apache.qpid.server.protocol.ErrorCodes;
 import org.apache.qpid.server.protocol.ProtocolVersion;
 import org.apache.qpid.server.protocol.v0_8.AMQDecoder;
@@ -59,6 +63,7 @@ import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionCloseOkBody;
 import org.apache.qpid.server.protocol.v0_8.transport.ConnectionTuneBody;
 import org.apache.qpid.server.protocol.v0_8.transport.HeartbeatBody;
+import org.apache.qpid.server.protocol.v0_8.transport.MessagePublishInfo;
 import org.apache.qpid.server.protocol.v0_8.transport.MethodRegistry;
 import org.apache.qpid.server.protocol.v0_8.transport.ProtocolInitiation;
 import org.apache.qpid.server.protocol.v0_8.transport.ServerChannelMethodProcessor;
@@ -86,6 +91,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
 
     private long connectionId;
+    @Getter
     private final ConcurrentLongHashMap<AmqpChannel> channels;
     private final ConcurrentLongLongHashMap closingChannelsList = new ConcurrentLongLongHashMap();
     @Getter
@@ -109,10 +115,19 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     @Getter
     private AmqpBrokerService amqpBrokerService;
     private AuthenticationState authenticationState;
+    @Getter
+    private String clientIp;
+    @Getter
+    private long connectedAt;
+
+    final Map<String, CompletableFuture<Producer<byte[]>>> producerMap;
+    final Map<String, MessagePublishInfo> publishInfoMap;
+    private String tenant;
 
     public AmqpConnection(AmqpServiceConfiguration amqpConfig,
                           AmqpBrokerService amqpBrokerService) {
         super(amqpBrokerService.getPulsarService(), amqpConfig);
+        this.tenant = amqpConfig.getAmqpTenant();
         this.connectionId = ID_GENERATOR.incrementAndGet();
         this.channels = new ConcurrentLongHashMap<>();
         this.protocolVersion = ProtocolVersion.v0_91;
@@ -124,6 +139,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         this.heartBeat = amqpConfig.getAmqpHeartBeat();
         this.amqpOutputConverter = new AmqpOutputConverter(this);
         this.amqpBrokerService = amqpBrokerService;
+        this.producerMap = new ConcurrentHashMap<>();
+        this.publishInfoMap = new ConcurrentHashMap<>();
     }
 
 
@@ -141,6 +158,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         completeAndCloseAllChannels();
+        closeAllProducers();
         amqpBrokerService.getConnectionContainer().removeConnection(namespaceName, this);
         this.brokerDecoder.close();
     }
@@ -167,7 +185,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.error("[{}] Got exception: {}", remoteAddress, cause.getMessage(), cause);
+        log.error("[{}] Got exception: {}", clientIp, cause.getMessage(), cause);
         close();
     }
 
@@ -176,6 +194,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         if (isActive.getAndSet(false)) {
             log.info("close netty channel {}", ctx.channel());
             ctx.close();
+            bufferSender.close();
         }
     }
 
@@ -186,6 +205,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             log.debug("RECV ConnectionStartOk[clientProperties: {}, mechanism: {}, locale: {}]",
                     clientProperties, mechanism, locale);
         }
+        this.clientIp = ctx.channel().remoteAddress().toString();
         assertState(ConnectionState.AWAIT_START_OK);
         // TODO clientProperties
 
@@ -276,7 +296,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public void receiveConnectionTuneOk(int channelMax, long frameMax, int heartbeat) {
         if (log.isDebugEnabled()) {
             log.debug("RECV ConnectionTuneOk[ channelMax: {} frameMax: {} heartbeat: {} ]",
-                channelMax, frameMax, heartbeat);
+                    channelMax, frameMax, heartbeat);
         }
         assertState(ConnectionState.AWAIT_TUNE_OK);
 
@@ -293,22 +313,22 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         if (frameMax > (long) brokerFrameMax) {
             sendConnectionClose(ErrorCodes.SYNTAX_ERROR,
-                "Attempt to set max frame size to " + frameMax
-                    + " greater than the broker will allow: "
-                    + brokerFrameMax, 0);
+                    "Attempt to set max frame size to " + frameMax
+                            + " greater than the broker will allow: "
+                            + brokerFrameMax, 0);
         } else if (frameMax > 0 && frameMax <  AMQDecoder.FRAME_MIN_SIZE) {
             sendConnectionClose(ErrorCodes.SYNTAX_ERROR,
-                "Attempt to set max frame size to " + frameMax
-                    + " which is smaller than the specification defined minimum: "
-                    + AMQFrame.getFrameOverhead(), 0);
+                    "Attempt to set max frame size to " + frameMax
+                            + " which is smaller than the specification defined minimum: "
+                            + AMQFrame.getFrameOverhead(), 0);
         } else {
             int calculatedFrameMax = frameMax == 0 ? brokerFrameMax : (int) frameMax;
             setMaxFrameSize(calculatedFrameMax);
 
             //0 means no implied limit, except that forced by protocol limitations (0xFFFF)
             int value = ((channelMax == 0) || (channelMax > 0xFFFF))
-                ? 0xFFFF
-                : channelMax;
+                    ? 0xFFFF
+                    : channelMax;
             maxChannels = value;
         }
         state = ConnectionState.AWAIT_OPEN;
@@ -324,50 +344,38 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         assertState(ConnectionState.AWAIT_OPEN);
 
-        boolean isDefaultNamespace = false;
         String virtualHostStr = AMQShortString.toString(virtualHost);
-        if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
-            virtualHostStr = virtualHostStr.substring(1);
-            if (StringUtils.isEmpty(virtualHostStr)){
-                virtualHostStr = DEFAULT_NAMESPACE;
-                isDefaultNamespace = true;
-            }
+        Pair<String, String> pair;
+        if (virtualHostStr == null || (pair = validateVirtualHost(virtualHostStr)) == null){
+            sendConnectionClose(ErrorCodes.NOT_ALLOWED, String.format(
+                    "The virtualHost [%s] configuration is incorrect. For example: tenant/namespace or namespace",
+                    virtualHostStr), 0);
+            return;
         }
 
-        NamespaceName namespaceName = NamespaceName.get(amqpConfig.getAmqpTenant(), virtualHostStr);
-        if (isDefaultNamespace) {
-            // avoid the namespace public/default is not owned in standalone mode
-            TopicName topic = TopicName.get(TopicDomain.persistent.value(),
-                    namespaceName, "__lookup__");
-            LookupOptions lookupOptions = LookupOptions.builder().authoritative(true).build();
-            getPulsarService().getNamespaceService().getBrokerServiceUrlAsync(topic, lookupOptions);
-        }
-        // Policies policies = getPolicies(namespaceName);
-//        if (policies != null) {
+        NamespaceName namespaceName = NamespaceName.get(pair.getLeft(), pair.getRight());
         this.namespaceName = namespaceName;
 
         MethodRegistry methodRegistry = getMethodRegistry();
         AMQMethodBody responseBody = methodRegistry.createConnectionOpenOkBody(virtualHost);
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
+        connectedAt = System.currentTimeMillis();
         amqpBrokerService.getConnectionContainer().addConnection(namespaceName, this);
-//        } else {
-//            sendConnectionClose(ErrorCodes.NOT_FOUND,
-//                "Unknown virtual host: '" + virtualHostStr + "'", 0);
-//        }
     }
 
     @Override
     public void receiveConnectionClose(int replyCode, AMQShortString replyText,
-        int classId, int methodId) {
+                                       int classId, int methodId) {
         if (log.isDebugEnabled()) {
             log.debug("RECV ConnectionClose[ replyCode: {} replyText: {} classId: {} methodId: {} ]",
-                replyCode, replyText, classId, methodId);
+                    replyCode, replyText, classId, methodId);
         }
 
         try {
             if (orderlyClose.compareAndSet(false, true)) {
                 completeAndCloseAllChannels();
+                closeAllProducers();
             }
 
             MethodRegistry methodRegistry = getMethodRegistry();
@@ -398,6 +406,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             try {
                 markChannelAwaitingCloseOk(channelId);
                 completeAndCloseAllChannels();
+                closeAllProducers();
             } finally {
                 writeFrame(frame);
             }
@@ -414,14 +423,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         if (this.namespaceName == null) {
             sendConnectionClose(ErrorCodes.COMMAND_INVALID,
-                "Virtualhost has not yet been set. ConnectionOpen has not been called.", channelId);
+                    "Virtualhost has not yet been set. ConnectionOpen has not been called.", channelId);
         } else if (channels.get(channelId) != null || channelAwaitingClosure(channelId)) {
             sendConnectionClose(ErrorCodes.CHANNEL_ERROR, "Channel " + channelId + " already exists", channelId);
         } else if (channelId > maxChannels) {
             sendConnectionClose(ErrorCodes.CHANNEL_ERROR,
-                "Channel " + channelId + " cannot be created as the max allowed channel id is "
-                    + maxChannels,
-                channelId);
+                    "Channel " + channelId + " cannot be created as the max allowed channel id is "
+                            + maxChannels,
+                    channelId);
         } else {
             log.debug("Connecting to: {}", namespaceName.getLocalName());
             final AmqpChannel channel;
@@ -467,7 +476,11 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             AMQMethodBody responseBody = this.methodRegistry.createConnectionStartBody(
                     (short) protocolVersion.getMajorVersion(),
                     (short) pv.getActualMinorVersion(),
-                    null,
+                    FieldTable.convertToFieldTable(new HashMap<>(2) {
+                        {
+                            put(ServerPropertyNames.VERSION, AopVersion.getVersion());
+                        }
+                    }),
                     // TODO temporary modification
                     "PLAIN token".getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));
@@ -491,22 +504,22 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         ServerChannelMethodProcessor channelMethodProcessor = getChannel(channelId);
         if (channelMethodProcessor == null) {
             channelMethodProcessor =
-                (ServerChannelMethodProcessor) Proxy.newProxyInstance(ServerMethodDispatcher.class.getClassLoader(),
-                new Class[] {ServerChannelMethodProcessor.class}, new InvocationHandler() {
-                    @Override
-                    public Object invoke(final Object proxy, final Method method, final Object[] args)
-                        throws Throwable {
-                        if (method.getName().equals("receiveChannelCloseOk") && channelAwaitingClosure(channelId)) {
-                            closeChannelOk(channelId);
-                        } else if (method.getName().startsWith("receive")) {
-                            sendConnectionClose(ErrorCodes.CHANNEL_ERROR,
-                                "Unknown channel id: " + channelId, channelId);
-                        } else if (method.getName().equals("ignoreAllButCloseOk")) {
-                            return channelAwaitingClosure(channelId);
-                        }
-                        return null;
-                    }
-                });
+                    (ServerChannelMethodProcessor) Proxy.newProxyInstance(ServerMethodDispatcher.class.getClassLoader(),
+                            new Class[] {ServerChannelMethodProcessor.class}, new InvocationHandler() {
+                                @Override
+                                public Object invoke(final Object proxy, final Method method, final Object[] args)
+                                        throws Throwable {
+                                    if (method.getName().equals("receiveChannelCloseOk") && channelAwaitingClosure(channelId)) {
+                                        closeChannelOk(channelId);
+                                    } else if (method.getName().startsWith("receive")) {
+                                        sendConnectionClose(ErrorCodes.CHANNEL_ERROR,
+                                                "Unknown channel id: " + channelId, channelId);
+                                    } else if (method.getName().equals("ignoreAllButCloseOk")) {
+                                        return channelAwaitingClosure(channelId);
+                                    }
+                                    return null;
+                                }
+                            });
         }
         return channelMethodProcessor;
     }
@@ -525,10 +538,23 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
     }
 
+    private Pair<String, String> validateVirtualHost(String virtualHostStr) {
+        String virtualHost = virtualHostStr.trim();
+        if ("/".equals(virtualHost)) {
+            return Pair.of(this.tenant, AmqpConnection.DEFAULT_NAMESPACE);
+        }
+        StringTokenizer tokenizer = new StringTokenizer(virtualHost, "/", false);
+        return switch (tokenizer.countTokens()) {
+            case 1 -> Pair.of(this.tenant, tokenizer.nextToken());
+            case 2 -> Pair.of(tokenizer.nextToken(), tokenizer.nextToken());
+            default -> null;
+        };
+    }
+
 
     public boolean channelAwaitingClosure(int channelId) {
         return ignoreAllButCloseOk() || (!closingChannelsList.isEmpty()
-            && closingChannelsList.containsKey(channelId));
+                && closingChannelsList.containsKey(channelId));
     }
 
     public void completeAndCloseAllChannels() {
@@ -550,7 +576,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                     exception = exceptionForThisChannel;
                 }
                 log.error("error informing channel that receiving is complete. Channel: " + channel,
-                    exceptionForThisChannel);
+                        exceptionForThisChannel);
             }
         }
 
@@ -593,7 +619,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     public void initHeartBeatHandler(long writerIdle, long readerIdle) {
 
         this.ctx.pipeline().addFirst("idleStateHandler", new IdleStateHandler(readerIdle, writerIdle, 0,
-            TimeUnit.MILLISECONDS));
+                TimeUnit.MILLISECONDS));
         this.ctx.pipeline().addLast("connectionIdleHandler", new ConnectionIdleHandler());
 
     }
@@ -605,10 +631,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 IdleStateEvent event = (IdleStateEvent) evt;
                 if (event.state().equals(IdleState.READER_IDLE)) {
                     log.error("heartbeat timeout close remoteSocketAddress [{}]",
-                        AmqpConnection.this.remoteAddress.toString());
+                            AmqpConnection.this.remoteAddress.toString());
                     AmqpConnection.this.close();
                 } else if (event.state().equals(IdleState.WRITER_IDLE)) {
-                    log.warn("heartbeat write  idle [{}]", AmqpConnection.this.remoteAddress.toString());
+                    //log.warn("heartbeat write  idle [{}]", AmqpConnection.this.remoteAddress.toString());
                     writeFrame(HeartbeatBody.FRAME);
                 }
             }
@@ -661,10 +687,10 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
     public void closeChannelAndWriteFrame(AmqpChannel channel, int cause, String message) {
         writeFrame(new AMQFrame(channel.getChannelId(),
-            getMethodRegistry().createChannelCloseBody(cause,
-                AMQShortString.validValueOf(message),
-                currentClassId,
-                currentMethodId)));
+                getMethodRegistry().createChannelCloseBody(cause,
+                        AMQShortString.validValueOf(message),
+                        currentClassId,
+                        currentMethodId)));
         closeChannel(channel, true);
     }
 
@@ -680,6 +706,13 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
     }
 
+    private void closeAllProducers() {
+        for (CompletableFuture<Producer<byte[]>> producer : producerMap.values()) {
+            producer.thenApply(Producer::closeAsync);
+        }
+        producerMap.clear();
+    }
+
     private void closeAllChannels() {
         RuntimeException exception = null;
         try {
@@ -691,7 +724,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                         exception = exceptionForThisChannel;
                     }
                     log.error("error informing channel that receiving is complete. Channel: " + channel,
-                        exceptionForThisChannel);
+                            exceptionForThisChannel);
                 }
             }
             if (exception != null) {

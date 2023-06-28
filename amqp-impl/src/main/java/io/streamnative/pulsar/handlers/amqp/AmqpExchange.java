@@ -165,4 +165,7 @@ public interface AmqpExchange {
                 new NotSupportedOperationException("Amqp exchange queue unbind operation is not supported."));
     }
 
+    default void close(){
+
+    }
 }

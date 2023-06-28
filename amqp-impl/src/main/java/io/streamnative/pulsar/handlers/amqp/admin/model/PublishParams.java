@@ -3,7 +3,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.streamnative.pulsar.handlers.amqp.admin.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -18,20 +19,20 @@ import java.util.Map;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * This class is used to declare exchange params.
- */
 @Data
 @NoArgsConstructor
-public class ExchangeDeclareParams {
+public class PublishParams {
 
-    private String type;
-    @JsonProperty(value = "auto_delete")
-    private boolean autoDelete;
-    private boolean durable;
-    private boolean internal;
-    private boolean passive;
-    private Map<String, Object> arguments;
-    private String vhost;
+    @JsonProperty("delivery_mode")
+    private String deliveryMode;
+    @JsonProperty("routing_key")
+    private String routingKey;
+    @JsonProperty("payload_encoding")
+    private String payloadEncoding;
     private String name;
+    private String payload;
+    private String vhost;
+    private Map<String, Object> headers;
+    private Map<String, Object> properties;
+    private Map<String, String> props;
 }

@@ -87,8 +87,7 @@ public final class MessageConvertUtils {
     private static final String PROP_IMMEDIATE = BASIC_PUBLISH_INFO_PRE + "immediate";
     private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
     public static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
-
-    public static final String AMQP_MESSAGE_HEADERS_PROPERTY_NAME = "__amqp__headers.property.name";
+    public static final String PROP_CUSTOM_PROPERTIES = BASIC_PROP_HEADER_PRE + "custom_properties";
 
     private static final Clock clock = Clock.systemDefaultZone();
 
@@ -137,7 +136,7 @@ public final class MessageConvertUtils {
             setProp(builder, PROP_PROPERTY_FLAGS, props.getPropertyFlags());
 
             byte[] headers = FieldTableFactory.createFieldTable(props.getHeadersAsMap()).getDataAsBytes();
-            builder.property(AMQP_MESSAGE_HEADERS_PROPERTY_NAME, Hex.encodeHexString(headers));
+            builder.property(PROP_CUSTOM_PROPERTIES, Hex.encodeHexString(headers));
         }
 
         setProp(builder, PROP_EXCHANGE, incomingMessage.getMessagePublishInfo().getExchange());
@@ -251,7 +250,7 @@ public final class MessageConvertUtils {
                 case PROP_ROUTING_KEY:
                     messagePublishInfo.setRoutingKey(AMQShortString.createAMQShortString(keyValue.getValue()));
                     break;
-                case AMQP_MESSAGE_HEADERS_PROPERTY_NAME:
+                case PROP_CUSTOM_PROPERTIES:
                     headers = setOriginalProperties(keyValue);
                     break;
                 default:

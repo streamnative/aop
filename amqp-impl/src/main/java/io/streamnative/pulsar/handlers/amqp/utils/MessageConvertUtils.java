@@ -31,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.client.api.CompressionType;
 import org.apache.pulsar.client.api.Message;
@@ -45,6 +47,7 @@ import org.apache.pulsar.common.protocol.Commands;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.bytebuffer.SingleQpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
+import org.apache.qpid.server.protocol.v0_8.FieldTable;
 import org.apache.qpid.server.protocol.v0_8.FieldTableFactory;
 import org.apache.qpid.server.protocol.v0_8.IncomingMessage;
 import org.apache.qpid.server.protocol.v0_8.transport.BasicContentHeaderProperties;
@@ -85,6 +88,7 @@ public final class MessageConvertUtils {
     private static final String PROP_IMMEDIATE = BASIC_PUBLISH_INFO_PRE + "immediate";
     private static final String PROP_MANDATORY = BASIC_PUBLISH_INFO_PRE + "mandatory";
     public static final String PROP_ROUTING_KEY = BASIC_PUBLISH_INFO_PRE + "routingKey";
+    public static final String PROP_CUSTOM_PROPERTIES = BASIC_PROP_HEADER_PRE + "custom_properties";
 
     private static final Clock clock = Clock.systemDefaultZone();
 
@@ -132,10 +136,8 @@ public final class MessageConvertUtils {
             setProp(builder, PROP_CLUSTER_ID, props.getClusterIdAsString());
             setProp(builder, PROP_PROPERTY_FLAGS, props.getPropertyFlags());
 
-            Map<String, Object> headers = props.getHeadersAsMap();
-            for (Map.Entry<String, Object> entry : headers.entrySet()) {
-                setProp(builder, BASIC_PROP_HEADER_PRE + entry.getKey(), entry.getValue());
-            }
+            byte[] headers = FieldTableFactory.createFieldTable(props.getHeadersAsMap()).getDataAsBytes();
+            builder.property(PROP_CUSTOM_PROPERTIES, Hex.encodeHexString(headers));
         }
 
         setProp(builder, PROP_EXCHANGE, incomingMessage.getMessagePublishInfo().getExchange());
@@ -188,10 +190,10 @@ public final class MessageConvertUtils {
     }
 
     public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
-                                List<KeyValue> propertiesList) throws UnsupportedEncodingException {
+                                List<KeyValue> propertiesList) throws UnsupportedEncodingException, DecoderException {
         BasicContentHeaderProperties props = new BasicContentHeaderProperties();
-        Map<String, Object> headers = new HashMap<>();
         MessagePublishInfo messagePublishInfo = new MessagePublishInfo();
+        FieldTable headers = null;
 
         for (KeyValue keyValue : propertiesList) {
             switch (keyValue.getKey()) {
@@ -249,12 +251,26 @@ public final class MessageConvertUtils {
                 case PROP_ROUTING_KEY:
                     messagePublishInfo.setRoutingKey(AMQShortString.createAMQShortString(keyValue.getValue()));
                     break;
+                case PROP_CUSTOM_PROPERTIES:
+                    headers = setOriginalProperties(keyValue);
+                    break;
                 default:
-                    headers.put(keyValue.getKey().substring(BASIC_PROP_HEADER_PRE.length()), keyValue.getValue());
+                    log.warn("unknown property: {}, value: {}", keyValue.getKey(), keyValue.getValue());
+                    break;
             }
         }
-        props.setHeaders(FieldTableFactory.createFieldTable(headers));
+        props.setHeaders(headers);
         return Pair.of(props, messagePublishInfo);
+    }
+
+    private static FieldTable setOriginalProperties(KeyValue keyValue) throws DecoderException {
+        if (keyValue.getValue() == null) {
+            return null;
+        }
+        byte[] bytes = Hex.decodeHex(keyValue.getValue());
+        try (QpidByteBuffer buffer = QpidByteBuffer.wrap(bytes)) {
+            return FieldTableFactory.createFieldTable(buffer);
+        }
     }
 
     public static Pair<BasicContentHeaderProperties, MessagePublishInfo> getPropertiesFromMetadata(
@@ -328,7 +344,7 @@ public final class MessageConvertUtils {
     }
 
     public static List<AmqpMessageData> entriesToAmqpBodyList(List<Entry> entries)
-                                                                throws UnsupportedEncodingException {
+            throws UnsupportedEncodingException, DecoderException {
         ImmutableList.Builder<AmqpMessageData> builder = ImmutableList.builder();
         // TODO convert bk entries to amqpbody,
         //  then assemble deliver body with ContentHeaderBody and ContentBody
@@ -369,7 +385,7 @@ public final class MessageConvertUtils {
     }
 
     public static AmqpMessageData entryToAmqpBody(Entry entry)
-        throws UnsupportedEncodingException {
+        throws UnsupportedEncodingException, DecoderException {
         AmqpMessageData amqpMessage = null;
         // TODO convert bk entries to amqpbody,
         //  then assemble deliver body with ContentHeaderBody and ContentBody

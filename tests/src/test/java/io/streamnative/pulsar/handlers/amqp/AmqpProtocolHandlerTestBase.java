@@ -55,7 +55,6 @@ import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.common.policies.data.TopicType;
-import org.apache.pulsar.compaction.Compactor;
 import org.apache.pulsar.metadata.api.extended.MetadataStoreExtended;
 import org.apache.pulsar.metadata.impl.ZKMetadataStore;
 import org.apache.zookeeper.CreateMode;
@@ -294,9 +293,6 @@ public abstract class AmqpProtocolHandlerTestBase {
 
         setupBrokerMocks(pulsar);
         pulsar.start();
-
-        Compactor spiedCompactor = spy(pulsar.getCompactor());
-        doReturn(spiedCompactor).when(pulsar).getCompactor();
 
         return pulsar;
     }

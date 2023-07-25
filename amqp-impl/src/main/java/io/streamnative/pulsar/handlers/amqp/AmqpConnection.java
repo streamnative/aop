@@ -24,6 +24,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.streamnative.pulsar.handlers.amqp.utils.VirtualHostUtil;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -36,14 +37,12 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.authentication.AuthenticationProvider;
 import org.apache.pulsar.broker.authentication.AuthenticationState;
-import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.service.ServerCnx;
 import org.apache.pulsar.common.api.AuthData;
 import org.apache.pulsar.common.naming.NamespaceName;
-import org.apache.pulsar.common.naming.TopicDomain;
-import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.collections.ConcurrentLongHashMap;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.ErrorCodes;
@@ -324,26 +323,16 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         assertState(ConnectionState.AWAIT_OPEN);
 
-        boolean isDefaultNamespace = false;
         String virtualHostStr = AMQShortString.toString(virtualHost);
-        if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
-            virtualHostStr = virtualHostStr.substring(1);
-            if (StringUtils.isEmpty(virtualHostStr)){
-                virtualHostStr = DEFAULT_NAMESPACE;
-                isDefaultNamespace = true;
-            }
+        Pair<String, String> pair;
+        if (virtualHostStr == null || (pair = VirtualHostUtil.getTenantAndNamespace(virtualHostStr, amqpConfig.getAmqpTenant())) == null){
+            sendConnectionClose(ErrorCodes.NOT_ALLOWED, String.format(
+                    "The virtualHost [%s] configuration is incorrect. For example: tenant/namespace or namespace",
+                    virtualHostStr), 0);
+            return;
         }
 
-        NamespaceName namespaceName = NamespaceName.get(amqpConfig.getAmqpTenant(), virtualHostStr);
-        if (isDefaultNamespace) {
-            // avoid the namespace public/default is not owned in standalone mode
-            TopicName topic = TopicName.get(TopicDomain.persistent.value(),
-                    namespaceName, "__lookup__");
-            LookupOptions lookupOptions = LookupOptions.builder().authoritative(true).build();
-            getPulsarService().getNamespaceService().getBrokerServiceUrlAsync(topic, lookupOptions);
-        }
-        // Policies policies = getPolicies(namespaceName);
-//        if (policies != null) {
+        NamespaceName namespaceName = NamespaceName.get(pair.getLeft(), pair.getRight());
         this.namespaceName = namespaceName;
 
         MethodRegistry methodRegistry = getMethodRegistry();
@@ -351,10 +340,6 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         writeFrame(responseBody.generateFrame(0));
         state = ConnectionState.OPEN;
         amqpBrokerService.getConnectionContainer().addConnection(namespaceName, this);
-//        } else {
-//            sendConnectionClose(ErrorCodes.NOT_FOUND,
-//                "Unknown virtual host: '" + virtualHostStr + "'", 0);
-//        }
     }
 
     @Override

@@ -18,7 +18,7 @@ import java.util.StringTokenizer;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * VirtualHostUtil
+ * VirtualHostUtil.
  */
 public class VirtualHostUtil {
 

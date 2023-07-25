@@ -325,7 +325,8 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         String virtualHostStr = AMQShortString.toString(virtualHost);
         Pair<String, String> pair;
-        if (virtualHostStr == null || (pair = VirtualHostUtil.getTenantAndNamespace(virtualHostStr, amqpConfig.getAmqpTenant())) == null){
+        if (virtualHostStr == null
+                || (pair = VirtualHostUtil.getTenantAndNamespace(virtualHostStr, amqpConfig.getAmqpTenant())) == null) {
             sendConnectionClose(ErrorCodes.NOT_ALLOWED, String.format(
                     "The virtualHost [%s] configuration is incorrect. For example: tenant/namespace or namespace",
                     virtualHostStr), 0);

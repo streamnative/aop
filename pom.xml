@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <!--
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,36 +14,28 @@
     limitations under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
     <version>18</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-
   <packaging>pom</packaging>
-
   <groupId>io.streamnative.pulsar.handlers</groupId>
   <artifactId>pulsar-protocol-handler-amqp-parent</artifactId>
-  <version>3.0.0.1-SNAPSHOT</version>
+  <version>3.1.0.2</version>
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Parent</name>
   <description>Parent for AMQP on Pulsar implemented using Pulsar Protocol Handler.</description>
-
   <properties>
     <redirectTestOutputToFile>true</redirectTestOutputToFile>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
-
     <!-- dependencies -->
-    <pulsar.version>3.0.0.1-SNAPSHOT</pulsar.version>
+    <pulsar.version>3.1.0.2</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
-
     <!-- test dependencies -->
     <qpid-client-version>6.4.0</qpid-client-version>
     <geronimo-jms-version>1.1.1</geronimo-jms-version>
@@ -51,7 +43,6 @@
     <testng.version>6.14.3</testng.version>
     <awaitility.version>4.2.0</awaitility.version>
     <assertj.version>3.15.0</assertj.version>
-
     <!-- plugin dependencies -->
     <spotbugs-annotations.version>3.1.8</spotbugs-annotations.version>
     <dockerfile-maven.version>1.4.9</dockerfile-maven.version>
@@ -63,7 +54,6 @@
     <puppycrawl.checkstyle.version>8.37</puppycrawl.checkstyle.version>
     <spotbugs-maven-plugin.version>4.2.2</spotbugs-maven-plugin.version>
   </properties>
-
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -71,18 +61,15 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
-
   <modules>
     <module>amqp-impl</module>
     <module>tests</module>
     <module>tests-qpid-jms-client</module>
     <module>amqp-client-auth</module>
   </modules>
-
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
-
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>pulsar</artifactId>
@@ -90,59 +77,49 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>pulsar-broker</artifactId>
         <version>${pulsar.version}</version>
       </dependency>
-
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>pulsar-broker</artifactId>
         <version>${pulsar.version}</version>
         <type>test-jar</type>
       </dependency>
-
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>testmocks</artifactId>
         <version>${pulsar.version}</version>
       </dependency>
-
       <dependency>
         <groupId>com.rabbitmq</groupId>
         <artifactId>amqp-client</artifactId>
         <version>${rabbitmq.version}</version>
       </dependency>
-
       <dependency>
         <groupId>org.apache.qpid</groupId>
         <artifactId>qpid-client</artifactId>
         <version>${qpid-client-version}</version>
       </dependency>
-
       <dependency>
         <groupId>org.apache.geronimo.specs</groupId>
         <artifactId>geronimo-jms_1.1_spec</artifactId>
         <version>${geronimo-jms-version}</version>
       </dependency>
-
       <dependency>
         <groupId>org.apache.qpid</groupId>
         <artifactId>qpid-test-utils</artifactId>
         <version>${qpid-protocol-plugin.version}</version>
       </dependency>
-
       <dependency>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-annotations</artifactId>
         <version>${spotbugs-annotations.version}</version>
       </dependency>
-
     </dependencies>
   </dependencyManagement>
-
   <!-- These dependencies are common to all submodules -->
   <dependencies>
     <!-- provided dependencies (available at compilation and test classpths and *NOT* packaged) -->
@@ -151,19 +128,16 @@
       <artifactId>pulsar-broker</artifactId>
       <scope>provided</scope>
     </dependency>
-
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
       <scope>provided</scope>
     </dependency>
-
     <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs-annotations</artifactId>
       <scope>provided</scope>
     </dependency>
-
     <!-- dependencies for tests -->
     <dependency>
       <groupId>io.streamnative</groupId>
@@ -171,37 +145,31 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>io.streamnative</groupId>
       <artifactId>testmocks</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.awaitility</groupId>
       <artifactId>awaitility</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
       <scope>test</scope>
     </dependency>
-
     <!-- TODO Currently, some tests use junit tool, we can unify the test framework in the future -->
     <dependency>
       <groupId>junit</groupId>
@@ -209,9 +177,7 @@
       <version>4.13.2</version>
       <scope>test</scope>
     </dependency>
-
   </dependencies>
-
   <build>
     <pluginManagement>
       <plugins>
@@ -260,7 +226,6 @@
           <excludeFilterFile>resources/findbugsExclude.xml</excludeFilterFile>
         </configuration>
       </plugin>
-
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>${maven-compiler-plugin.version}</version>
@@ -277,7 +242,6 @@
           </compilerArgs>
         </configuration>
       </plugin>
-
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
@@ -293,14 +257,12 @@
           <trimStackTrace>false</trimStackTrace>
         </configuration>
       </plugin>
-
       <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
         <version>${license-maven-plugin.version}</version>
         <configuration>
           <header>resources/license.template</header>
-
           <excludes>
             <exclude>LICENSE</exclude>
             <exclude>NOTICE</exclude>
@@ -330,7 +292,6 @@
           </mapping>
         </configuration>
       </plugin>
-
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>templating-maven-plugin</artifactId>
@@ -344,7 +305,6 @@
           </execution>
         </executions>
       </plugin>
-
       <plugin>
         <groupId>pl.project13.maven</groupId>
         <artifactId>git-commit-id-plugin</artifactId>
@@ -370,10 +330,8 @@
           <commitIdGenerationMode>full</commitIdGenerationMode>
         </configuration>
       </plugin>
-
     </plugins>
   </build>
-
   <repositories>
     <repository>
       <id>central</id>
@@ -384,6 +342,23 @@
       <id>nexus-snapshot-repo</id>
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-2488/content</url>
+    </repository>
+    <repository>
+      <id>nexus-snapshot</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
   </repositories>
-
+  <distributionManagement>
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
+  </distributionManagement>
 </project>

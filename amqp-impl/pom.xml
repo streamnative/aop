@@ -54,6 +54,12 @@
       <version>${qpid-protocol-plugin.version}</version>
     </dependency>
 
+    <dependency>
+      <groupId>com.rabbitmq</groupId>
+      <artifactId>amqp-client</artifactId>
+      <scope>test</scope>
+    </dependency>
+
   </dependencies>
 
   <build>

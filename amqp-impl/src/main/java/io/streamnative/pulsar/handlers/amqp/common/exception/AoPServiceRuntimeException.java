@@ -47,4 +47,10 @@ public class AoPServiceRuntimeException extends RuntimeException {
         }
     }
 
+    public static class MessageConvertException extends AoPServiceRuntimeException{
+        public MessageConvertException(String message) {
+            super(message);
+        }
+    }
+
 }

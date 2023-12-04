@@ -282,6 +282,7 @@ public abstract class AmqpProtocolHandlerTestBase {
             aopAdminPortList.add(amqpAdminPort);
             conf.setAmqpAdminPort(amqpAdminPort);
 
+            beforeStartBroker();
             log.info("Start broker info [{}], brokerPort: {}, amqpBrokerPort: {}, aopProxyPort: {}",
                     i, brokerPort, amqpBrokerPort, aopProxyPort);
             this.pulsarServiceList.add(startBroker(conf));
@@ -430,6 +431,10 @@ public abstract class AmqpProtocolHandlerTestBase {
             sb.append((char) (ThreadLocalRandom.current().nextInt(26) + 'a'));
         }
         return sb.toString();
+    }
+
+    public void beforeStartBroker() {
+        // no-op
     }
 
 }

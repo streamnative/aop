@@ -16,7 +16,6 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import io.streamnative.pulsar.handlers.amqp.AmqpProtocolHandler;
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -27,6 +26,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.resources.MetadataStoreCacheLoader;
+import org.apache.pulsar.client.impl.LookupTopicResult;
 import org.apache.pulsar.client.impl.PulsarClientImpl;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.policies.data.loadbalancer.LoadManagerReport;
@@ -53,19 +53,19 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
         CompletableFuture<Pair<String, Integer>> lookupResult = new CompletableFuture<>();
 
         // lookup the broker for the given topic
-        CompletableFuture<Pair<InetSocketAddress, InetSocketAddress>> lookup =
+        CompletableFuture<LookupTopicResult> lookup =
                 pulsarClient.getLookup().getBroker(topicName);
         lookup.whenComplete((result, throwable) -> {
             if (throwable != null) {
                 lookupResult.completeExceptionally(throwable);
                 return;
             }
-            if (result == null || result.getLeft() == null) {
+            if (result == null || result.getLogicalAddress() == null) {
                 lookupResult.completeExceptionally(new ProxyException(
                         "Unable to resolve the broker for the topic: " + topicName));
                 return;
             }
-            String hostAndPort = result.getLeft().getHostName() + ":" + result.getLeft().getPort();
+            String hostAndPort = result.getLogicalAddress().getHostName() + ":" + result.getLogicalAddress().getPort();
 
             // fetch the protocol handler data
             List<LoadManagerReport> brokers = metadataStoreCacheLoader.getAvailableBrokers();

@@ -14,7 +14,9 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.channel.ChannelHandlerContext;
+import java.util.Optional;
 import org.apache.pulsar.broker.PulsarService;
+import org.apache.pulsar.broker.loadbalance.extensions.data.BrokerLookupData;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.ServerCnx;
 
@@ -30,7 +32,7 @@ public class AmqpPulsarServerCnx extends ServerCnx {
     }
 
     @Override
-    public void closeConsumer(Consumer consumer) {
+    public void closeConsumer(Consumer consumer, Optional<BrokerLookupData> assignedBrokerLookupData) {
         // avoid close the connection when closing the consumer
     }
 }

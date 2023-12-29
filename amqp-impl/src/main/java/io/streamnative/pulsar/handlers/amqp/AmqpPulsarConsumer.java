@@ -113,6 +113,10 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         }
     }
 
+    @Override
+    public void handleFlow(int permits) {
+    }
+
     public void close() throws PulsarClientException {
         this.isClosed = true;
         this.consumer.pause();

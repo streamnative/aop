@@ -415,6 +415,10 @@ To use proxy, complete the following steps. If you do not know some detailed ste
     $RABBITMQ_PERF_TOOL_HOME/bin/runjava com.rabbitmq.perf.PerfTest -e ex-perf -u qu-perf -r 1000 -h amqp://127.0.0.1:5682 -p
     ```
 
+# Advanced features
+You can configure and manage AoP based on your requirements. Check the following guides for more details.
+- [Secure AoP](docs/security.md)
+
 ## Project Maintainer
 -   [@codelipenghui](https://github.com/codelipenghui)
 -   [@gaoran10](https://github.com/gaoran10)

@@ -22,6 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
 import io.streamnative.pulsar.handlers.amqp.flow.AmqpFlowCreditManager;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
+import io.streamnative.pulsar.handlers.amqp.security.AmqpOperation;
+import io.streamnative.pulsar.handlers.amqp.security.auth.Resource;
+import io.streamnative.pulsar.handlers.amqp.security.auth.ResourceType;
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -395,8 +398,21 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
                 if (amqpQueue == null) {
                     closeChannel(ErrorCodes.NOT_FOUND, "No such queue: '" + queue.toString() + "'");
                 } else {
-                    PersistentTopic indexTopic = ((PersistentQueue) amqpQueue).getIndexTopic();
-                    subscribe(getConsumerTag(consumerTag), queue.toString(), indexTopic, noAck, exclusive, nowait);
+                    connection.authorize(AmqpOperation.READ, Resource.of(ResourceType.TOPIC, amqpQueue.getTopic().getName()))
+                            .whenComplete((isAuthorized, ex) -> {
+                                if (ex != null) {
+                                    log.error("Read topic authorize failed, topic - {}. {}", amqpQueue.getTopic().getName(), ex.getMessage());
+                                    closeChannel(ErrorCodes.NOT_ALLOWED, "Read topic failed.");
+                                    return;
+                                }
+                                if (!isAuthorized) {
+                                    log.error("Read topic authorize failed, topic - {}.", amqpQueue.getTopic().getName());
+                                    closeChannel(ErrorCodes.NOT_ALLOWED, ".Read topic failed.");
+                                    return;
+                                }
+                                PersistentTopic indexTopic = ((PersistentQueue) amqpQueue).getIndexTopic();
+                                subscribe(getConsumerTag(consumerTag), queue.toString(), indexTopic, noAck, exclusive, nowait);
+                            });
                 }
             }
         });
@@ -481,48 +497,66 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
             log.debug("RECV[{}] BasicPublish[exchange: {} routingKey: {} mandatory: {} immediate: {}]",
                     channelId, exchange, routingKey, mandatory, immediate);
         }
-        if (isDefaultExchange(exchange)) {
-            CompletableFuture<AmqpExchange> completableFuture = exchangeContainer.
-                    asyncGetExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
-                            true, ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
-            completableFuture.whenComplete((amqpExchange, throwable) -> {
-                if (null != throwable) {
-                    log.error("Get exchange failed. exchange name:{}", AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
-                    closeChannel(ErrorCodes.INTERNAL_ERROR, "Get exchange failed. ");
-                } else {
-                    String queueName = routingKey.toString();
-                    CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
-                            queueContainer.asyncGetQueue(connection.getNamespaceName(), queueName, false);
-                    amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable1) -> {
-                        if (throwable1 != null) {
-                            log.error("Get Topic error:{}", throwable1.getMessage());
-                            closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable1.getMessage());
-                        } else {
-                            if (amqpQueue == null) {
-                                closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + queueName);
-                                return;
+
+        String topic = connection.getNamespaceName().getPersistentTopicName((isDefaultExchange(exchange) ?
+                AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE :
+                AMQShortString.toString(exchange)));
+        connection.authorize(AmqpOperation.WRITE, Resource.of(ResourceType.TOPIC, topic))
+                .whenComplete((isAuthorized, ex) -> {
+                    if (ex != null) {
+                        log.error("Write topic authorize failed, topic - {}. {}", topic, ex.getMessage());
+                        closeChannel(ErrorCodes.NOT_ALLOWED, "Write topic failed.");
+                        return;
+                    }
+                    if (!isAuthorized) {
+                        log.error("Write topic authorize failed, topic - {}.", topic);
+                        currentMessage = null;
+                        closeChannel(ErrorCodes.NOT_ALLOWED, "Write topic failed.");
+                        return;
+                    }
+                    if (isDefaultExchange(exchange)) {
+                        CompletableFuture<AmqpExchange> completableFuture = exchangeContainer.
+                                asyncGetExchange(connection.getNamespaceName(), AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE,
+                                        true, ExchangeDefaults.DIRECT_EXCHANGE_CLASS);
+                        completableFuture.whenComplete((amqpExchange, throwable) -> {
+                            if (null != throwable) {
+                                log.error("Get exchange failed. exchange name:{}", AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE);
+                                closeChannel(ErrorCodes.INTERNAL_ERROR, "Get exchange failed. ");
                             } else {
-                                // bind to default exchange.
-                                if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null
-                                        || amqpExchange.getQueue(queueName) == null) {
-                                    amqpQueue.bindExchange(amqpExchange,
-                                            AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
-                                            routingKey.toString(), null);
-                                }
-                                MessagePublishInfo info = new MessagePublishInfo(AMQShortString.
-                                        valueOf(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE), immediate,
-                                        mandatory, routingKey);
-                                setPublishFrame(info, null);
+                                String queueName = routingKey.toString();
+                                CompletableFuture<AmqpQueue> amqpQueueCompletableFuture =
+                                        queueContainer.asyncGetQueue(connection.getNamespaceName(), queueName, false);
+                                amqpQueueCompletableFuture.whenComplete((amqpQueue, throwable1) -> {
+                                    if (throwable1 != null) {
+                                        log.error("Get Topic error:{}", throwable1.getMessage());
+                                        closeChannel(INTERNAL_ERROR, "Get Topic error: " + throwable1.getMessage());
+                                    } else {
+                                        if (amqpQueue == null) {
+                                            closeChannel(ErrorCodes.NOT_FOUND, "No such queue: " + queueName);
+                                            return;
+                                        } else {
+                                            // bind to default exchange.
+                                            if (amqpQueue.getRouter(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE) == null
+                                                    || amqpExchange.getQueue(queueName) == null) {
+                                                amqpQueue.bindExchange(amqpExchange,
+                                                        AbstractAmqpMessageRouter.generateRouter(AmqpExchange.Type.Direct),
+                                                        routingKey.toString(), null);
+                                            }
+                                            MessagePublishInfo info = new MessagePublishInfo(AMQShortString.
+                                                    valueOf(AbstractAmqpExchange.DEFAULT_EXCHANGE_DURABLE), immediate,
+                                                    mandatory, routingKey);
+                                            setPublishFrame(info, null);
+                                        }
+                                    }
+                                }).join();
                             }
-                        }
-                    }).join();
-                }
-            }).join();
-        } else {
-            MessagePublishInfo info = new MessagePublishInfo(exchange, immediate,
-                    mandatory, routingKey);
-            setPublishFrame(info, null);
-        }
+                        }).join();
+                    } else {
+                        MessagePublishInfo info = new MessagePublishInfo(exchange, immediate,
+                                mandatory, routingKey);
+                        setPublishFrame(info, null);
+                    }
+                }).join();
     }
 
     private void setPublishFrame(MessagePublishInfo info, final MessageDestination e) {

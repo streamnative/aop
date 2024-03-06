@@ -148,17 +148,22 @@ public class ExchangeDeclareTest extends ExchangeEquivalenceBase {
         // the replicator cursor of exchange is created in async way,
         // delete the exchange may fail due to non-empty directory error
         //
-        // KeeperErrorCode = Directory not empty for /managed-ledgers/public/vhost1/persistent/__amqp_exchange__exchange_test
+        // KeeperErrorCode = Directory not empty for
+        // /managed-ledgers/public/vhost1/persistent/__amqp_exchange__exchange_test
+        //
         // - /managed-ledgers/public/vhost1/persistent/__amqp_exchange__exchange_test
         // - /managed-ledgers/public/vhost1/persistent/__amqp_exchange__exchange_test/__amqp_replicator__exchange_test
-        Awaitility.await().atMost(5, TimeUnit.SECONDS).pollInterval(100, TimeUnit.MILLISECONDS).until(() -> {
-            try {
-                channel.exchangeDelete(NAME);
-            } catch (Exception e) {
-                return false;
-            }
-            return true;
-        });
+        Awaitility.await()
+                .atMost(5, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> {
+                    try {
+                        channel.exchangeDelete(NAME);
+                    } catch (Exception e) {
+                        return false;
+                    }
+                    return true;
+                });
     }
 
 }

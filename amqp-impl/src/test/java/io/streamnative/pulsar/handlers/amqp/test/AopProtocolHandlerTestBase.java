@@ -77,6 +77,7 @@ public abstract class AopProtocolHandlerTestBase {
         amqpServiceConfiguration.setMessagingProtocols(Sets.newHashSet("amqp"));
         amqpServiceConfiguration.setBrokerShutdownTimeoutMs(0L);
         this.conf = amqpServiceConfiguration;
+        this.conf.setClusterName("test-cluster");
     }
 
     protected final void internalSetup() throws Exception {

@@ -21,6 +21,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AmqpMessageData;
 import io.streamnative.pulsar.handlers.amqp.IndexMessage;
+import io.streamnative.pulsar.handlers.amqp.common.exception.AoPServiceRuntimeException;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -422,6 +423,7 @@ public final class MessageConvertUtils {
                     .build();
             } else {
                 // currently, no consider for batch
+                throw new AoPServiceRuntimeException.MessageConvertException("Batch message not support yet.");
             }
             return amqpMessage;
         } finally {

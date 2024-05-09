@@ -40,7 +40,7 @@
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
 
     <!-- dependencies -->
-    <pulsar.version>3.2.0-SNAPSHOT</pulsar.version>
+    <pulsar.version>3.2.2.6</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
 
@@ -383,6 +383,12 @@
     <repository>
       <id>nexus-snapshot-repo</id>
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
+
+<!--    this is a temporary repository for resolving the class `Backoff` change, we can remove it after 3.2.2.6 released.-->
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-3083/content</url>
     </repository>
   </repositories>
 

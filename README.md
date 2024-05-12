@@ -21,6 +21,9 @@
 
 [![LICENSE](https://img.shields.io/hexpm/l/pulsar.svg)](https://github.com/streamnative/aop/blob/master/LICENSE)
 
+> **Notes**
+> 
+> The AoP plugin supports only the 0-9-1 protocol with basic produce and consume functionalities, and does not include advanced features such as transactions. It is available as an open-source plugin and is only offered as a private preview feature in the Private Cloud distribution as an experimental feature. It is not available on StreamNative Cloud. Please use it with caution.
 
 # AMQP on Pulsar (AoP)
 

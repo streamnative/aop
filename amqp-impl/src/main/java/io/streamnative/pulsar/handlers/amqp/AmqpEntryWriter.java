@@ -97,7 +97,7 @@ public class AmqpEntryWriter implements AsyncCallbacks.AddEntryCallback {
             log.debug("[{}] Success to write entry with position {}.", topic.getName(), position);
         }
         topic.recordAddLatency(System.nanoTime() - context.startTimeNs, TimeUnit.MICROSECONDS);
-        topic.getTransactionBuffer().syncMaxReadPositionForNormalPublish((PositionImpl) position);
+        topic.getTransactionBuffer().syncMaxReadPositionForNormalPublish((PositionImpl) position, false);
         context.positionFuture.complete(position);
         context.recycle();
     }

@@ -23,9 +23,9 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.impl.Backoff;
-import org.apache.pulsar.client.impl.BackoffBuilder;
 import org.apache.pulsar.client.impl.MessageIdImpl;
+import org.apache.pulsar.common.util.Backoff;
+import org.apache.pulsar.common.util.BackoffBuilder;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**

@@ -73,6 +73,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             AtomicIntegerFieldUpdater.newUpdater(AmqpExchangeReplicator.class, "pendingQueueSize");
     private int readBatchSize;
     private final int readMaxSizeBytes;
+    private final int readMaxBatchSize;
 
     private static final int FALSE = 0;
     private static final int TRUE = 1;
@@ -93,8 +94,9 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         this.scheduledExecutorService = topic.getBrokerService().executor();
         this.initMaxRouteQueueSize(routeQueueSize);
         this.routeExecutor = routeExecutor;
-        this.readBatchSize = Math.min(this.routeQueueSize,
+        this.readMaxBatchSize = Math.min(this.routeQueueSize,
                 topic.getBrokerService().getPulsar().getConfig().getDispatcherMaxReadBatchSize());
+        this.readBatchSize = this.readMaxBatchSize;
         this.readMaxSizeBytes = topic.getBrokerService().getPulsar().getConfig().getDispatcherMaxReadSizeBytes();
         STATE_UPDATER.set(this, AmqpExchangeReplicator.State.Stopped);
         this.name = "[AMQP Replicator for " + topic.getName() + " ]";
@@ -247,9 +249,8 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             return;
         }
 
-        int maxReadBatchSize = topic.getBrokerService().pulsar().getConfiguration().getDispatcherMaxReadBatchSize();
-        if (readBatchSize < maxReadBatchSize) {
-            int newReadBatchSize = Math.min(readBatchSize * 2, maxReadBatchSize);
+        if (readBatchSize < readMaxBatchSize) {
+            int newReadBatchSize = Math.min(readBatchSize * 2, readMaxBatchSize);
             if (log.isDebugEnabled()) {
                 log.debug("[{}] Increasing read batch size from {} to {}", name, readBatchSize,
                         newReadBatchSize);
@@ -266,7 +267,13 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         PENDING_SIZE_UPDATER.addAndGet(this, list.size());
 
         List<Pair<Position, Map<String, Object>>> propsList = new ArrayList<>();
+        boolean encounterError = false;
         for (Entry entry : list) {
+            if (encounterError) {
+                entry.release();
+                continue;
+            }
+
             Map<String, Object> props;
             try {
                 MessageImpl<byte[]> message = MessageImpl.deserialize(entry.getDataBuffer());
@@ -274,15 +281,21 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
                         .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
             } catch (Exception e) {
                 log.error("Failed to deserialize entry dataBuffer for topic: {}, rewind cursor.", name, e);
-                cursor.rewind();
-                PENDING_SIZE_UPDATER.set(this, 0);
-                this.readMoreEntries();
-                return;
+                encounterError = true;
+                propsList.clear();
+                continue;
             }
+
             propsList.add(Pair.of(entry.getPosition(), props));
             topic.getDispatchRateLimiter().ifPresent(
                     limiter -> limiter.consumeDispatchQuota(1, entry.getLength()));
             entry.release();
+        }
+        if (encounterError) {
+            cursor.rewind();
+            PENDING_SIZE_UPDATER.set(this, 0);
+            this.readMoreEntries();
+            return;
         }
 
         for (var posAndProps : propsList) {

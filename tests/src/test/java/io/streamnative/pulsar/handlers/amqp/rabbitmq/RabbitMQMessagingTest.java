@@ -517,7 +517,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         conn.close();
     }
 
-    @Test
+    @Test(timeOut = 15_000)
     public void testConsumeMoreThanInFlightSize() throws Exception {
         Connection conn = getConnection("vhost1", true);
         Channel channel = conn.createChannel();
@@ -548,7 +548,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         } while (sendContentSize.addAndGet(content.length) < totalContentSize);
 
 
-        assertTrue(latch.await(30, TimeUnit.SECONDS));
+        assertTrue(latch.await(10, TimeUnit.SECONDS));
         channel.close();
         conn.close();
     }

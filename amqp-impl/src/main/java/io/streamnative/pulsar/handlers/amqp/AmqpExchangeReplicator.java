@@ -15,27 +15,30 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
 
-import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.impl.Backoff;
+import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
+import org.apache.pulsar.common.api.proto.KeyValue;
 
 /**
  * Amqp exchange replicator, read entries from BookKeeper and process entries.
@@ -64,11 +67,12 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         Stopped, Starting, Started, Stopping
     }
 
-    private static final int defaultReadMaxSizeBytes = 5 * 1024 * 1024;
     private int routeQueueSize = 200;
     private volatile int pendingQueueSize = 0;
     private static final AtomicIntegerFieldUpdater<AmqpExchangeReplicator> PENDING_SIZE_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AmqpExchangeReplicator.class, "pendingQueueSize");
+    private int readBatchSize;
+    private final int readMaxSizeBytes;
 
     private static final int FALSE = 0;
     private static final int TRUE = 1;
@@ -89,6 +93,9 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         this.scheduledExecutorService = topic.getBrokerService().executor();
         this.initMaxRouteQueueSize(routeQueueSize);
         this.routeExecutor = routeExecutor;
+        this.readBatchSize = Math.min(this.routeQueueSize,
+                topic.getBrokerService().getPulsar().getConfig().getDispatcherMaxReadBatchSize());
+        this.readMaxSizeBytes = topic.getBrokerService().getPulsar().getConfig().getDispatcherMaxReadSizeBytes();
         STATE_UPDATER.set(this, AmqpExchangeReplicator.State.Stopped);
         this.name = "[AMQP Replicator for " + topic.getName() + " ]";
     }
@@ -175,11 +182,16 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         }
         int availablePermits = getAvailablePermits();
         if (availablePermits > 0) {
+            int messagesToRead = Math.min(availablePermits, readBatchSize);
+            // avoid messageToRead is 0
+            messagesToRead = Math.max(messagesToRead, 1);
+
             if (HAVE_PENDING_READ_UPDATER.compareAndSet(this, FALSE, TRUE)) {
+                log.info("{} Schedule read of {} messages.", name, messagesToRead);
                 if (log.isDebugEnabled()) {
-                    log.debug("{} Schedule read of {} messages.", name, availablePermits);
+                    log.debug("{} Schedule read of {} messages.", name, messagesToRead);
                 }
-                cursor.asyncReadEntriesOrWait(availablePermits, defaultReadMaxSizeBytes, this, null, null);
+                cursor.asyncReadEntriesOrWait(messagesToRead, readMaxSizeBytes, this, null, null);
             } else {
                 if (log.isDebugEnabled()) {
                     log.debug("{} Not schedule read due to pending read. Messages to read {}.",
@@ -201,6 +213,23 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             }
             return 0;
         }
+
+        if (topic.getDispatchRateLimiter().isPresent()
+                && topic.getDispatchRateLimiter().get().isDispatchRateLimitingEnabled()) {
+            long availableOnByte = topic.getDispatchRateLimiter().get().getAvailableDispatchRateLimitOnByte();
+            long availableOnMsg = topic.getDispatchRateLimiter().get().getAvailableDispatchRateLimitOnMsg();
+            if (availableOnByte == 0 || availableOnMsg == 0) {
+                if (log.isDebugEnabled()) {
+                    log.debug("{} Dispatch rate limit is reached, availableOnByte: {}, availableOnMsg: {}.",
+                            name, availableOnByte, availableOnMsg);
+                }
+                return -1;
+            }
+            if (availableOnMsg > 0) {
+                availablePermits = Math.min(availablePermits, (int) availableOnMsg);
+            }
+        }
+
         return availablePermits;
     }
 
@@ -210,26 +239,55 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             log.debug("{} Read entries complete. Entries size: {}", name, list.size());
         }
         HAVE_PENDING_READ_UPDATER.set(this, FALSE);
-        if (list == null || list.isEmpty()) {
+        if (CollectionUtils.isEmpty(list)) {
             long delay = readFailureBackoff.next();
             log.warn("{} The read entry list is empty, will retry in {} ms. ReadPosition: {}, LAC: {}.",
                     name, delay, cursor.getReadPosition(), topic.getManagedLedger().getLastConfirmedEntry());
             scheduledExecutorService.schedule(this::readMoreEntries, delay, TimeUnit.MILLISECONDS);
             return;
         }
-        readFailureBackoff.reduceToHalf();
-        List<Pair<PositionImpl, ByteBuf>> bufList = new ArrayList<>(list.size());
-        for (Entry entry : list) {
-            bufList.add(
-                    Pair.of(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry.getDataBuffer()));
+
+        int maxReadBatchSize = topic.getBrokerService().pulsar().getConfiguration().getDispatcherMaxReadBatchSize();
+        if (readBatchSize < maxReadBatchSize) {
+            int newReadBatchSize = Math.min(readBatchSize * 2, maxReadBatchSize);
+            if (log.isDebugEnabled()) {
+                log.debug("[{}] Increasing read batch size from {} to {}", name, readBatchSize,
+                        newReadBatchSize);
+            }
+
+            readBatchSize = newReadBatchSize;
         }
-        routeExecutor.execute(() -> this.readComplete(bufList));
+
+        readFailureBackoff.reduceToHalf();
+        routeExecutor.execute(() -> this.handleEntries(list));
     }
 
-    private void readComplete(List<Pair<PositionImpl, ByteBuf>> list) {
-        for (Pair<PositionImpl, ByteBuf> entry : list) {
-            PENDING_SIZE_UPDATER.incrementAndGet(this);
-            readProcess(entry.getRight(), entry.getLeft()).whenCompleteAsync((ignored, exception) -> {
+    private void handleEntries(List<Entry> list) {
+        PENDING_SIZE_UPDATER.addAndGet(this, list.size());
+
+        List<Pair<Position, Map<String, Object>>> propsList = new ArrayList<>();
+        for (Entry entry : list) {
+            Map<String, Object> props;
+            try {
+                MessageImpl<byte[]> message = MessageImpl.deserialize(entry.getDataBuffer());
+                props = message.getMessageBuilder().getPropertiesList().stream()
+                        .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
+            } catch (Exception e) {
+                log.error("Failed to deserialize entry dataBuffer for topic: {}, rewind cursor.", name, e);
+                cursor.rewind();
+                PENDING_SIZE_UPDATER.set(this, 0);
+                this.readMoreEntries();
+                return;
+            }
+            propsList.add(Pair.of(entry.getPosition(), props));
+            topic.getDispatchRateLimiter().ifPresent(
+                    limiter -> limiter.consumeDispatchQuota(1, entry.getLength()));
+            entry.release();
+        }
+
+        for (var posAndProps : propsList) {
+            final Position position = posAndProps.getLeft();
+            routeIndex(posAndProps.getRight(), position).whenCompleteAsync((ignored, exception) -> {
                 if (exception != null) {
                     log.error("{} Error producing messages", name, exception);
                     this.cursor.rewind();
@@ -237,19 +295,16 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
                     if (log.isDebugEnabled()) {
                         log.debug("{} Route message successfully.", name);
                     }
-                    AmqpExchangeReplicator.this.cursor
-                            .asyncDelete(entry.getLeft(), this, entry.getLeft());
+                    AmqpExchangeReplicator.this.cursor.asyncDelete(position, this, position);
                 }
-                if (PENDING_SIZE_UPDATER.decrementAndGet(this) < routeQueueSize * 0.5
-                        && HAVE_PENDING_READ_UPDATER.get(this) == FALSE) {
+                if (PENDING_SIZE_UPDATER.decrementAndGet(this) <= 0) {
                     this.readMoreEntries();
                 }
             }, routeExecutor);
-            entry.getRight().release();
         }
     }
 
-    public abstract CompletableFuture<Void> readProcess(ByteBuf data, Position position);
+    public abstract CompletableFuture<Void> routeIndex(Map<String, Object> props, Position position);
 
     @Override
     public void readEntriesFailed(ManagedLedgerException exception, Object o) {
@@ -266,6 +321,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             log.debug("{} Read entries from bookie failed, retrying in {} s", name, waitTimeMs / 1000, exception);
         }
         HAVE_PENDING_READ_UPDATER.set(this, FALSE);
+        readBatchSize = topic.getBrokerService().pulsar().getConfiguration().getDispatcherMinReadBatchSize();
         scheduledExecutorService.schedule(this::readMoreEntries, waitTimeMs, TimeUnit.MILLISECONDS);
     }
 

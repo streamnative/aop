@@ -13,6 +13,8 @@
  */
 package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 
+import static org.junit.Assert.assertTrue;
+
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
@@ -33,9 +35,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClient;
@@ -512,4 +516,41 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         channel.close();
         conn.close();
     }
+
+    @Test
+    public void testConsumeMoreThanInFlightSize() throws Exception {
+        Connection conn = getConnection("vhost1", true);
+        Channel channel = conn.createChannel();
+
+        String qu = randQuName();
+        channel.queueDeclare(qu, true, false, false, null);
+
+        long totalContentSize = conf.getManagedLedgerMaxReadsInFlightSizeInMB() * 1024 * 1024 * 2;
+        AtomicLong receiveContentSize = new AtomicLong(0);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        channel.basicConsume(qu, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                                       byte[] body) throws IOException {
+                System.out.println("receive msg");
+                if (receiveContentSize.addAndGet(body.length) >= totalContentSize) {
+                    latch.countDown();
+                }
+            }
+        });
+
+        AtomicLong sendContentSize = new AtomicLong(0);
+        byte[] content = RandomUtils.nextBytes(1024 * 100);
+        do {
+            channel.basicPublish("", qu, null, content);
+            System.out.println("send message");
+        } while (sendContentSize.addAndGet(content.length) < totalContentSize);
+
+
+        assertTrue(latch.await(30, TimeUnit.SECONDS));
+        channel.close();
+        conn.close();
+    }
+
 }

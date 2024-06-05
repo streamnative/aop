@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -163,10 +162,6 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
                 .until(messageSet::isEmpty);
         channel.close();
         conn.close();
-
-        for (PulsarService pulsarService : getPulsarServiceList()) {
-
-        }
     }
 
 }

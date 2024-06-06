@@ -19,7 +19,6 @@ import static org.apache.curator.shaded.com.google.common.base.Preconditions.che
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Sets;
-import io.netty.buffer.ByteBuf;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
 import io.streamnative.pulsar.handlers.amqp.AmqpEntryWriter;
 import io.streamnative.pulsar.handlers.amqp.AmqpExchangeReplicator;
@@ -35,7 +34,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -51,9 +49,7 @@ import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
-import org.apache.pulsar.client.impl.MessageImpl;
 import org.apache.pulsar.common.api.proto.CommandSubscribe;
-import org.apache.pulsar.common.api.proto.KeyValue;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
@@ -126,16 +122,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         if (messageReplicator == null) {
             messageReplicator = new AmqpExchangeReplicator(this, routeExecutor, routeQueueSize) {
                 @Override
-                public CompletableFuture<Void> readProcess(ByteBuf data, Position position) {
-                    Map<String, Object> props;
-                    try {
-                        MessageImpl<byte[]> message = MessageImpl.deserialize(data);
-                        props = message.getMessageBuilder().getPropertiesList().stream()
-                                .collect(Collectors.toMap(KeyValue::getKey, KeyValue::getValue));
-                    } catch (Exception e) {
-                        log.error("Failed to deserialize entry dataBuffer. exchangeName: {}", exchangeName, e);
-                        return FutureUtil.failedFuture(e);
-                    }
+                public CompletableFuture<Void> routeIndex(Map<String, Object> props, Position position) {
 
                     List<CompletableFuture<Void>> routeFutureList = new ArrayList<>();
                     if (exchangeType == Type.Direct) {

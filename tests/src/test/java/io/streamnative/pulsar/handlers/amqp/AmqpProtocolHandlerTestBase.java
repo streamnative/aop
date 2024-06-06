@@ -102,6 +102,8 @@ public abstract class AmqpProtocolHandlerTestBase {
     @Getter
     private List<Integer> aopAdminPortList = new ArrayList<>();
 
+    private final Integer inFlightSizeInMB = 5;
+
     public AmqpProtocolHandlerTestBase() {
         resetConfig();
     }
@@ -128,6 +130,7 @@ public abstract class AmqpProtocolHandlerTestBase {
         amqpConfig.setBrokerShutdownTimeoutMs(0L);
         amqpConfig.setDefaultNumPartitions(1);
         amqpConfig.setTransactionCoordinatorEnabled(true);
+        amqpConfig.setManagedLedgerMaxReadsInFlightSizeInMB(inFlightSizeInMB);
 
         // set protocol related config
         URL testHandlerUrl = this.getClass().getClassLoader().getResource("test-protocol-handler.nar");

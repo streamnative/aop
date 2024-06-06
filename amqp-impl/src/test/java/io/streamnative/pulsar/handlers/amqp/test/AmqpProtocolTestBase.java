@@ -148,6 +148,7 @@ public abstract class AmqpProtocolTestBase {
             }
         });
         when(pulsarService.getConfiguration()).thenReturn(serviceConfiguration);
+        when(pulsarService.getConfig()).thenReturn(serviceConfiguration);
         when(pulsarService.getOrderedExecutor()).thenReturn(
                 OrderedExecutor.newBuilder().numThreads(8).name("pulsar-ordered").build());
         when(serviceConfiguration.getNumIOThreads()).thenReturn(2 * Runtime.getRuntime().availableProcessors());

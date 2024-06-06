@@ -533,7 +533,6 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
                                        byte[] body) throws IOException {
-                System.out.println("receive msg");
                 if (receiveContentSize.addAndGet(body.length) >= totalContentSize) {
                     latch.countDown();
                 }
@@ -544,9 +543,7 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         byte[] content = RandomUtils.nextBytes(1024 * 100);
         do {
             channel.basicPublish("", qu, null, content);
-            System.out.println("send message");
         } while (sendContentSize.addAndGet(content.length) < totalContentSize);
-
 
         assertTrue(latch.await(10, TimeUnit.SECONDS));
         channel.close();

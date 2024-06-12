@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -204,21 +205,21 @@ public abstract class AopProtocolHandlerTestBase {
     private final BookKeeperClientFactory mockBookKeeperClientFactory = new BookKeeperClientFactory() {
 
         @Override
-        public BookKeeper create(ServiceConfiguration conf, MetadataStoreExtended store,
-                                 EventLoopGroup eventLoopGroup,
-                                 Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
-                                 Map<String, Object> properties) {
+        public CompletableFuture<BookKeeper> create(ServiceConfiguration conf, MetadataStoreExtended store,
+                                        EventLoopGroup eventLoopGroup,
+                                        Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
+                                        Map<String, Object> properties) {
             // Always return the same instance (so that we don't loose the mock BK content on broker restart
-            return mockBookKeeper;
+            return CompletableFuture.completedFuture(mockBookKeeper);
         }
 
         @Override
-        public BookKeeper create(ServiceConfiguration conf, MetadataStoreExtended store,
+        public CompletableFuture<BookKeeper> create(ServiceConfiguration conf, MetadataStoreExtended store,
                                  EventLoopGroup eventLoopGroup,
                                  Optional<Class<? extends EnsemblePlacementPolicy>> ensemblePlacementPolicyClass,
                                  Map<String, Object> properties, StatsLogger statsLogger) {
             // Always return the same instance (so that we don't loose the mock BK content on broker restart
-            return mockBookKeeper;
+            return CompletableFuture.completedFuture(mockBookKeeper);
         }
 
         @Override

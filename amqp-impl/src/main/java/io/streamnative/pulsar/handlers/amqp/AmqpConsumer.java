@@ -30,7 +30,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.EntryBatchIndexesAcks;
 import org.apache.pulsar.broker.service.EntryBatchSizes;
@@ -64,7 +63,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
     /**
      * map(exchangeName,treeMap(indexPosition,msgPosition)) .
      */
-    private final Map<String, ConcurrentSkipListMap<PositionImpl, PositionImpl>> unAckMessages;
+    private final Map<String, ConcurrentSkipListMap<Position, Position>> unAckMessages;
     private static final AtomicIntegerFieldUpdater<AmqpConsumer> MESSAGE_PERMITS_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AmqpConsumer.class, "availablePermits");
     private volatile int availablePermits;
@@ -158,8 +157,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
                     try {
                         long deliveryTag = channel.getNextDeliveryTag();
 
-                        addUnAckMessages(indexMessage.getExchangeName(), (PositionImpl) index.getPosition(),
-                                (PositionImpl) msg.getPosition());
+                        addUnAckMessages(indexMessage.getExchangeName(), index.getPosition(), msg.getPosition());
                         if (!autoAck) {
                             channel.getUnacknowledgedMessageMap().add(deliveryTag,
                                     index.getPosition(), this, msg.getLength());
@@ -210,11 +208,11 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
                     log.error("Failed to get queue from queue container", throwable);
                 } else {
                     synchronized (this) {
-                        PositionImpl newDeletePosition = (PositionImpl) cursor.getMarkDeletedPosition();
+                        Position newDeletePosition = cursor.getMarkDeletedPosition();
                         unAckMessages.forEach((key, value) -> {
-                            SortedMap<PositionImpl, PositionImpl> ackMap = value.headMap(newDeletePosition, true);
+                            SortedMap<Position, Position> ackMap = value.headMap(newDeletePosition, true);
                             if (ackMap.size() > 0) {
-                                PositionImpl lastValue = ackMap.get(ackMap.lastKey());
+                                Position lastValue = ackMap.get(ackMap.lastKey());
                                 amqpQueue.acknowledgeAsync(key, lastValue.getLedgerId(), lastValue.getEntryId());
                             }
                             ackMap.clear();
@@ -231,7 +229,7 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
     }
 
     @Override
-    public void requeue(List<PositionImpl> positions) {
+    public void requeue(List<Position> positions) {
         getSubscription().getDispatcher().redeliverUnacknowledgedMessages(this, positions);
     }
 
@@ -267,8 +265,8 @@ public class AmqpConsumer extends Consumer implements UnacknowledgedMessageMap.M
         return channel.getConnection().ctx.channel().isWritable();
     }
 
-    void addUnAckMessages(String exchangeName, PositionImpl index, PositionImpl message) {
-        ConcurrentSkipListMap<PositionImpl, PositionImpl> map = unAckMessages.computeIfAbsent(exchangeName,
+    void addUnAckMessages(String exchangeName, Position index, Position message) {
+        ConcurrentSkipListMap<Position, Position> map = unAckMessages.computeIfAbsent(exchangeName,
                 treeMap -> new ConcurrentSkipListMap<>());
         map.put(index, message);
     }

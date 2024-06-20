@@ -25,7 +25,6 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
@@ -115,7 +114,7 @@ public final class MessageFetchContext {
                                     log.error("Failed to convert entry to AMQP body", e);
                                 }
                                 consumer.addUnAckMessages(indexMessage.getExchangeName(),
-                                        (PositionImpl) index.getPosition(), (PositionImpl) msg.getPosition());
+                                        index.getPosition(), msg.getPosition());
                             } else {
                                 message.complete(Pair.of(index.getPosition(), null));
                             }

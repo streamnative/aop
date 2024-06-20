@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 
 
 /**
@@ -35,7 +34,7 @@ public class UnacknowledgedMessageMap {
 
     public interface MessageProcessor {
         void messageAck(Position position);
-        void requeue(List<PositionImpl> positions);
+        void requeue(List<Position> positions);
     }
 
     /**

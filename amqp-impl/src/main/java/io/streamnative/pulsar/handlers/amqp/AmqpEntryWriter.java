@@ -23,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.AsyncCallbacks;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
 
@@ -97,7 +96,7 @@ public class AmqpEntryWriter implements AsyncCallbacks.AddEntryCallback {
             log.debug("[{}] Success to write entry with position {}.", topic.getName(), position);
         }
         topic.recordAddLatency(System.nanoTime() - context.startTimeNs, TimeUnit.MICROSECONDS);
-        topic.getTransactionBuffer().syncMaxReadPositionForNormalPublish((PositionImpl) position);
+        topic.getTransactionBuffer().syncMaxReadPositionForNormalPublish(position, false);
         context.positionFuture.complete(position);
         context.recycle();
     }

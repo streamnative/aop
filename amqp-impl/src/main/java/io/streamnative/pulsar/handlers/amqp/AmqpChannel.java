@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.log4j.Log4j2;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.bookkeeper.mledger.Position;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.service.Consumer;
 import org.apache.pulsar.broker.service.Subscription;
@@ -778,12 +778,12 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     private void requeue(Collection<UnacknowledgedMessageMap.MessageConsumerAssociation> messages) {
-        Map<UnacknowledgedMessageMap.MessageProcessor, List<PositionImpl>> positionMap = new HashMap<>();
+        Map<UnacknowledgedMessageMap.MessageProcessor, List<Position>> positionMap = new HashMap<>();
         messages.stream().forEach(association -> {
             UnacknowledgedMessageMap.MessageProcessor consumer = association.getConsumer();
-            List<PositionImpl> positions = positionMap.computeIfAbsent(consumer,
+            List<Position> positions = positionMap.computeIfAbsent(consumer,
                 list -> new ArrayList<>());
-            positions.add((PositionImpl) association.getPosition());
+            positions.add(association.getPosition());
         });
         positionMap.entrySet().stream().forEach(entry -> {
             entry.getKey().requeue(entry.getValue());

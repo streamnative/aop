@@ -44,8 +44,8 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.Message;
@@ -169,7 +169,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String queueName, long ledgerId, long entryId) {
-        return readEntryAsync(queueName, PositionImpl.get(ledgerId, entryId));
+        return readEntryAsync(queueName, PositionFactory.create(ledgerId, entryId));
     }
 
     @Override
@@ -177,7 +177,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         // TODO Temporarily put the creation operation here, and later put the operation in router
         CompletableFuture<Entry> future = new CompletableFuture<>();
         ((ManagedLedgerImpl) persistentTopic.getManagedLedger())
-                .asyncReadEntry((PositionImpl) position, new AsyncCallbacks.ReadEntryCallback() {
+                .asyncReadEntry(position, new AsyncCallbacks.ReadEntryCallback() {
                     @Override
                     public void readEntryComplete(Entry entry, Object o) {
                         future.complete(entry);
@@ -193,7 +193,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> markDeleteAsync(String queueName, long ledgerId, long entryId) {
-        return markDeleteAsync(queueName, PositionImpl.get(ledgerId, entryId));
+        return markDeleteAsync(queueName, PositionFactory.create(ledgerId, entryId));
     }
 
     @Override
@@ -205,7 +205,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
                         + queueName + " of the exchange " + exchangeName + " is null."));
                 return;
             }
-            if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
+            if ((position).compareTo(cursor.getMarkDeletedPosition()) < 0) {
                 future.complete(null);
                 return;
             }
@@ -220,7 +220,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
 
                 @Override
                 public void markDeleteFailed(ManagedLedgerException e, Object ctx) {
-                    if (((PositionImpl) position).compareTo((PositionImpl) cursor.getMarkDeletedPosition()) < 0) {
+                    if ((position).compareTo(cursor.getMarkDeletedPosition()) < 0) {
                         log.warn("Mark delete failed for position: {}, {}", position, e.getMessage());
                     } else {
                         log.error("Mark delete failed for position: {}", position, e);

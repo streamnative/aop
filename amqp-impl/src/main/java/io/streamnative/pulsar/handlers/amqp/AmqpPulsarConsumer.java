@@ -19,7 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -89,7 +89,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
                 });
             } else {
                 this.amqpChannel.getUnacknowledgedMessageMap().add(
-                        deliveryIndex, PositionImpl.get(messageId.getLedgerId(), messageId.getEntryId()),
+                        deliveryIndex, PositionFactory.create(messageId.getLedgerId(), messageId.getEntryId()),
                         AmqpPulsarConsumer.this, message.size());
             }
             consumeBackoff.reset();
@@ -107,8 +107,8 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
     }
 
     @Override
-    public void requeue(List<PositionImpl> positions) {
-        for (PositionImpl pos : positions) {
+    public void requeue(List<Position> positions) {
+        for (Position pos : positions) {
             consumer.negativeAcknowledge(new MessageIdImpl(pos.getLedgerId(), pos.getEntryId(), -1));
         }
     }

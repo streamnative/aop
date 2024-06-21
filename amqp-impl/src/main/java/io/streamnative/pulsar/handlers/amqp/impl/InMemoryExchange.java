@@ -28,8 +28,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.bookkeeper.mledger.impl.EntryImpl;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.service.Topic;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.common.util.FutureUtil;
@@ -39,8 +39,8 @@ import org.apache.pulsar.common.util.FutureUtil;
  */
 public class InMemoryExchange extends AbstractAmqpExchange {
 
-    private final TreeMap<PositionImpl, Entry> messageStore = new TreeMap<>();
-    private final Map<String, TreeMap<PositionImpl, Object>> cursors = new ConcurrentHashMap<>();
+    private final TreeMap<Position, Entry> messageStore = new TreeMap<>();
+    private final Map<String, TreeMap<Position, Object>> cursors = new ConcurrentHashMap<>();
     private final long currentLedgerId;
     private long currentEntryId;
 
@@ -59,11 +59,11 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     public CompletableFuture<Position> writeMessageAsync(Message<byte[]> message, String routingKey) {
         Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId,
                 MessageConvertUtils.messageToByteBuf(message));
-        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
-        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
+        Position position = PositionFactory.create(entry.getLedgerId(), entry.getEntryId());
+        messageStore.put(PositionFactory.create(entry.getLedgerId(), entry.getEntryId()), entry);
         List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
         for (AmqpQueue queue : queues) {
-            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
+            TreeMap<Position, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
             cursor.put(position, null);
             routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
                     position.getEntryId(), routingKey, null));
@@ -73,12 +73,12 @@ public class InMemoryExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String queueName, long ledgerId, long entryId) {
-        return readEntryAsync(queueName, PositionImpl.get(ledgerId, entryId));
+        return readEntryAsync(queueName, PositionFactory.create(ledgerId, entryId));
     }
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String queueName, Position position) {
-        TreeMap<PositionImpl, Object> cursor = cursors.get(queueName);
+        TreeMap<Position, Object> cursor = cursors.get(queueName);
         if (cursor == null) {
             return CompletableFuture.completedFuture(null);
         }
@@ -92,41 +92,41 @@ public class InMemoryExchange extends AbstractAmqpExchange {
 
     @Override
     public CompletableFuture<Void> markDeleteAsync(String queueName, long ledgerId, long entryId) {
-        return markDeleteAsync(queueName, PositionImpl.get(ledgerId, entryId));
+        return markDeleteAsync(queueName, PositionFactory.create(ledgerId, entryId));
     }
 
     @Override
     public CompletableFuture<Void> markDeleteAsync(String queueName, Position position) {
-        TreeMap<PositionImpl, Object> cursor = cursors.get(queueName);
+        TreeMap<Position, Object> cursor = cursors.get(queueName);
         if (cursor == null) {
             return CompletableFuture.completedFuture(null);
         }
-        cursor.subMap(PositionImpl.get(0, 0), true, (PositionImpl) position, true).clear();
-        PositionImpl deletePosition = null;
-        for (TreeMap<PositionImpl, Object> c : cursors.values()) {
-            PositionImpl firstKey = c.firstKey();
+        cursor.subMap(PositionFactory.create(0, 0), true, position, true).clear();
+        Position deletePosition = null;
+        for (TreeMap<Position, Object> c : cursors.values()) {
+            Position firstKey = c.firstKey();
             if (deletePosition == null) {
-                deletePosition = PositionImpl.get(firstKey.getLedgerId(), firstKey.getEntryId() - 1);
+                deletePosition = PositionFactory.create(firstKey.getLedgerId(), firstKey.getEntryId() - 1);
             } else {
                 if (firstKey.compareTo(deletePosition) < 0) {
-                    deletePosition = PositionImpl.get(firstKey.getLedgerId(), firstKey.getEntryId() - 1);
+                    deletePosition = PositionFactory.create(firstKey.getLedgerId(), firstKey.getEntryId() - 1);
                 }
             }
         }
         if (deletePosition != null) {
-            messageStore.subMap(PositionImpl.get(0, 0), true, deletePosition, true).clear();
+            messageStore.subMap(PositionFactory.create(0, 0), true, deletePosition, true).clear();
         }
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Position> getMarkDeleteAsync(String queueName) {
-        TreeMap<PositionImpl, Object> cursor = cursors.get(queueName);
+        TreeMap<Position, Object> cursor = cursors.get(queueName);
         if (cursor == null) {
             return CompletableFuture.completedFuture(null);
         }
-        PositionImpl first = cursor.firstKey();
-        return CompletableFuture.completedFuture(PositionImpl.get(first.getLedgerId(), first.getEntryId() - 1));
+        Position first = cursor.firstKey();
+        return CompletableFuture.completedFuture(PositionFactory.create(first.getLedgerId(), first.getEntryId() - 1));
     }
 
     @VisibleForTesting
@@ -137,11 +137,11 @@ public class InMemoryExchange extends AbstractAmqpExchange {
     @VisibleForTesting
     public CompletableFuture<Position> writeMessageAsync(ByteBuf byteBuf) {
         Entry entry = EntryImpl.create(currentLedgerId, ++currentEntryId, byteBuf);
-        PositionImpl position = PositionImpl.get(entry.getLedgerId(), entry.getEntryId());
-        messageStore.put(PositionImpl.get(entry.getLedgerId(), entry.getEntryId()), entry);
+        Position position = PositionFactory.create(entry.getLedgerId(), entry.getEntryId());
+        messageStore.put(PositionFactory.create(entry.getLedgerId(), entry.getEntryId()), entry);
         List<CompletableFuture<Void>> routeFutures = new ArrayList<>(queues.size());
         for (AmqpQueue queue : queues) {
-            TreeMap<PositionImpl, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
+            TreeMap<Position, Object> cursor = cursors.computeIfAbsent(queue.getName(), key -> new TreeMap<>());
             cursor.put(position, null);
             routeFutures.add(queue.getRouter(this.exchangeName).routingMessage(position.getLedgerId(),
                     position.getEntryId(), "", null));

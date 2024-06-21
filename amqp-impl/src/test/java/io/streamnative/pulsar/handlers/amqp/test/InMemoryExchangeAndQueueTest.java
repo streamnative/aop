@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.Position;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.client.api.Message;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
@@ -80,8 +79,7 @@ public class InMemoryExchangeAndQueueTest {
         Assert.assertEquals(entry.getDataBuffer(), expectedContentByteBuf);
 
         // Test read entry from queue.
-        PositionImpl p = (PositionImpl) position;
-        entry = queue.readEntryAsync(exchangeName, p.getLedgerId(), p.getEntryId()).get();
+        entry = queue.readEntryAsync(exchangeName, position.getLedgerId(), position.getEntryId()).get();
         Assert.assertNotNull(entry);
         Assert.assertEquals(entry.getDataBuffer(), expectedContentByteBuf);
     }
@@ -131,23 +129,23 @@ public class InMemoryExchangeAndQueueTest {
             Assert.assertNotNull(exchange.readEntryAsync(queueName, position));
         }
 
-        PositionImpl ackPosition = (PositionImpl) positions.get(2);
+        Position ackPosition = positions.get(2);
         queue.acknowledgeAsync(exchangeName, ackPosition.getLedgerId(), ackPosition.getEntryId()).get();
-        PositionImpl readPosition = (PositionImpl) positions.get(0);
+        Position readPosition = positions.get(0);
         Assert.assertNotNull(queue.readEntryAsync(exchangeName, readPosition.getLedgerId(),
                 readPosition.getEntryId()).get());
-        readPosition = (PositionImpl) positions.get(1);
+        readPosition = positions.get(1);
         Assert.assertNotNull(queue.readEntryAsync(exchangeName, readPosition.getLedgerId(),
                 readPosition.getEntryId()).get());
-        readPosition = (PositionImpl) positions.get(2);
+        readPosition = positions.get(2);
         Assert.assertNull(queue.readEntryAsync(exchangeName, readPosition.getLedgerId(),
                 readPosition.getEntryId()).get());
-        readPosition = (PositionImpl) positions.get(3);
+        readPosition = positions.get(3);
         Assert.assertNotNull(queue.readEntryAsync(exchangeName, readPosition.getLedgerId(),
                 readPosition.getEntryId()).get());
-        ackPosition = (PositionImpl) positions.get(1);
+        ackPosition = positions.get(1);
         queue.acknowledgeAsync(exchangeName, ackPosition.getLedgerId(), ackPosition.getEntryId()).get();
-        ackPosition = (PositionImpl) positions.get(0);
+        ackPosition = positions.get(0);
         queue.acknowledgeAsync(exchangeName, ackPosition.getLedgerId(), ackPosition.getEntryId()).get();
 
         Position markDelete = exchange.getMarkDeleteAsync(queueName).get();
@@ -216,7 +214,7 @@ public class InMemoryExchangeAndQueueTest {
                     generateMessage(exchangeName2, singleContent), "").get());
         }
 
-        PositionImpl ackPosition = (PositionImpl) positionsForExchange1.get(2);
+        Position ackPosition = positionsForExchange1.get(2);
         queue1.acknowledgeAsync(exchangeName1, ackPosition.getLedgerId(), ackPosition.getEntryId()).get();
         Assert.assertNull(queue1.readEntryAsync(exchangeName1, ackPosition.getLedgerId(),
                 ackPosition.getEntryId()).get());
@@ -227,7 +225,7 @@ public class InMemoryExchangeAndQueueTest {
         Assert.assertNotNull(queue2.readEntryAsync(exchangeName2, ackPosition.getLedgerId(),
                 ackPosition.getEntryId()).get());
 
-        ackPosition = (PositionImpl) positionsForExchange1.get(0);
+        ackPosition = positionsForExchange1.get(0);
         queue1.acknowledgeAsync(exchangeName1, ackPosition.getLedgerId(), ackPosition.getEntryId()).get();
         Assert.assertEquals(exchange1.getMarkDeleteAsync(queueName1).get(), positionsForExchange1.get(0));
         Assert.assertEquals(((InMemoryExchange) exchange1).getMessages(), 10);

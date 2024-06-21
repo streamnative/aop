@@ -20,7 +20,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.bookkeeper.mledger.Entry;
-import org.apache.bookkeeper.mledger.impl.PositionImpl;
+import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.PositionFactory;
 import org.apache.pulsar.broker.service.Topic;
 
 /**
@@ -28,7 +29,7 @@ import org.apache.pulsar.broker.service.Topic;
  */
 public class InMemoryQueue extends AbstractAmqpQueue {
 
-    private final Map<String, LinkedList<PositionImpl>> indexStore = new ConcurrentHashMap<>();
+    private final Map<String, LinkedList<Position>> indexStore = new ConcurrentHashMap<>();
 
     public InMemoryQueue(String queueName, long connectionId) {
         super(queueName, false, connectionId);
@@ -41,15 +42,15 @@ public class InMemoryQueue extends AbstractAmqpQueue {
     @Override
     public CompletableFuture<Void> writeIndexMessageAsync(String exchangeName, long ledgerId, long entryId,
                                                           Map<String, Object> properties) {
-        List<PositionImpl> positions = indexStore.computeIfAbsent(exchangeName, (key) -> new LinkedList<>());
-        positions.add(PositionImpl.get(ledgerId, entryId));
+        List<Position> positions = indexStore.computeIfAbsent(exchangeName, (key) -> new LinkedList<>());
+        positions.add(PositionFactory.create(ledgerId, entryId));
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Entry> readEntryAsync(String exchangeName, long ledgerId, long entryId) {
-        LinkedList<PositionImpl> indexes = indexStore.get(exchangeName);
-        if (indexes == null || indexes.size() == 0 || !indexes.contains(PositionImpl.get(ledgerId, entryId))) {
+        LinkedList<Position> indexes = indexStore.get(exchangeName);
+        if (indexes == null || indexes.size() == 0 || !indexes.contains(PositionFactory.create(ledgerId, entryId))) {
             return CompletableFuture.completedFuture(null);
         }
         return routers.get(exchangeName).getExchange().readEntryAsync(this.queueName, ledgerId, entryId);
@@ -57,10 +58,10 @@ public class InMemoryQueue extends AbstractAmqpQueue {
 
     @Override
     public CompletableFuture<Void> acknowledgeAsync(String exchangeName, long ledgerId, long entryId) {
-        LinkedList<PositionImpl> positions = indexStore.get(exchangeName);
+        LinkedList<Position> positions = indexStore.get(exchangeName);
         if (positions != null && positions.size() > 0) {
-            positions.remove(PositionImpl.get(ledgerId, entryId));
-            PositionImpl markDeletePosition = positions.getFirst();
+            positions.remove(PositionFactory.create(ledgerId, entryId));
+            Position markDeletePosition = positions.getFirst();
             return routers.get(exchangeName).getExchange().markDeleteAsync(this.queueName,
                     markDeletePosition.getLedgerId(), markDeletePosition.getEntryId() - 1);
         }

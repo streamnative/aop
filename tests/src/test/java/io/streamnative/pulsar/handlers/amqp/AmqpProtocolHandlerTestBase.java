@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import io.opentelemetry.api.OpenTelemetry;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -309,10 +308,8 @@ public abstract class AmqpProtocolHandlerTestBase {
         doReturn(mockBookKeeperClientFactory).when(pulsar).newBookKeeperClientFactory();
 
         MockZooKeeperSession mockZooKeeperSession = MockZooKeeperSession.newInstance(mockZooKeeper);
-        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar)
-                .createLocalMetadataStore(any(), OpenTelemetry.noop());
-        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar)
-                .createConfigurationMetadataStore(any(), OpenTelemetry.noop());
+        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar).createLocalMetadataStore(any(), any());
+        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar).createConfigurationMetadataStore(any(), any());
 
         Supplier<NamespaceService> namespaceServiceSupplier = () -> spy(new NamespaceService(pulsar));
         doReturn(namespaceServiceSupplier).when(pulsar).getNamespaceServiceProvider();

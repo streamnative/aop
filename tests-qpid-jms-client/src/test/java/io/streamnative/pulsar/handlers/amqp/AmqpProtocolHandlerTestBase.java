@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.channel.EventLoopGroup;
+import io.opentelemetry.api.OpenTelemetry;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -280,8 +281,10 @@ public abstract class AmqpProtocolHandlerTestBase {
         doReturn(mockBookKeeperClientFactory).when(pulsar).newBookKeeperClientFactory();
 
         MockZooKeeperSession mockZooKeeperSession = MockZooKeeperSession.newInstance(mockZooKeeper);
-        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar).createLocalMetadataStore(any());
-        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar).createConfigurationMetadataStore(any());
+        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar)
+                .createLocalMetadataStore(any(), OpenTelemetry.noop());
+        doReturn(new ZKMetadataStore(mockZooKeeperSession)).when(pulsar)
+                .createConfigurationMetadataStore(any(), OpenTelemetry.noop());
 
         Supplier<NamespaceService> namespaceServiceSupplier = () -> spy(new NamespaceService(pulsar));
         doReturn(namespaceServiceSupplier).when(pulsar).getNamespaceServiceProvider();

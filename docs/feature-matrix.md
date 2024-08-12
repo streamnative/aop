@@ -27,8 +27,8 @@
 ### RabbitMQ Plugin
 
 | plugin          | single-bundle | multi-bundles | description |
-|-----------------|---------------|-------not supported--------|-------------|
-| delayed message | supported     |  |             |
+|-----------------|---------------|---------------|-------------|
+| delayed message | supported     | not supported |             |
 
 ### Authentication
 

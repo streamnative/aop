@@ -46,6 +46,7 @@ import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
 import org.apache.bookkeeper.mledger.impl.ManagedCursorImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
+import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.api.MessageId;
@@ -161,7 +162,7 @@ public abstract class ExchangeMessageRouter {
                         HAVE_PENDING_READ_UPDATER.set(ExchangeMessageRouter.this, FALSE);
                         log.error("Failed to read entries from exchange {}", exchange.getName(), exception);
                     }
-                }, null, null);
+                }, null, PositionImpl.LATEST);
             } else {
                 log.warn("{} Not schedule read due to pending read. Messages to read {}.",
                         exchange.getName(), availablePermits);

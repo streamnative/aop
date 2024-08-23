@@ -32,6 +32,7 @@ import org.apache.bookkeeper.mledger.Entry;
 import org.apache.bookkeeper.mledger.ManagedCursor;
 import org.apache.bookkeeper.mledger.ManagedLedgerException;
 import org.apache.bookkeeper.mledger.Position;
+import org.apache.bookkeeper.mledger.impl.PositionImpl;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
@@ -193,7 +194,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
                 if (log.isDebugEnabled()) {
                     log.debug("{} Schedule read of {} messages.", name, messagesToRead);
                 }
-                cursor.asyncReadEntriesOrWait(messagesToRead, readMaxSizeBytes, this, null, null);
+                cursor.asyncReadEntriesOrWait(messagesToRead, readMaxSizeBytes, this, null, PositionImpl.LATEST);
             } else {
                 if (log.isDebugEnabled()) {
                     log.debug("{} Not schedule read due to pending read. Messages to read {}.",

@@ -40,7 +40,7 @@
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
 
     <!-- dependencies -->
-    <pulsar.version>3.0.5.5</pulsar.version>
+    <pulsar.version>3.0.6.3</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
 
@@ -387,7 +387,7 @@
 
     <repository>
       <id>ossrh</id>
-      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-3192/content</url>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-3277/content</url>
     </repository>
   </repositories>
 

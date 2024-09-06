@@ -40,7 +40,7 @@
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
 
     <!-- dependencies -->
-    <pulsar.version>3.4.0-SNAPSHOT</pulsar.version>
+    <pulsar.version>4.0.0-ursa-4-SNAPSHOT</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
 
@@ -383,6 +383,10 @@
     <repository>
       <id>nexus-snapshot-repo</id>
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/0/content</url>
     </repository>
   </repositories>
 

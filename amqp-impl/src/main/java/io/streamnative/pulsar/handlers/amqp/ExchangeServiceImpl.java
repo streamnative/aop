@@ -19,10 +19,11 @@ import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isBuildInE
 import static io.streamnative.pulsar.handlers.amqp.utils.ExchangeUtil.isDefaultExchange;
 
 import io.streamnative.pulsar.handlers.amqp.common.exception.AoPException;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.common.naming.NamespaceName;
@@ -168,8 +169,8 @@ public class ExchangeServiceImpl implements ExchangeService {
                     if (null == amqpExchange) {
                         replyCode = ExchangeBoundOkBody.EXCHANGE_NOT_FOUND;
                     } else {
-                        List<String> subs = amqpExchange.getTopic().getSubscriptions().keys();
-                        if (null == subs || subs.isEmpty()) {
+                        Set<String> subs = amqpExchange.getTopic().getSubscriptions().keySet();
+                        if (CollectionUtils.isEmpty(subs)) {
                             replyCode = ExchangeBoundOkBody.QUEUE_NOT_FOUND;
                         } else {
                             replyCode = ExchangeBoundOkBody.OK;

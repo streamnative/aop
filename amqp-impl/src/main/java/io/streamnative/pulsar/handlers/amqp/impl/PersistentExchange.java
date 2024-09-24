@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -54,7 +55,6 @@ import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
-import org.apache.pulsar.common.util.collections.ConcurrentOpenHashMap;
 
 /**
  * Persistent Exchange.
@@ -72,7 +72,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
     private static final String BINDINGS = "BINDINGS";
 
     private PersistentTopic persistentTopic;
-    private final ConcurrentOpenHashMap<String, CompletableFuture<ManagedCursor>> cursors;
+    private final ConcurrentHashMap<String, CompletableFuture<ManagedCursor>> cursors;
     private AmqpExchangeReplicator messageReplicator;
     private AmqpEntryWriter amqpEntryWriter;
 
@@ -97,7 +97,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
         super(exchangeName, type, Sets.newConcurrentHashSet(), durable, autoDelete, internal, arguments);
         this.persistentTopic = persistentTopic;
         topicNameValidate();
-        cursors = new ConcurrentOpenHashMap<>(16, 1);
+        cursors = new ConcurrentHashMap<>(16, 1);
         for (ManagedCursor cursor : persistentTopic.getManagedLedger().getCursors()) {
             cursors.put(cursor.getName(), CompletableFuture.completedFuture(cursor));
             log.info("PersistentExchange {} recover cursor {}", persistentTopic.getName(), cursor.toString());

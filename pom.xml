@@ -42,7 +42,7 @@
     <!-- dependencies -->
     <pulsar.version>4.0.0-ursa-10-SNAPSHOT</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
-    <rabbitmq.version>5.8.0</rabbitmq.version>
+    <rabbitmq.version>5.18.0</rabbitmq.version>
 
     <!-- test dependencies -->
     <qpid-client-version>6.4.0</qpid-client-version>

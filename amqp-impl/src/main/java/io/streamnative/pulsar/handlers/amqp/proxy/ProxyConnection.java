@@ -378,6 +378,9 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         if (cnx != null) {
             cnx.close();
         }
+        if (brokerDecoder != null) {
+            brokerDecoder.close();
+        }
         state = State.Closed;
     }
 

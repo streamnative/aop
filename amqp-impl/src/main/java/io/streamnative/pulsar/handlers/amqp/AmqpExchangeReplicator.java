@@ -190,7 +190,6 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             messagesToRead = Math.max(messagesToRead, 1);
 
             if (HAVE_PENDING_READ_UPDATER.compareAndSet(this, FALSE, TRUE)) {
-                log.info("{} Schedule read of {} messages.", name, messagesToRead);
                 if (log.isDebugEnabled()) {
                     log.debug("{} Schedule read of {} messages.", name, messagesToRead);
                 }

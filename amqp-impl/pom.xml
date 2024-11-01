@@ -22,7 +22,7 @@
   <parent>
     <groupId>io.streamnative.pulsar.handlers</groupId>
     <artifactId>pulsar-protocol-handler-amqp-parent</artifactId>
-    <version>3.3.0-SNAPSHOT</version>
+    <version>4.1.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pulsar-protocol-handler-amqp</artifactId>

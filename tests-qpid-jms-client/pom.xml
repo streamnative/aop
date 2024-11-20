@@ -36,6 +36,11 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.apache.qpid</groupId>
+      <artifactId>qpid-broker-core</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- jms test -->
     <dependency>
       <groupId>org.apache.qpid</groupId>

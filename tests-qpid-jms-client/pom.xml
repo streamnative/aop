@@ -28,6 +28,14 @@
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Qpid-JMS Client Tests</name>
 
   <dependencies>
+    <dependency>
+      <groupId>io.streamnative</groupId>
+      <artifactId>pulsar-broker</artifactId>
+      <version>${pulsar.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+
     <!-- test dependencies -->
     <dependency>
       <groupId>io.streamnative.pulsar.handlers</groupId>

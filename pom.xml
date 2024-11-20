@@ -340,8 +340,11 @@
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
     <repository>
-      <id>ossrh</id>
-      <url>https://s01.oss.sonatype.org/service/local/repositories/0/content</url>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/streamnative/streamnative-bom</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
 

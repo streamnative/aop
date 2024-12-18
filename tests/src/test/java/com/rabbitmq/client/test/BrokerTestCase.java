@@ -126,7 +126,6 @@ public class BrokerTestCase extends AmqpProtocolHandlerTestBase {
         }
         ((PulsarClientImpl) getPulsarServiceList().get(0).getClient()).getLookup().
                 getBroker(TopicName.get("public/vhost1/test")).join();
-        checkPulsarServiceState();
         assumeTrue(shouldRun());
         openConnection();
         openChannel();

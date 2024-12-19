@@ -373,12 +373,6 @@ public abstract class AmqpProtocolHandlerTestBase {
         field.set(classObj, fieldValue);
     }
 
-    public void checkPulsarServiceState() {
-        for (PulsarService pulsarService : pulsarServiceList) {
-            Mockito.when(pulsarService.getState()).thenReturn(PulsarService.State.Started);
-        }
-    }
-
     /**
      * Get available proxy port.
      * @return random proxy port

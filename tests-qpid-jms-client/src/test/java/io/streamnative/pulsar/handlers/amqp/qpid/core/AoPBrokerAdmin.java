@@ -70,8 +70,6 @@ public class AoPBrokerAdmin extends AmqpProtocolHandlerTestBase implements Broke
                         NamespaceName.get(ns), "__lookup__").toString());
             }
         }
-
-        checkPulsarServiceState();
     }
 
     @Override

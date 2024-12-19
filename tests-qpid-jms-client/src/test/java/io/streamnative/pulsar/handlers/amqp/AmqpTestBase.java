@@ -68,8 +68,6 @@ public class AmqpTestBase extends AmqpProtocolHandlerTestBase {
                         NamespaceName.get(ns), "__lookup__").toString());
             }
         }
-
-        checkPulsarServiceState();
     }
 
     @AfterClass

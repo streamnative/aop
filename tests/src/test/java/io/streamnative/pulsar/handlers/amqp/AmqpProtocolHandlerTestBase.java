@@ -401,12 +401,6 @@ public abstract class AmqpProtocolHandlerTestBase {
         field.set(classObj, fieldValue);
     }
 
-    public void checkPulsarServiceState() {
-        for (PulsarService pulsarService : pulsarServiceList) {
-            doReturn(PulsarService.State.Started).when(pulsarService).getState();
-        }
-    }
-
     /**
      * Get available proxy port.
      * @return random proxy port

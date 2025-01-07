@@ -24,7 +24,7 @@
   <packaging>pom</packaging>
   <groupId>io.streamnative.pulsar.handlers</groupId>
   <artifactId>pulsar-protocol-handler-amqp-parent</artifactId>
-  <version>3.0.7.5</version>
+  <version>3.0.7.5-shade</version>
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Parent</name>
   <description>Parent for AMQP on Pulsar implemented using Pulsar Protocol Handler.</description>
   <properties>
@@ -33,7 +33,7 @@
     <maven.compiler.target>17</maven.compiler.target>
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
     <!-- dependencies -->
-    <pulsar.version>3.0.7.5</pulsar.version>
+    <pulsar.version>3.0.7.5-shade</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
     <!-- test dependencies -->
@@ -343,11 +343,15 @@
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
     <repository>
-      <id>ossrh</id>
-      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-3487/content</url>
+      <id>nexus-snapshot</id>
+      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
     <repository>
-      <id>nexus-snapshot</id>
+      <id>ossrh</id>
+      <url>https://s01.oss.sonatype.org/service/local/repositories/iostreamnative-3591/content</url>
+    </repository>
+    <repository>
+      <id>nexus-snapshot-ci</id>
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
   </repositories>

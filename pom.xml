@@ -40,9 +40,10 @@
     <project.compiler.release>${maven.compiler.target}</project.compiler.release>
 
     <!-- dependencies -->
-    <pulsar.version>4.0.0-ursa-10-SNAPSHOT</pulsar.version>
+    <pulsar.version>4.1.0-SNAPSHOT</pulsar.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
+    <sn.bom.verison>4.1.0-SNAPSHOT</sn.bom.verison>
 
     <!-- test dependencies -->
     <qpid-client-version>6.4.0</qpid-client-version>
@@ -51,6 +52,7 @@
     <testng.version>6.14.3</testng.version>
     <awaitility.version>4.2.0</awaitility.version>
     <assertj.version>3.15.0</assertj.version>
+    <mockito.version>5.12.0</mockito.version>
 
     <!-- plugin dependencies -->
     <spotbugs-annotations.version>3.1.8</spotbugs-annotations.version>
@@ -82,56 +84,19 @@
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
-
       <dependency>
         <groupId>io.streamnative</groupId>
-        <artifactId>pulsar</artifactId>
-        <version>${pulsar.version}</version>
-        <type>pom</type>
+        <artifactId>streamnative-bom</artifactId>
+        <version>4.1.0-SNAPSHOT</version>
         <scope>import</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>io.streamnative</groupId>
-        <artifactId>pulsar-broker</artifactId>
-        <version>${pulsar.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>io.streamnative</groupId>
-        <artifactId>pulsar-broker</artifactId>
-        <version>${pulsar.version}</version>
-        <type>test-jar</type>
+        <type>pom</type>
       </dependency>
 
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>testmocks</artifactId>
         <version>${pulsar.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>com.rabbitmq</groupId>
-        <artifactId>amqp-client</artifactId>
-        <version>${rabbitmq.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.qpid</groupId>
-        <artifactId>qpid-client</artifactId>
-        <version>${qpid-client-version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.geronimo.specs</groupId>
-        <artifactId>geronimo-jms_1.1_spec</artifactId>
-        <version>${geronimo-jms-version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.qpid</groupId>
-        <artifactId>qpid-test-utils</artifactId>
-        <version>${qpid-protocol-plugin.version}</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -167,38 +132,28 @@
     <!-- dependencies for tests -->
     <dependency>
       <groupId>io.streamnative</groupId>
-      <artifactId>pulsar-broker</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>io.streamnative</groupId>
       <artifactId>testmocks</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.testng</groupId>
-      <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
+      <version>${mockito.version}</version>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>org.awaitility</groupId>
       <artifactId>awaitility</artifactId>
+      <version>${awaitility.version}</version>
       <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
       <scope>test</scope>
     </dependency>
 
@@ -282,7 +237,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
         <configuration>
-          <argLine> -Xmx2G
+          <argLine>-Xmx2G
             -Dpulsar.allocator.pooled=false
             -Dpulsar.allocator.leak_detection=Advanced
             -Dlog4j.configurationFile="log4j2.xml"
@@ -385,8 +340,11 @@
       <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
     </repository>
     <repository>
-      <id>ossrh</id>
-      <url>https://s01.oss.sonatype.org/service/local/repositories/0/content</url>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/streamnative/streamnative-bom</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
 

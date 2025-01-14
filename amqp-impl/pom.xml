@@ -31,11 +31,21 @@
 
   <!-- include the dependencies -->
   <dependencies>
-
+    <dependency>
+      <groupId>io.streamnative</groupId>
+      <artifactId>pulsar-broker</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.streamnative</groupId>
+      <artifactId>pulsar-broker</artifactId>
+      <version>${pulsar.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.qpid</groupId>
       <artifactId>qpid-broker-core</artifactId>
-      <version>${qpid-protocol-plugin.version}</version>
       <exclusions>
         <exclusion>
           <groupId>com.fasterxml.jackson.core</groupId>
@@ -51,7 +61,6 @@
     <dependency>
       <groupId>org.apache.qpid</groupId>
       <artifactId>qpid-broker-plugins-amqp-0-8-protocol</artifactId>
-      <version>${qpid-protocol-plugin.version}</version>
     </dependency>
 
     <dependency>

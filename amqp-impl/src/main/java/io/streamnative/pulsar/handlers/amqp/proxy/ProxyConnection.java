@@ -177,7 +177,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                         }
                     }),
                     // TODO temporary modification
-                    "PLAIN token".getBytes(US_ASCII),
+                    this.proxyConfig.getAmqpAllowedMechanisms().getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
         } catch (QpidException e) {

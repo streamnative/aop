@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.channel.EventLoopGroup;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -290,7 +289,7 @@ public abstract class AmqpProtocolHandlerTestBase {
     }
 
     public static MockZooKeeper createMockZooKeeper() throws Exception {
-        MockZooKeeper zk = MockZooKeeper.newInstance(MoreExecutors.newDirectExecutorService());
+        MockZooKeeper zk = MockZooKeeper.newInstance();
         zk.setSessionId(-1);
         List<ACL> dummyAclList = new ArrayList<>(0);
 

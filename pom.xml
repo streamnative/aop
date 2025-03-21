@@ -381,8 +381,11 @@
       <url>https://repo1.maven.org/maven2</url>
     </repository>
     <repository>
-      <id>nexus-snapshot-repo</id>
-      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/streamnative/*</url>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
 

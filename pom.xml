@@ -105,6 +105,12 @@
         <version>${spotbugs-annotations.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>org.apache.qpid</groupId>
+        <artifactId>qpid-test-utils</artifactId>
+        <version>${qpid-protocol-plugin.version}</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 

@@ -91,6 +91,8 @@ public class AmqpBrokerDecoder extends ServerDecoder {
     }
 
     public void close() {
-        netInputBuffer = null;
+        if (netInputBuffer != null) {
+            netInputBuffer.close();
+        }
     }
 }

@@ -39,7 +39,6 @@ import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.common.naming.NamespaceName;
 import org.apache.pulsar.common.naming.TopicDomain;
 import org.apache.pulsar.common.naming.TopicName;
-import org.apache.qpid.server.QpidException;
 import org.apache.qpid.server.bytebuffer.QpidByteBuffer;
 import org.apache.qpid.server.common.ServerPropertyNames;
 import org.apache.qpid.server.protocol.ProtocolVersion;
@@ -180,7 +179,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                     "PLAIN token".getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
-        } catch (QpidException e) {
+        } catch (Exception e) {
             log.error("Received unsupported protocol initiation for protocol version: {} ", getProtocolVersion(), e);
         }
     }
@@ -363,7 +362,17 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         if (log.isDebugEnabled()) {
             log.debug("send: " + frame);
         }
-        cnx.writeAndFlush(frame);
+        cnx.writeAndFlush(frame)
+                .addListener(future -> {
+                    if (!future.isSuccess()) {
+                        log.error("ProxyConnection failed to write frame.", future.cause());
+                    }
+                });
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        log.error("ProxyConnection exception caught: ", cause);
     }
 
     public void close() {

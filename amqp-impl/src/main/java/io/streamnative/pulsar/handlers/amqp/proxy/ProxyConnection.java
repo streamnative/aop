@@ -73,6 +73,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     private LookupHandler lookupHandler;
     private AMQShortString virtualHost;
     private String vhost;
+    private String remoteAddress;
 
     private List<Object> connectMsgList = new ArrayList<>();
 
@@ -80,6 +81,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         Init,
         RedirectLookup,
         RedirectToBroker,
+        Closing,
         Closed
     }
 
@@ -98,12 +100,16 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     public void channelActive(ChannelHandlerContext cnx) throws Exception {
         super.channelActive(cnx);
         this.cnx = cnx;
+        this.remoteAddress = cnx.channel().remoteAddress().toString();
+        log.info("[{}] New proxy connection established", remoteAddress);
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
-        this.close();
+        resetProxyHandler();
+        log.info("[{}] ProxyConnection closed.", remoteAddress);
+        this.state = State.Closed;
     }
 
     @Override
@@ -135,7 +141,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 try {
                     brokerDecoder.decodeBuffer(QpidByteBuffer.wrap(buffer.nioBuffer()));
                 } catch (Throwable e) {
-                    log.error("error while handle command:", e);
+                    log.error("Closing the proxy connection, error while handle command:", e);
                     close();
                 }
 
@@ -242,7 +248,8 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
     public void handleConnect(AtomicInteger retryTimes) {
         log.info("handle connect residue retryTimes: {}", retryTimes);
         if (retryTimes.get() == 0) {
-            log.warn("Handle connect retryTimes is 0.");
+            log.warn("[{}] Closing the proxy connection, retry times for handling connect is exhausted.",
+                    remoteAddress);
             close();
             return;
         }
@@ -264,8 +271,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
                 handleConnectComplete(pair.getLeft(), pair.getRight(), retryTimes);
             });
         } catch (Exception e) {
-            log.error("Lookup broker failed.", e);
-            resetProxyHandler();
+            log.error("[{}] Closing the proxy connection, lookup broker failed.", remoteAddress, e);
             close();
         }
     }
@@ -365,29 +371,23 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         cnx.writeAndFlush(frame)
                 .addListener(future -> {
                     if (!future.isSuccess()) {
-                        log.error("ProxyConnection failed to write frame.", future.cause());
+                        log.error("[{}] ProxyConnection failed to write frame.", remoteAddress, future.cause());
                     }
                 });
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("ProxyConnection exception caught: ", cause);
+        super.exceptionCaught(ctx, cause);
+        log.error("[{}] Closing the proxy connection, exception caught: ", remoteAddress, cause);
+        close();
     }
 
     public void close() {
-        log.info("ProxyConnection close.");
-        if (log.isDebugEnabled()) {
-            log.debug("ProxyConnection close.");
+        if (state != State.Closed) {
+            state = State.Closing;
         }
-
-        if (proxyHandler != null) {
-            resetProxyHandler();
-        }
-        if (cnx != null) {
-            cnx.close();
-        }
-        state = State.Closed;
+        cnx.close();
     }
 
 }

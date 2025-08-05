@@ -84,6 +84,41 @@
   <!-- dependency definitions -->
   <dependencyManagement>
     <dependencies>
+
+      <dependency>
+        <groupId>org.apache.qpid</groupId>
+        <artifactId>qpid-broker-plugins-amqp-0-8-protocol</artifactId>
+        <version>${qpid-protocol-plugin.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.qpid</groupId>
+        <artifactId>qpid-broker-core</artifactId>
+        <version>${qpid-protocol-plugin.version}</version>
+        <exclusions>
+          <exclusion>
+            <artifactId>jackson-core</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+          </exclusion>
+          <exclusion>
+            <artifactId>jackson-databind</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+          </exclusion>
+          <exclusion>
+            <artifactId>guava</artifactId>
+            <groupId>com.google.guava</groupId>
+          </exclusion>
+          <exclusion>
+            <artifactId>slf4j-api</artifactId>
+            <groupId>org.slf4j</groupId>
+          </exclusion>
+          <exclusion>
+            <artifactId>commons-lang3</artifactId>
+            <groupId>org.apache.commons</groupId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
       <dependency>
         <groupId>io.streamnative</groupId>
         <artifactId>streamnative-bom</artifactId>

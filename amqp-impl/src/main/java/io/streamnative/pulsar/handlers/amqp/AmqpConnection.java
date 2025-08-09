@@ -18,6 +18,7 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -28,6 +29,8 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,6 +39,7 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.authentication.AuthenticationProvider;
 import org.apache.pulsar.broker.authentication.AuthenticationState;
 import org.apache.pulsar.broker.namespace.LookupOptions;
@@ -109,6 +113,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
     @Getter
     private AmqpBrokerService amqpBrokerService;
     private AuthenticationState authenticationState;
+    public final static String SUPPORT_MECHANISM = "PLAIN AMQPLAIN token";
 
     public AmqpConnection(AmqpServiceConfiguration amqpConfig,
                           AmqpBrokerService amqpBrokerService) {
@@ -201,7 +206,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
             }
 
             String authMethod = String.valueOf(mechanism);
-            if (authMethod.equals("PLAIN")) {
+            if (authMethod.equals("PLAIN") || authMethod.equals("AMQPLAIN")) {
                 authMethod = "basic";
             }
 
@@ -219,18 +224,14 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                 AuthData authData;
                 if (authMethod.equals("basic")) {
                     // Original format: \000USERNAME\000PASSWORD
-                    String splitter = "\000";
-                    String[] data = StringUtils.stripStart(new String(response, StandardCharsets.UTF_8), splitter)
-                            .split(splitter);
-                    if (data.length != 2) {
-                        if (log.isDebugEnabled()) {
-                            log.debug("Authentication data format error: mechanism={}", mechanism);
-                        }
-                        sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "Authentication data format error", 0);
+                    // Encode data to Pulsar format: USERNAME:PASSWORD
+                    Pair<String, String> userAndPw = getUserAndPwForBasicAuth(response, String.valueOf(mechanism));
+                    if (userAndPw == null) {
+                        // The userAndPw is null indicates auth data is invalid.
                         return;
                     }
-                    // Encode data to Pulsar format: USERNAME:PASSWORD
-                    authData = AuthData.of(String.format("%s:%s", data[0], data[1]).getBytes(StandardCharsets.UTF_8));
+                    authData = AuthData.of(String.format("%s:%s", userAndPw.getLeft(), userAndPw.getRight())
+                            .getBytes(StandardCharsets.UTF_8));
                 } else {
                     authData = AuthData.of(response);
                 }
@@ -255,6 +256,42 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
 
         writeFrame(tuneBody.generateFrame(0));
         state = ConnectionState.AWAIT_TUNE_OK;
+    }
+
+    private Pair<String, String> getUserAndPwForBasicAuth(byte[] response, String mechanism) {
+        if ("PLAIN".equals(mechanism)) {
+            String splitter = "\000";
+            String[] data = StringUtils.stripStart(new String(response, StandardCharsets.UTF_8), splitter)
+                    .split(splitter);
+            if (data.length != 2) {
+                log.error("Authentication data format error: mechanism={}", mechanism);
+                sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "Authentication data format error", 0);
+                return null;
+            }
+            return Pair.of(data[0], data[1]);
+        } else if ("AMQPLAIN".equals(mechanism)) {
+            Map<String, String> dataMap = new HashMap<>();
+            ByteBuf byteBuf = Unpooled.wrappedBuffer(response);
+            while (byteBuf.isReadable()) {
+                byte[] keyData = new byte[byteBuf.readByte()];
+                byteBuf.readBytes(keyData);
+                byteBuf.readByte();
+                byte[] valueData = new byte[byteBuf.readInt()];
+                byteBuf.readBytes(valueData);
+                dataMap.put(new String(keyData), new String(valueData));
+            }
+            if (!dataMap.containsKey("LOGIN") || !dataMap.containsKey("PASSWORD")) {
+                log.error("Authentication data format error: mechanism={}", mechanism);
+                sendConnectionClose(ErrorCodes.CONNECTION_FORCED, "Authentication data format error", 0);
+                return null;
+            }
+            return Pair.of(dataMap.get("LOGIN"), dataMap.get("PASSWORD"));
+        } else {
+            log.error("Authentication data format error: unsupported mechanism={}", mechanism);
+            sendConnectionClose(ErrorCodes.CONNECTION_FORCED,
+                    "Authentication data format error, unsupported mechanism", 0);
+            return null;
+        }
     }
 
     @Override
@@ -469,7 +506,7 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
                     (short) pv.getActualMinorVersion(),
                     null,
                     // TODO temporary modification
-                    "PLAIN token".getBytes(US_ASCII),
+                    SUPPORT_MECHANISM.getBytes(US_ASCII),
                     "en_US".getBytes(US_ASCII));
             writeFrame(responseBody.generateFrame(0));
             state = ConnectionState.AWAIT_START_OK;

@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.log4j.Log4j2;
 import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.mledger.ManagedLedger;
-import org.apache.bookkeeper.mledger.impl.ManagedCursorContainer;
+import org.apache.bookkeeper.mledger.impl.ManagedCursorContainerImpl;
 import org.apache.bookkeeper.mledger.impl.ManagedLedgerImpl;
 import org.apache.pulsar.broker.PulsarServerException;
 import org.apache.pulsar.broker.PulsarService;
@@ -191,7 +191,7 @@ public abstract class AmqpProtocolTestBase {
         when(subscription.addConsumer(Mockito.any())).thenReturn(CompletableFuture.completedFuture(null));
         when(persistentTopic.getSubscriptions()).thenReturn(new ConcurrentHashMap<>());
         ManagedLedger managedLedger = mock(ManagedLedgerImpl.class);
-        when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainer());
+        when(managedLedger.getCursors()).thenReturn(new ManagedCursorContainerImpl());
         when(persistentTopic.getManagedLedger()).thenReturn(managedLedger);
         when(persistentTopic.getBrokerService()).thenReturn(brokerService);
         CompletableFuture<Void> deleteCpm = new CompletableFuture<>();

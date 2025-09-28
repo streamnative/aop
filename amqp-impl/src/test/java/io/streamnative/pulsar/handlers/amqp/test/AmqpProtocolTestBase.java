@@ -138,7 +138,7 @@ public abstract class AmqpProtocolTestBase {
         pulsarService = mock(PulsarService.class);
         PulsarAdmin adminClient = mock(PulsarAdmin.class);
         Namespaces namespaces = mock(Namespaces.class);
-        ServiceConfiguration serviceConfiguration = mock(ServiceConfiguration.class);
+        ServiceConfiguration serviceConfiguration = spy(new ServiceConfiguration());
         when(pulsarService.getAdminClient()).thenReturn(adminClient);
         when(pulsarService.getAdminClient().namespaces()).thenReturn(namespaces);
         when(pulsarService.getBrokerService()).then(new Answer<Object>() {

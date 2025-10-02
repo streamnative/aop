@@ -322,7 +322,7 @@ public class PersistentExchange extends AbstractAmqpExchange {
             if (log.isDebugEnabled()) {
                 log.debug("Create cursor {} for topic {}", name, persistentTopic.getName());
             }
-            ledger.asyncOpenCursor(name, CommandSubscribe.InitialPosition.Earliest,
+            ledger.asyncOpenCursor(name, CommandSubscribe.InitialPosition.Latest,
                     new AsyncCallbacks.OpenCursorCallback() {
                     @Override
                     public void openCursorComplete(ManagedCursor cursor, Object ctx) {

@@ -139,4 +139,21 @@ public class AmqpServiceConfiguration extends ServiceConfiguration {
     )
     private int amqpPulsarConsumerQueueSize = 10000;
 
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        doc = "is the amqp authentication open"
+    )
+    private boolean amqpAuthenticationEnabled = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP,
+            doc = "is the amqp authorization open"
+    )
+    private boolean amqpAuthorizationEnabled = false;
+
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        doc = "Mechanisms supported"
+    )
+    private String amqpAllowedMechanisms = "PLAIN token";
 }

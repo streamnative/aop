@@ -237,7 +237,7 @@ public class ProxyConnection extends ChannelInboundHandlerAdapter implements
         String virtualHostStr = AMQShortString.toString(virtualHost);
         if ((virtualHostStr != null) && virtualHostStr.charAt(0) == '/') {
             virtualHostStr = virtualHostStr.substring(1);
-            if (org.apache.commons.lang3.StringUtils.isEmpty(virtualHostStr)){
+            if (StringUtils.isEmpty(virtualHostStr)){
                 virtualHostStr = AmqpConnection.DEFAULT_NAMESPACE;
             }
         }

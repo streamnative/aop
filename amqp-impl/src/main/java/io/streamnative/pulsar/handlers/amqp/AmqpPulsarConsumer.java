@@ -14,6 +14,7 @@
 package io.streamnative.pulsar.handlers.amqp;
 
 import io.streamnative.pulsar.handlers.amqp.utils.MessageConvertUtils;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +26,6 @@ import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.impl.MessageIdImpl;
 import org.apache.pulsar.common.util.Backoff;
-import org.apache.pulsar.common.util.BackoffBuilder;
 import org.apache.qpid.server.protocol.v0_8.AMQShortString;
 
 /**
@@ -49,11 +49,11 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         this.autoAck = autoAck;
         this.amqpChannel = amqpChannel;
         this.executorService = executorService;
-        this.consumeBackoff = new BackoffBuilder()
-                .setInitialTime(1, TimeUnit.MILLISECONDS)
-                .setMax(1, TimeUnit.SECONDS)
-                .setMandatoryStop(0, TimeUnit.SECONDS)
-                .create();
+        this.consumeBackoff = Backoff.builder()
+                .initialDelay(Duration.ofMillis(1))
+                .maxBackoff(Duration.ofSeconds(1))
+                .mandatoryStop(Duration.ofSeconds(0))
+                .build();
     }
 
     public void startConsume() {
@@ -69,7 +69,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
         try {
             message = this.consumer.receive(0, TimeUnit.SECONDS);
             if (message == null) {
-                this.executorService.schedule(this::consume, consumeBackoff.next(), TimeUnit.MILLISECONDS);
+                this.executorService.schedule(this::consume, consumeBackoff.next().toMillis(), TimeUnit.MILLISECONDS);
                 return;
             }
 
@@ -95,7 +95,7 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
             consumeBackoff.reset();
             this.consume();
         } catch (Exception e) {
-            long backoff = consumeBackoff.next();
+            long backoff = consumeBackoff.next().toMillis();
             log.error("Failed to receive message and send to client, retry in {} ms.", backoff, e);
             this.executorService.schedule(this::consume, backoff, TimeUnit.MILLISECONDS);
         }

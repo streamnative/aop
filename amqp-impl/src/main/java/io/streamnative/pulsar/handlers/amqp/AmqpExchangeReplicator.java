@@ -16,6 +16,7 @@ package io.streamnative.pulsar.handlers.amqp;
 import static org.apache.pulsar.broker.service.persistent.PersistentTopic.MESSAGE_RATE_BACKOFF_MS;
 
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -55,8 +56,11 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
     private ManagedCursor cursor;
     private ScheduledExecutorService scheduledExecutorService;
 
-    protected final Backoff backOff = new Backoff(
-            100, TimeUnit.MILLISECONDS, 1, TimeUnit.MINUTES, 0, TimeUnit.MILLISECONDS);
+    protected final Backoff backOff = Backoff.builder()
+             .initialDelay(Duration.ZERO.ofMillis(100))
+                .maxBackoff(Duration.ofMinutes(1))
+            .mandatoryStop(Duration.ofMillis(0))
+            .build();
 
     private static final AtomicReferenceFieldUpdater<AmqpExchangeReplicator, State> STATE_UPDATER =
             AtomicReferenceFieldUpdater.newUpdater(AmqpExchangeReplicator.class, State.class, "state");
@@ -83,8 +87,11 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             AtomicIntegerFieldUpdater.newUpdater(AmqpExchangeReplicator.class, "havePendingRead");
     private volatile int havePendingRead = FALSE;
 
-    private final Backoff readFailureBackoff = new Backoff(
-            1, TimeUnit.SECONDS, 1, TimeUnit.MINUTES, 0, TimeUnit.MILLISECONDS);
+    private final Backoff readFailureBackoff = Backoff.builder()
+            .initialDelay(Duration.ofSeconds(1))
+            .maxBackoff(Duration.ofMinutes(1))
+            .mandatoryStop(Duration.ofMillis(0))
+            .build();
 
     private final ExecutorService routeExecutor;
 
@@ -114,7 +121,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
 
     public void startReplicate() {
         if (STATE_UPDATER.get(AmqpExchangeReplicator.this).equals(AmqpExchangeReplicator.State.Stopping)) {
-            long waitTimeMs = backOff.next();
+            long waitTimeMs = backOff.next().toMillis();
             if (log.isDebugEnabled()) {
                 log.debug("{} Waiting for producer close before attempting reconnect, retrying in {} s",
                         name, waitTimeMs / 1000);
@@ -153,7 +160,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
 
     private void retryStartReplicator(Throwable ex) {
         if (STATE_UPDATER.compareAndSet(this, State.Starting, State.Stopped)) {
-            long waitTimeMs = backOff.next();
+            long waitTimeMs = backOff.next().toMillis();
             if (log.isDebugEnabled()) {
                 log.debug("{} Failed to start replicator, errorMsg: {}, retrying in {} s.",
                         name, ex.getMessage(), waitTimeMs / 1000);
@@ -242,7 +249,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
         }
         HAVE_PENDING_READ_UPDATER.set(this, FALSE);
         if (CollectionUtils.isEmpty(list)) {
-            long delay = readFailureBackoff.next();
+            long delay = readFailureBackoff.next().toMillis();
             log.warn("{} The read entry list is empty, will retry in {} ms. ReadPosition: {}, LAC: {}.",
                     name, delay, cursor.getReadPosition(), topic.getManagedLedger().getLastConfirmedEntry());
             scheduledExecutorService.schedule(this::readMoreEntries, delay, TimeUnit.MILLISECONDS);
@@ -329,7 +336,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
             return;
         }
 
-        long waitTimeMs = readFailureBackoff.next();
+        long waitTimeMs = readFailureBackoff.next().toMillis();
         if (log.isDebugEnabled()) {
             log.debug("{} Read entries from bookie failed, retrying in {} s", name, waitTimeMs / 1000, exception);
         }
@@ -380,7 +387,7 @@ public abstract class AmqpExchangeReplicator implements AsyncCallbacks.ReadEntri
                         STATE_UPDATER.set(AmqpExchangeReplicator.this, State.Stopped);
                         return;
                     }
-                    long waitTimeMs = backOff.next();
+                    long waitTimeMs = backOff.next().toMillis();
                     log.error("[{}] AMQP Exchange Replicator stop failed. retrying in {} s",
                             name, waitTimeMs / 1000, e);
                     AmqpExchangeReplicator.this.scheduledExecutorService.schedule(

@@ -28,7 +28,7 @@ import io.streamnative.pulsar.handlers.amqp.qpid.core.ConnectionBuilder;
 import io.streamnative.pulsar.handlers.amqp.qpid.core.JmsTestBase;
 import io.streamnative.pulsar.handlers.amqp.qpid.jms_1_1.extensions.BrokerManagementHelper;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -43,8 +43,6 @@ import javax.jms.JMSException;
 import javax.jms.Session;
 import javax.jms.TemporaryQueue;
 import javax.naming.NamingException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.qpid.server.model.Port;
 import org.apache.qpid.server.model.Protocol;
 import org.apache.qpid.server.security.FileTrustStore;
@@ -59,12 +57,14 @@ import org.apache.qpid.test.utils.tls.KeyCertificatePair;
 import org.apache.qpid.test.utils.tls.PrivateKeyEntry;
 import org.apache.qpid.test.utils.tls.TlsResource;
 import org.apache.qpid.test.utils.tls.TlsResourceBuilder;
+import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
-import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.util.Callback;
 import org.hamcrest.Matchers;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -109,7 +109,7 @@ public class AuthenticationTest extends JmsTestBase
     private static final String USER_PASSWORD = "user";
 
     private static final Server CRL_SERVER = new Server();
-    private static final HandlerCollection HANDLERS = new HandlerCollection();
+    private static final Handler.Collection HANDLERS = new Handler.Sequence();
 
     private static final String CRL_TEMPLATE = "http://localhost:%d/%s";
 
@@ -832,7 +832,7 @@ public class AuthenticationTest extends JmsTestBase
         return DataUrlUtils.getDataUrlForBytes(Files.readAllBytes(file));
     }
 
-    private static class CrlServerHandler extends AbstractHandler
+    private static class CrlServerHandler extends Handler.Abstract
     {
         final Path crlPath;
 
@@ -842,15 +842,13 @@ public class AuthenticationTest extends JmsTestBase
         }
 
         @Override
-        public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
+        public boolean handle(Request request, Response response, Callback callback)
                 throws IOException
         {
             final byte[] crlBytes = Files.readAllBytes(crlPath);
-            response.setStatus(HttpServletResponse.SC_OK);
-            try (final OutputStream responseBody = response.getOutputStream())
-            {
-                responseBody.write(crlBytes);
-            }
+            response.setStatus(HttpStatus.OK_200);
+            response.write(true, ByteBuffer.wrap(crlBytes), callback);
+            return true;
         }
     }
 }

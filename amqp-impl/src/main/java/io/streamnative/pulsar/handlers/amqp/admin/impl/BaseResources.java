@@ -143,40 +143,36 @@ public class BaseResources {
         return aop().getBrokerService().getPulsar();
     }
 
-    public boolean isRequestHttps() {
-        return "https".equalsIgnoreCase(httpRequest.getScheme());
-    }
-
     protected CompletableFuture<Void> validateTopicOwnershipAsync(TopicName topicName, boolean authoritative) {
         NamespaceService nsService = pulsar().getNamespaceService();
 
         LookupOptions options = LookupOptions.builder()
                 .authoritative(authoritative)
-                .requestHttps(isRequestHttps())
                 .readOnly(false)
                 .loadTopicsInBundle(false)
                 .build();
 
-        return nsService.getWebServiceUrlAsync(topicName, options)
-                .thenApply(webUrl -> {
+        return nsService.getLookupResultForWebRequestAsync(topicName, options)
+                .thenApply(lookupResult -> {
                     // Ensure we get a url
-                    if (webUrl == null || !webUrl.isPresent()) {
-                        log.info("Unable to get web service url");
+                    if (lookupResult.isEmpty()) {
+                        log.warn("Unable to get lookup result for topic: {}, authoritative: {}",
+                                topicName, authoritative);
                         throw new RestException(Response.Status.PRECONDITION_FAILED,
                                 "Failed to find ownership for topic:" + topicName);
                     }
-                    return webUrl.get();
+                    return lookupResult.get();
                 }).thenCompose(webUrl -> nsService.isServiceUnitOwnedAsync(topicName)
                         .thenApply(isTopicOwned -> Pair.of(webUrl, isTopicOwned))
                 ).thenAccept(pair -> {
-                    URL webUrl = pair.getLeft();
+                    URI webUri = pair.getLeft().toLookupRedirectUri(uri.getRequestUri());
                     boolean isTopicOwned = pair.getRight();
 
                     if (!isTopicOwned) {
                         boolean newAuthoritative = isLeaderBroker(pulsar());
                         // Replace the host and port of the current request and redirect
                         URI redirect = UriBuilder.fromUri(uri.getRequestUri())
-                                .host(webUrl.getHost())
+                                .host(webUri.getHost())
                                 .port(aop().getAmqpConfig().getAmqpAdminPort())
                                 .replaceQueryParam("authoritative", newAuthoritative)
                                 .build();

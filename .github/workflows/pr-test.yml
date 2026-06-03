@@ -11,7 +11,23 @@ on:
       - branch-*
 
 jobs:
+  fork-pr-preflight:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Explain skipped Maven validation for fork PRs
+      run: |
+        echo "This pull request comes from a fork."
+        echo "The full Maven workflow is skipped because it depends on"
+        echo "private GitHub Packages credentials that are not exposed to fork PRs."
+        echo "Maintainers can run the full workflow after the branch is pushed to"
+        echo "this repository or by triggering an internal workflow."
+
   build:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
 
     runs-on: ubuntu-latest
 
@@ -34,10 +50,15 @@ jobs:
         docker rmi $(docker images -q) -f
         df -h
 
-    - name: Configure Maven Settings
-      uses: s4u/maven-settings-action@v2.7.0
+    - name: Set github server
+      uses: s4u/maven-settings-action@v3.1.0
       with:
-        servers: '[{"id": "github", "username": "streamnativebot", "password": "${{ secrets.SNBOT_GITHUB_TOKEN }}"}]'
+        servers: |
+          [{
+              "id": "github",
+              "username": "streamnativebot",
+              "password": "${{ secrets.SNBOT_GITHUB_TOKEN }}"
+          }]
 
     - name: License check
       run: mvn license:check

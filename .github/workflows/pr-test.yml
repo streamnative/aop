@@ -11,23 +11,7 @@ on:
       - branch-*
 
 jobs:
-  fork-pr-preflight:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v1
-
-    - name: Explain skipped Maven validation for fork PRs
-      run: |
-        echo "This pull request comes from a fork."
-        echo "The full Maven workflow is skipped because it depends on"
-        echo "private GitHub Packages credentials that are not exposed to fork PRs."
-        echo "Maintainers can run the full workflow after the branch is pushed to"
-        echo "this repository or by triggering an internal workflow."
-
   build:
-    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
 
     runs-on: ubuntu-latest
 

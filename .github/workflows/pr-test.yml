@@ -34,15 +34,10 @@ jobs:
         docker rmi $(docker images -q) -f
         df -h
 
-    - name: Set github server
-      uses: s4u/maven-settings-action@v3.1.0
+    - name: Configure Maven Settings
+      uses: s4u/maven-settings-action@v2.7.0
       with:
-        servers: |
-          [{
-              "id": "github",
-              "username": "streamnativebot",
-              "password": "${{ secrets.SNBOT_GITHUB_TOKEN }}"
-          }]
+        servers: '[{"id": "github", "username": "streamnativebot", "password": "${{ secrets.SNBOT_GITHUB_TOKEN }}"}]'
 
     - name: License check
       run: mvn license:check

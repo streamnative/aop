@@ -74,7 +74,7 @@ public class MultiBundlesTest extends AmqpTestBase {
 
         AtomicInteger receiveCount = new AtomicInteger();
         AtomicBoolean flag1 = new AtomicBoolean(false);
-        channel.basicConsume(qu1, false, new DefaultConsumer(channel) {
+        channel.basicConsume(qu1, true, new DefaultConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
                                        byte[] body) throws IOException {
@@ -82,12 +82,11 @@ public class MultiBundlesTest extends AmqpTestBase {
                 if (!new String(body).contains(key1)) {
                     flag1.set(true);
                 }
-                channel.basicAck(envelope.getDeliveryTag(), false);
             }
         });
 
         AtomicBoolean flag2 = new AtomicBoolean(false);
-        channel.basicConsume(qu2, false, new DefaultConsumer(channel) {
+        channel.basicConsume(qu2, true, new DefaultConsumer(channel) {
             @Override
             public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
                                        byte[] body) throws IOException {
@@ -95,7 +94,6 @@ public class MultiBundlesTest extends AmqpTestBase {
                 if (!new String(body).contains(key2)) {
                     flag2.set(true);
                 }
-                channel.basicAck(envelope.getDeliveryTag(), false);
             }
         });
 

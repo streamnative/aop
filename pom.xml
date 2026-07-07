@@ -269,6 +269,13 @@
         <version>${maven-compiler-plugin.version}</version>
         <configuration>
           <release>${project.compiler.release}</release>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>1.18.32</version>
+            </path>
+          </annotationProcessorPaths>
           <compilerArgs>
             <!--
             <compilerArg>-Werror</compilerArg>

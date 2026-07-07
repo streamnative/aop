@@ -102,7 +102,7 @@ public abstract class AmqpProtocolHandlerTestBase {
     @Getter
     private List<Integer> aopAdminPortList = new ArrayList<>();
 
-    private final Integer inFlightSizeInMB = 5;
+    private final Long inFlightSizeInMB = 5L;
 
     public AmqpProtocolHandlerTestBase() {
         resetConfig();

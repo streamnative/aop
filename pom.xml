@@ -29,7 +29,7 @@
 
   <groupId>io.streamnative.pulsar.handlers</groupId>
   <artifactId>pulsar-protocol-handler-amqp-parent</artifactId>
-  <version>3.3.0-SNAPSHOT</version>
+  <version>5.0.0-M1-SNAPSHOT</version>
   <name>StreamNative :: Pulsar Protocol Handler :: AoP Parent</name>
   <description>Parent for AMQP on Pulsar implemented using Pulsar Protocol Handler.</description>
 
@@ -44,7 +44,7 @@
     <sn.bom.version>5.0.0-M1-SNAPSHOT</sn.bom.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
-    <opentelemetry.version>1.56.0</opentelemetry.version>
+    <opentelemetry.version>1.62.0</opentelemetry.version>
 
     <!-- test dependencies -->
     <qpid-client-version>6.4.0</qpid-client-version>
@@ -269,6 +269,13 @@
         <version>${maven-compiler-plugin.version}</version>
         <configuration>
           <release>${project.compiler.release}</release>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>1.18.32</version>
+            </path>
+          </annotationProcessorPaths>
           <compilerArgs>
             <!--
             <compilerArg>-Werror</compilerArg>

@@ -44,7 +44,7 @@
     <sn.bom.version>5.0.0-M1-SNAPSHOT</sn.bom.version>
     <qpid-protocol-plugin.version>8.0.0</qpid-protocol-plugin.version>
     <rabbitmq.version>5.8.0</rabbitmq.version>
-    <opentelemetry.version>1.56.0</opentelemetry.version>
+    <opentelemetry.version>1.62.0</opentelemetry.version>
 
     <!-- test dependencies -->
     <qpid-client-version>6.4.0</qpid-client-version>

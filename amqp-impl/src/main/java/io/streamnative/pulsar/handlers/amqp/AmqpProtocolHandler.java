@@ -24,6 +24,7 @@ import io.streamnative.pulsar.handlers.amqp.proxy.ProxyService;
 import io.streamnative.pulsar.handlers.amqp.utils.ConfigurationUtils;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Optional;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.ServiceConfiguration;
@@ -46,6 +47,7 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     public static final String SSL_PREFIX = "amqp+ssl://";
     public static final String PLAINTEXT_PREFIX = "amqp://";
     public static final String LISTENER_DEL = ",";
+    public static final String PROTOCOL_DATA_SEP = "|";
     public static final String LISTENER_PATTEN = "^(amqp)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-0-9+]";
 
     @Getter
@@ -84,10 +86,13 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     // This method is called after initialize
     @Override
     public String getProtocolDataToAdvertise() {
+        // Format: <amqp-listeners>|<admin-port>
+        // Admin port is required for multi-broker ownership redirects of AoP admin REST calls.
+        String protocolData = getAppliedAmqpListeners(amqpConfig) + PROTOCOL_DATA_SEP + amqpConfig.getAmqpAdminPort();
         if (log.isDebugEnabled()) {
-            log.debug("Get configured listeners: {}", getAppliedAmqpListeners(amqpConfig));
+            log.debug("Get protocol data to advertise: {}", protocolData);
         }
-        return getAppliedAmqpListeners(amqpConfig);
+        return protocolData;
     }
 
     @Override
@@ -182,9 +187,14 @@ public class AmqpProtocolHandler implements ProtocolHandler {
     @Override
     public void close() {
         try {
-            webServer.stop();
+            if (webServer != null) {
+                webServer.stop();
+            }
         } catch (Exception e) {
             log.error("Failed to stop web server for aop", e);
+        }
+        if (amqpBrokerService != null) {
+            amqpBrokerService.close();
         }
     }
 
@@ -206,5 +216,46 @@ public class AmqpProtocolHandler implements ProtocolHandler {
 
     public static String amqpUrl(String host, int port) {
         return String.format("amqp://%s:%d", host, port);
+    }
+
+    /**
+     * Extract AMQP listeners from protocol advertise data.
+     * Compatible with both legacy format (`amqp://host:port`) and
+     * new format (`amqp://host:port|adminPort`).
+     */
+    public static String extractAmqpListeners(String protocolData) {
+        if (protocolData == null) {
+            return null;
+        }
+        int sep = protocolData.lastIndexOf(PROTOCOL_DATA_SEP);
+        if (sep < 0) {
+            return protocolData;
+        }
+        String maybeAdminPort = protocolData.substring(sep + 1);
+        try {
+            Integer.parseInt(maybeAdminPort);
+            return protocolData.substring(0, sep);
+        } catch (NumberFormatException e) {
+            return protocolData;
+        }
+    }
+
+    /**
+     * Extract AoP admin port from protocol advertise data.
+     * Returns empty if the data uses the legacy format without admin port.
+     */
+    public static Optional<Integer> extractAmqpAdminPort(String protocolData) {
+        if (protocolData == null) {
+            return Optional.empty();
+        }
+        int sep = protocolData.lastIndexOf(PROTOCOL_DATA_SEP);
+        if (sep < 0) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Integer.parseInt(protocolData.substring(sep + 1)));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 }

@@ -124,8 +124,9 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     /**
      * The delivery tag is unique per channel. This is pre-incremented before putting into the deliver frame so that
      * value of this represents the <b>last</b> tag sent out.
+     * AtomicLong is required because multi-bundle mode may deliver from multiple consumers concurrently.
      */
-    protected volatile long deliveryTag = 0;
+    protected final AtomicLong deliveryTag = new AtomicLong(0);
     protected final AmqpFlowCreditManager creditManager;
     protected final AtomicBoolean blockedOnCredit = new AtomicBoolean(false);
     public static final int DEFAULT_CONSUMER_PERMIT = 1000;
@@ -905,7 +906,7 @@ public class AmqpChannel implements ServerChannelMethodProcessor {
     }
 
     public long getNextDeliveryTag() {
-        return ++deliveryTag;
+        return deliveryTag.incrementAndGet();
     }
 
     public AmqpConnection getConnection() {

@@ -2,13 +2,17 @@ name: aop mvn build check and ut
 
 on:
   pull_request:
+    # PR target branches (e.g. master, branch-4.0)
     branches:
       - master
       - branch-*
   push:
+    # Only maintenance / main lines. Exclude PR head branches like branch-4.0.10.2
+    # so "branch-4.0.10.2 -> branch-4.0" PRs are not double-triggered by push.
     branches:
       - master
       - branch-*
+      - '!branch-*.*.*'
 
 jobs:
   build:

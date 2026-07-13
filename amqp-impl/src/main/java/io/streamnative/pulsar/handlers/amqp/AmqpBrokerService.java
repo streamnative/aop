@@ -16,15 +16,19 @@ package io.streamnative.pulsar.handlers.amqp;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.streamnative.pulsar.handlers.amqp.admin.AmqpAdmin;
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.authentication.AuthenticationService;
+import org.apache.pulsar.broker.resources.MetadataStoreCacheLoader;
 
 /**
  * AMQP broker related.
  */
+@Slf4j
 public class AmqpBrokerService {
     @Getter
     private AmqpTopicManager amqpTopicManager;
@@ -42,6 +46,8 @@ public class AmqpBrokerService {
     private PulsarService pulsarService;
     @Getter
     private AmqpAdmin amqpAdmin;
+    @Getter
+    private MetadataStoreCacheLoader metadataStoreCacheLoader;
 
     public AmqpBrokerService(PulsarService pulsarService, AmqpServiceConfiguration config) {
         this.pulsarService = pulsarService;
@@ -53,6 +59,15 @@ public class AmqpBrokerService {
         this.queueService = new QueueServiceImpl(exchangeContainer, queueContainer);
         this.connectionContainer = new ConnectionContainer(pulsarService, exchangeContainer, queueContainer);
         this.amqpAdmin = new AmqpAdmin("localhost", config.getAmqpAdminPort());
+        try {
+            // Used by admin ownership redirects to resolve the owner broker's amqpAdminPort.
+            this.metadataStoreCacheLoader = new MetadataStoreCacheLoader(pulsarService.getPulsarResources(),
+                    30_000);
+        } catch (Exception e) {
+            // Unit tests may mock PulsarResources without load-report store; keep service usable.
+            log.warn("Failed to init MetadataStoreCacheLoader for AoP, admin redirects may fail", e);
+            this.metadataStoreCacheLoader = null;
+        }
     }
 
     private ExecutorService initRouteExecutor(AmqpServiceConfiguration config) {
@@ -66,5 +81,15 @@ public class AmqpBrokerService {
 
     public AuthenticationService getAuthenticationService() {
         return pulsarService.getBrokerService().getAuthenticationService();
+    }
+
+    public void close() {
+        if (metadataStoreCacheLoader != null) {
+            try {
+                metadataStoreCacheLoader.close();
+            } catch (IOException e) {
+                log.warn("Failed to close MetadataStoreCacheLoader", e);
+            }
+        }
     }
 }

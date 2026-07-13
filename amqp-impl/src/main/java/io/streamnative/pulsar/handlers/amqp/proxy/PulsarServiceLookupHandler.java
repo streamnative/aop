@@ -84,7 +84,7 @@ public class PulsarServiceLookupHandler implements LookupHandler, Closeable {
                 return;
             }
 
-            String amqpBrokerAddress = protocolData.get();
+            String amqpBrokerAddress = AmqpProtocolHandler.extractAmqpListeners(protocolData.get());
             if (!StringUtils.startsWith(amqpBrokerAddress, AmqpProtocolHandler.PLAINTEXT_PREFIX)
                 && !StringUtils.startsWith(amqpBrokerAddress, AmqpProtocolHandler.SSL_PREFIX)) {
                 amqpBrokerAddress = AmqpProtocolHandler.PLAINTEXT_PREFIX + amqpBrokerAddress;

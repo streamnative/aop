@@ -23,6 +23,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
@@ -33,10 +34,12 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pulsar.broker.PulsarService;
 import org.apache.pulsar.broker.namespace.LookupOptions;
 import org.apache.pulsar.broker.namespace.NamespaceService;
+import org.apache.pulsar.broker.resources.MetadataStoreCacheLoader;
 import org.apache.pulsar.broker.resources.NamespaceResources;
 import org.apache.pulsar.broker.service.BrokerServiceException;
 import org.apache.pulsar.broker.web.RestException;
@@ -44,6 +47,7 @@ import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.common.naming.TopicName;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.apache.pulsar.metadata.api.MetadataStoreException;
+import org.apache.pulsar.policies.data.loadbalancer.LoadManagerReport;
 
 /**
  * Base resources.
@@ -174,10 +178,14 @@ public class BaseResources {
 
                     if (!isTopicOwned) {
                         boolean newAuthoritative = isLeaderBroker(pulsar());
-                        // Replace the host and port of the current request and redirect
+                        int adminPort = resolveOwnerAmqpAdminPort(webUrl)
+                                .orElseThrow(() -> new RestException(Response.Status.PRECONDITION_FAILED,
+                                        "Failed to resolve amqp admin port for topic:" + topicName));
+                        // Redirect to the owner broker's AoP admin endpoint.
+                        // Host comes from lookup; port must be the owner admin port (not local).
                         URI redirect = UriBuilder.fromUri(uri.getRequestUri())
                                 .host(webUrl.getHost())
-                                .port(aop().getAmqpConfig().getAmqpAdminPort())
+                                .port(adminPort)
                                 .replaceQueryParam("authoritative", newAuthoritative)
                                 .build();
                         // Redirect
@@ -200,6 +208,39 @@ public class BaseResources {
                         throw new RestException(ex.getCause());
                     }
                 });
+    }
+
+    private Optional<Integer> resolveOwnerAmqpAdminPort(URL webUrl) {
+        MetadataStoreCacheLoader cacheLoader = aop().getAmqpBrokerService().getMetadataStoreCacheLoader();
+        if (cacheLoader == null) {
+            log.warn("MetadataStoreCacheLoader is unavailable, cannot resolve owner amqp admin port");
+            return Optional.empty();
+        }
+        String webUrlStr = webUrl.toString();
+        List<LoadManagerReport> brokers = cacheLoader.getAvailableBrokers();
+        Optional<LoadManagerReport> owner = brokers.stream()
+                .filter(report -> matchesOwnerBroker(report, webUrlStr))
+                .findFirst();
+        if (owner.isEmpty()) {
+            log.warn("Unable to locate load report for owner broker. webUrl={}, available={}",
+                    webUrlStr, brokers.size());
+            return Optional.empty();
+        }
+        Optional<String> protocolData = owner.get().getProtocol(AmqpProtocolHandler.PROTOCOL_NAME);
+        if (protocolData.isEmpty()) {
+            log.warn("Owner broker has no amqp protocol data. webServiceUrl={}", owner.get().getWebServiceUrl());
+            return Optional.empty();
+        }
+        Optional<Integer> adminPort = AmqpProtocolHandler.extractAmqpAdminPort(protocolData.get());
+        if (adminPort.isEmpty()) {
+            log.warn("Owner broker amqp protocol data has no admin port: {}", protocolData.get());
+        }
+        return adminPort;
+    }
+
+    private static boolean matchesOwnerBroker(LoadManagerReport report, String webUrl) {
+        return StringUtils.equals(report.getWebServiceUrl(), webUrl)
+                || StringUtils.equals(report.getWebServiceUrlTls(), webUrl);
     }
 
     protected static boolean isLeaderBroker(PulsarService pulsar) {

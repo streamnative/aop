@@ -71,13 +71,15 @@ public final class MessageFetchContext {
                 long deliveryTag = channel.getNextDeliveryTag();
                 boolean isRedelivery = consumer.getRedeliveryTracker()
                         .getRedeliveryCount(pair.getLeft().getLedgerId(), pair.getLeft().getEntryId()) > 0;
+                // Register unacked before get-ok so a fast client ack cannot miss the tag.
+                if (!autoAck) {
+                    channel.getUnacknowledgedMessageMap().add(deliveryTag, pair.getLeft(), consumer, 0);
+                    channel.getCreditManager().useCreditForMessages(1, 0);
+                }
                 channel.getConnection().getAmqpOutputConverter().writeGetOk(pair.getRight(), channel.getChannelId(),
                         isRedelivery, deliveryTag, 0);
                 if (autoAck) {
                     consumer.messageAck(pair.getLeft());
-                } else {
-                    channel.getUnacknowledgedMessageMap().add(deliveryTag, pair.getLeft(), consumer, 0);
-                    channel.getCreditManager().useCreditForMessages(1, 0);
                 }
             } else {
                 if (pair != null && pair.getLeft() != null) {

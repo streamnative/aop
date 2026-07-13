@@ -75,6 +75,12 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
 
             MessageIdImpl messageId = (MessageIdImpl) message.getMessageId();
             long deliveryIndex = this.amqpChannel.getNextDeliveryTag();
+            // Register unacked before deliver so a fast client ack cannot miss the tag.
+            if (!this.autoAck) {
+                this.amqpChannel.getUnacknowledgedMessageMap().add(
+                        deliveryIndex, PositionFactory.create(messageId.getLedgerId(), messageId.getEntryId()),
+                        AmqpPulsarConsumer.this, message.size());
+            }
             this.amqpChannel.getConnection().getAmqpOutputConverter().writeDeliver(
                     MessageConvertUtils.messageToAmqpBody(message),
                     this.amqpChannel.getChannelId(),
@@ -87,10 +93,6 @@ public class AmqpPulsarConsumer implements UnacknowledgedMessageMap.MessageProce
                             messageId, consumer.getTopic(), t);
                     return null;
                 });
-            } else {
-                this.amqpChannel.getUnacknowledgedMessageMap().add(
-                        deliveryIndex, PositionFactory.create(messageId.getLedgerId(), messageId.getEntryId()),
-                        AmqpPulsarConsumer.this, message.size());
             }
             consumeBackoff.reset();
             this.consume();

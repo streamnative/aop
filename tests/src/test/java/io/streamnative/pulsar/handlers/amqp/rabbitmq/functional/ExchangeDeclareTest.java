@@ -16,6 +16,7 @@
 
 package io.streamnative.pulsar.handlers.amqp.rabbitmq.functional;
 
+import static org.junit.Assert.assertEquals;
 import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
@@ -116,11 +117,9 @@ public class ExchangeDeclareTest extends ExchangeEquivalenceBase {
 
     private void doTestExchangeDeclaredWithEnumerationEquivalent(Channel channel)
             throws IOException, InterruptedException {
-        for (BuiltinExchangeType exchangeType : new BuiltinExchangeType[]{
-                BuiltinExchangeType.DIRECT,
-                BuiltinExchangeType.FANOUT,
-                BuiltinExchangeType.TOPIC,
-                BuiltinExchangeType.HEADERS}) {
+        assertEquals("There are 8 standard exchange types",
+                8, BuiltinExchangeType.values().length);
+        for (BuiltinExchangeType exchangeType : BuiltinExchangeType.values()) {
             channel.exchangeDeclare(NAME, exchangeType);
             verifyEquivalent(NAME, exchangeType.getType(), false, false, null);
             deleteExchangeWithRetry();

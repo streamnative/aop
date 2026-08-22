@@ -301,6 +301,7 @@ public abstract class ExchangeMessageRouter {
             case Direct -> new DirectExchangeMessageRouter(exchange, routeExecutor);
             case Topic -> new TopicExchangeMessageRouter(exchange, routeExecutor);
             case Headers -> new HeadersExchangeMessageRouter(exchange, routeExecutor);
+            default -> null;
         };
     }
 

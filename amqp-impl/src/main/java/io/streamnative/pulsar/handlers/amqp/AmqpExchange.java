@@ -34,10 +34,20 @@ public interface AmqpExchange {
      *
      */
     enum Type{
-        Direct,
-        Fanout,
-        Topic,
-        Headers;
+        Direct("direct"),
+        Fanout("fanout"),
+        Topic("topic"),
+        Headers("headers"),
+        ConsistentHash("x-consistent-hash"),
+        ModulusHash("x-modulus-hash"),
+        LocalRandom("x-local-random"),
+        Random("x-random");
+
+        private final String type;
+
+        Type(String type) {
+            this.type = type;
+        }
 
         public static Type value(String type) {
             if (type == null || type.length() == 0) {
@@ -53,9 +63,22 @@ public interface AmqpExchange {
                     return Topic;
                 case "headers":
                     return Headers;
+                case "x-consistent-hash":
+                    return ConsistentHash;
+                case "x-modulus-hash":
+                    return ModulusHash;
+                case "x-local-random":
+                    return LocalRandom;
+                case "x-random":
+                    return Random;
                 default:
                     return null;
             }
+        }
+
+        @Override
+        public String toString() {
+            return type;
         }
 
     }

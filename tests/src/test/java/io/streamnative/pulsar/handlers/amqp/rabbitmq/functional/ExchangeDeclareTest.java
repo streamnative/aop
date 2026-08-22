@@ -118,8 +118,8 @@ public class ExchangeDeclareTest extends ExchangeEquivalenceBase {
 
     private void doTestExchangeDeclaredWithEnumerationEquivalent(Channel channel)
             throws IOException, InterruptedException {
-        assertEquals("There are 4 standard exchange types",
-                4, BuiltinExchangeType.values().length);
+        assertEquals("There are 8 standard exchange types",
+                8, BuiltinExchangeType.values().length);
         for (BuiltinExchangeType exchangeType : BuiltinExchangeType.values()) {
             channel.exchangeDeclare(NAME, exchangeType);
             verifyEquivalent(NAME, exchangeType.getType(), false, false, null);

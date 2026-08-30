@@ -14,7 +14,6 @@
 package io.streamnative.pulsar.handlers.amqp.impl;
 
 import static org.apache.curator.shaded.com.google.common.base.Preconditions.checkArgument;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -135,13 +134,19 @@ public class PersistentQueue extends AbstractAmqpQueue {
             CompletableFuture<AmqpExchange> amqpExchangeCompletableFuture =
                     exchangeContainer.asyncGetExchange(namespaceName, exchangeName, false, null);
             amqpExchangeCompletableFuture.whenComplete((amqpExchange, throwable) -> {
-                AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
-                        generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
-                messageRouter.setQueue(this);
-                messageRouter.setExchange(amqpExchange);
-                messageRouter.setArguments(arguments);
-                messageRouter.setBindingKeys(bindingKeys);
-                amqpExchange.addQueue(this).thenAccept(__ -> routers.put(exchangeName, messageRouter));
+                try {
+                    AmqpMessageRouter messageRouter = AbstractAmqpMessageRouter.
+                            generateRouter(AmqpExchange.Type.value(amqpQueueProperty.getType().toString()));
+                    messageRouter.setQueue(this);
+                    messageRouter.setExchange(amqpExchange);
+                    messageRouter.setArguments(arguments);
+                    messageRouter.setBindingKeys(bindingKeys);
+                    routers.put(exchangeName, messageRouter);
+                    amqpExchange.addQueue(this).get();
+                } catch (Exception e) {
+                    log.error("Recover router from queue properties failed, exchange {} - queue {} - bindingKeys {}.",
+                            amqpExchange.getName(), this.getName(), bindingKeys, e);
+                }
             });
         });
     }

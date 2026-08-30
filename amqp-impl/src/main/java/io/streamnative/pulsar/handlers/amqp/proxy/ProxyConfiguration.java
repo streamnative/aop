@@ -31,6 +31,8 @@ public class ProxyConfiguration {
     private static final String CATEGORY_AMQP_PROXY = "AMQP Proxy";
     @Category
     private static final String CATEGORY_BROKER_DISCOVERY = "Broker Discovery";
+    @Category
+    private static final String CATEGORY_AMQP_SSL = "AMQP Proxy SSL";
 
     @FieldContext(
             category = CATEGORY_AMQP,
@@ -85,4 +87,76 @@ public class ProxyConfiguration {
     )
     private int amqpExplicitFlushAfterFlushes = 1000;
 
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "is the amqp proxy ssl open"
+    )
+    private boolean amqpTlsEnabled = false;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslProtocol = "TLSv1.2";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeystoreType = "PKCS12";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeystoreLocation;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeystorePassword;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTruststoreType = "JKS";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTruststoreLocation;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTruststorePassword;
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslKeymanagerAlgorithm = "SunX509";
+
+    @FieldContext(
+            category = CATEGORY_AMQP_SSL,
+            doc = "amqp ssl configuration"
+    )
+    private String amqpSslTrustmanagerAlgorithm = "SunX509";
+
+    @FieldContext(
+        category = CATEGORY_AMQP_SSL,
+        doc = "amqp TLS peer or not"
+    )
+    private boolean amqpSslClientAuth = false;
+
+
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        doc = "Mechanisms supported"
+    )
+    private String amqpAllowedMechanisms = "PLAIN token";
 }

@@ -16,23 +16,33 @@ package io.streamnative.pulsar.handlers.amqp.proxy;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.flush.FlushConsolidationHandler;
+import io.netty.handler.ssl.SslHandler;
 import io.streamnative.pulsar.handlers.amqp.AmqpEncoder;
+import io.streamnative.pulsar.handlers.amqp.utils.SSLUtils;
 
 /**
  * Proxy service channel initializer.
  */
 public class ServiceChannelInitializer extends ChannelInitializer<SocketChannel> {
 
+    public static final String TLS_HANDLER = "tls";
+
     private ProxyService proxyService;
+
+    private final boolean isTlsEnabled;
 
     public ServiceChannelInitializer(ProxyService proxyService) {
         this.proxyService = proxyService;
+        this.isTlsEnabled = proxyService.getProxyConfig().isAmqpTlsEnabled();
     }
 
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
         ch.pipeline().addLast("consolidation", new FlushConsolidationHandler(
                 proxyService.getProxyConfig().getAmqpExplicitFlushAfterFlushes(), true));
+        if (isTlsEnabled) {
+            ch.pipeline().addLast(TLS_HANDLER, new SslHandler(SSLUtils.createSslEngineSun(proxyService.getProxyConfig())));
+        }
         ch.pipeline().addLast("frameEncoder", new AmqpEncoder());
         ch.pipeline().addLast("handler", new ProxyConnection(proxyService));
     }

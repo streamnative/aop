@@ -236,11 +236,15 @@ public class BaseResources {
         return adminPort;
     }
 
-    private static boolean matchesOwnerBroker(LoadManagerReport report, LookupData lookupData) {
-        return StringUtils.equals(report.getWebServiceUrl(), lookupData.getHttpUrl())
-                || StringUtils.equals(report.getWebServiceUrlTls(), lookupData.getHttpUrlTls())
-                || StringUtils.equals(report.getPulsarServiceUrl(), lookupData.getBrokerUrl())
-                || StringUtils.equals(report.getPulsarServiceUrlTls(), lookupData.getBrokerUrlTls());
+    static boolean matchesOwnerBroker(LoadManagerReport report, LookupData lookupData) {
+        return equalsNonBlank(report.getWebServiceUrl(), lookupData.getHttpUrl())
+                || equalsNonBlank(report.getWebServiceUrlTls(), lookupData.getHttpUrlTls())
+                || equalsNonBlank(report.getPulsarServiceUrl(), lookupData.getBrokerUrl())
+                || equalsNonBlank(report.getPulsarServiceUrlTls(), lookupData.getBrokerUrlTls());
+    }
+
+    private static boolean equalsNonBlank(String left, String right) {
+        return StringUtils.isNotBlank(left) && left.equals(right);
     }
 
     protected static boolean isLeaderBroker(PulsarService pulsar) {

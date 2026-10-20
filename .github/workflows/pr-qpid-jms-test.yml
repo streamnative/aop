@@ -18,11 +18,11 @@
 #    steps:
 #    - uses: actions/checkout@v1
 #
-#    - name: Set up JDK 17
+#    - name: Set up JDK 21
 #      uses: actions/setup-java@v2
 #      with:
 #        distribution: 'temurin'
-#        java-version: 17
+#        java-version: 21
 #
 #    - name: clean disk
 #      if: steps.docs.outputs.changed_only == 'no'

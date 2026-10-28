@@ -19,14 +19,12 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.net.SocketAddress;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.pulsar.broker.PulsarService;
 
 
 /**
  * A decoder that decodes amqp requests and responses.
  */
-@Slf4j
 public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
     protected ChannelHandlerContext ctx;
     protected SocketAddress remoteAddress;
@@ -39,18 +37,6 @@ public abstract class AmqpCommandDecoder extends ChannelInboundHandlerAdapter {
     protected AmqpCommandDecoder(PulsarService pulsarService, AmqpServiceConfiguration amqpConfig) {
         this.pulsarService = pulsarService;
         this.amqpConfig = amqpConfig;
-    }
-
-    @Override
-    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
-        if (log.isDebugEnabled()) {
-            log.debug("Channel writability has changed to: {}", ctx.channel().isWritable());
-        }
-    }
-
-
-    public AmqpBrokerDecoder getBrokerDecoder() {
-        return brokerDecoder;
     }
 
     abstract void close();

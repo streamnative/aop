@@ -13,6 +13,7 @@
  */
 package io.streamnative.pulsar.handlers.amqp.rabbitmq;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertTrue;
 
 import com.rabbitmq.client.AMQP;
@@ -24,6 +25,7 @@ import com.rabbitmq.client.Envelope;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.streamnative.pulsar.handlers.amqp.AbstractAmqpExchange;
+import io.streamnative.pulsar.handlers.amqp.AmqpConsumer;
 import io.streamnative.pulsar.handlers.amqp.AmqpTestBase;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentExchange;
 import io.streamnative.pulsar.handlers.amqp.impl.PersistentQueue;
@@ -35,11 +37,16 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.Cleanup;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.pulsar.broker.service.ServerCnx;
+import org.apache.pulsar.broker.service.persistent.PersistentDispatcherMultipleConsumers;
+import org.apache.pulsar.broker.service.persistent.PersistentSubscription;
+import org.apache.pulsar.broker.service.persistent.PersistentTopic;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClient;
@@ -515,6 +522,88 @@ public class RabbitMQMessagingTest extends AmqpTestBase {
         Assert.assertEquals(messageCnt, consumeIndex.get());
         channel.close();
         conn.close();
+    }
+
+    @Test(timeOut = 30_000)
+    public void testConsumeResumesWhenConnectionBecomesWritable() throws Exception {
+        try (Connection conn = getConnection("vhost1", true); Channel channel = conn.createChannel()) {
+            String queue = randQuName();
+            channel.queueDeclare(queue, true, false, false, null);
+            int messageCount = 3;
+            CountDownLatch received = new CountDownLatch(messageCount);
+            AtomicIntegerArray deliveries = new AtomicIntegerArray(messageCount);
+            String consumerTag = channel.basicConsume(queue, true, new DefaultConsumer(channel) {
+                @Override
+                public void handleDelivery(String tag, Envelope envelope, AMQP.BasicProperties properties,
+                                           byte[] body) {
+                    deliveries.incrementAndGet(body[0]);
+                    received.countDown();
+                }
+            });
+
+            AtomicReference<AmqpConsumer> consumerRef = new AtomicReference<>();
+            await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+                for (var pulsar : getPulsarServiceList()) {
+                    var topic = pulsar.getBrokerService().getTopicReference(
+                            "persistent://public/vhost1/__amqp_queue__" + queue);
+                    if (topic.isEmpty()) {
+                        continue;
+                    }
+                    for (var subscription : topic.get().getSubscriptions().values()) {
+                        for (var consumer : subscription.getConsumers()) {
+                            if (consumer instanceof AmqpConsumer
+                                    && consumerTag.equals(((AmqpConsumer) consumer).getConsumerTag())) {
+                                consumerRef.set((AmqpConsumer) consumer);
+                            }
+                        }
+                    }
+                }
+                Assert.assertNotNull(consumerRef.get(), "AMQP consumer must be registered");
+            });
+            AmqpConsumer consumer = consumerRef.get();
+            PersistentSubscription subscription = (PersistentSubscription) consumer.getSubscription();
+            PersistentDispatcherMultipleConsumers dispatcher =
+                    (PersistentDispatcherMultipleConsumers) subscription.getDispatcher();
+            var brokerChannel = ((ServerCnx) consumer.cnx()).ctx().channel();
+            await().atMost(5, TimeUnit.SECONDS).until(dispatcher::isHavePendingRead);
+
+            try {
+                // Hold the connection unwritable independently of socket speed or message size.
+                brokerChannel.eventLoop().submit(() -> brokerChannel.unsafe().outboundBuffer()
+                        .setUserDefinedWritability(1, false)).sync();
+                Assert.assertFalse(consumer.isWritable());
+                for (int i = 0; i < messageCount; i++) {
+                    channel.basicPublish("", queue, null, new byte[] {(byte) i});
+                }
+
+                // Let the pending read finish while no consumer is writable. This leaves
+                // the dispatcher idle with messages still waiting to be delivered.
+                await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+                    var ledger = ((PersistentTopic) subscription.getTopic()).getManagedLedger();
+                    Assert.assertEquals(ledger.getLastConfirmedEntry().getEntryId(), messageCount - 1L);
+                    synchronized (dispatcher) {
+                        Assert.assertFalse(dispatcher.isHavePendingRead());
+                        Assert.assertFalse(dispatcher.isHavePendingReplayRead());
+                    }
+                    Assert.assertEquals(received.getCount(), (long) messageCount);
+                    Assert.assertTrue(consumer.getAvailablePermits() > 0);
+                });
+
+                // Only restore writability; do not publish or grant credit to wake dispatch.
+                brokerChannel.eventLoop().submit(() -> brokerChannel.unsafe().outboundBuffer()
+                        .setUserDefinedWritability(1, true)).sync();
+                assertTrue("Consumption must resume after the connection becomes writable",
+                        received.await(5, TimeUnit.SECONDS));
+                for (int i = 0; i < messageCount; i++) {
+                    Assert.assertEquals(deliveries.get(i), 1, "Each message must be delivered once");
+                }
+            } finally {
+                if (brokerChannel.isActive()) {
+                    brokerChannel.eventLoop().submit(() -> brokerChannel.unsafe().outboundBuffer()
+                            .setUserDefinedWritability(1, true)).sync();
+                }
+            }
+        }
     }
 
     @Test(timeOut = 15_000)

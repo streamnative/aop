@@ -291,8 +291,7 @@ public abstract class AmqpProtocolTestBase {
 
     /**
      * Before test connection methods and channel methods, client should send protocol header to AMQP server. Otherwise,
-     * the server decoder will skip all other methods. Also can get around by {@code
-     * connection.getBrokerDecoder().setExpectProtocolInitiation(false)}.
+     * the server decoder will skip all other methods.
      */
     protected void initProtocol() {
         ProtocolInitiation initiation = new ProtocolInitiation(ProtocolVersion.v0_91);

@@ -559,6 +559,26 @@ public class AmqpConnection extends AmqpCommandDecoder implements ServerMethodPr
         }
     }
 
+    @Override
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+        super.channelWritabilityChanged(ctx);
+        if (ctx.channel().isWritable()) {
+            // Defer dispatch until the outbound-buffer callback has returned. Recheck the
+            // connection because another write or close may happen before this task runs.
+            ctx.executor().execute(() -> {
+                if (!ctx.channel().isActive() || !ctx.channel().isWritable()) {
+                    return;
+                }
+                for (AmqpChannel channel : channels.values()) {
+                    channel.getTag2ConsumersMap().values().forEach(consumer -> {
+                        // Wake the dispatcher without changing the consumer's message credit.
+                        consumer.getSubscription().consumerFlow(consumer, 0);
+                    });
+                }
+            });
+        }
+    }
+
     public synchronized void writeFrame(AMQDataBlock frame) {
         if (log.isDebugEnabled()) {
             log.debug("send: " + frame);

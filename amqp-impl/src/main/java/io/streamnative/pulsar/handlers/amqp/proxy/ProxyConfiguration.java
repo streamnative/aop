@@ -85,4 +85,10 @@ public class ProxyConfiguration {
     )
     private int amqpExplicitFlushAfterFlushes = 1000;
 
+
+    @FieldContext(
+        category = CATEGORY_AMQP,
+        doc = "Mechanisms supported"
+    )
+    private String amqpAllowedMechanisms = "PLAIN token";
 }
